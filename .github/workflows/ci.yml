@@ -119,14 +119,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run gitleaks
-        env:
-          GITLEAKS_TELEMETRY: '0'
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/zricethezav/gitleaks/master/install.sh | bash
-          # Fail the job on leak for PRs; allow nightly to continue but report
-          gitleaks detect --source . --report-path gitleaks-report.json || (cat gitleaks-report.json && exit 1)
+      - name: Run gitleaks action
+        uses: zricethezav/gitleaks-action@v2
+        with:
+          args: detect --source . --report-path gitleaks-report.json
       - name: Upload gitleaks report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gitleaks-report
