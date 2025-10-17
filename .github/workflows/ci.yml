@@ -41,7 +41,7 @@ jobs:
     name: Lint & Format (fast)
     needs: filter
     runs-on: ubuntu-latest
-    if: needs.filter.outputs.contracts == 'true' || needs.filter.outputs.sdk == 'true' || needs.filter.outputs.clis == 'true' || needs.filter.outputs.frontends == 'true'
+    if: "needs.filter.outputs.contracts == 'true' || needs.filter.outputs.sdk == 'true' || needs.filter.outputs.clis == 'true' || needs.filter.outputs.frontends == 'true'"
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
@@ -61,7 +61,7 @@ jobs:
     name: Contracts: build
     needs: filter
     runs-on: ubuntu-latest
-    if: needs.filter.outputs.contracts == 'true'
+    if: "needs.filter.outputs.contracts == 'true'"
     steps:
       - uses: actions/checkout@v4
       - name: Install Foundry
@@ -85,7 +85,7 @@ jobs:
     name: Contracts: test (PR quick)
     needs: contracts-build
     runs-on: ubuntu-latest
-    if: needs.filter.outputs.contracts == 'true'
+    if: "needs.filter.outputs.contracts == 'true'"
     steps:
       - uses: actions/checkout@v4
       - name: Setup Foundry
@@ -101,7 +101,7 @@ jobs:
     name: JS/TS tests
     needs: lint
     runs-on: ubuntu-latest
-    if: needs.filter.outputs.sdk == 'true' || needs.filter.outputs.clis == 'true' || needs.filter.outputs.frontends == 'true'
+    if: "needs.filter.outputs.sdk == 'true' || needs.filter.outputs.clis == 'true' || needs.filter.outputs.frontends == 'true'"
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
@@ -134,7 +134,7 @@ jobs:
     name: Slither (Solidity static analysis)
     needs: contracts-build
     runs-on: ubuntu-latest
-    if: needs.filter.outputs.contracts == 'true'
+    if: "needs.filter.outputs.contracts == 'true'"
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python & Foundry
@@ -157,7 +157,7 @@ jobs:
   security-full:
     name: Nightly / full security (CodeQL + full scanners)
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
+    if: "github.event_name == 'schedule' || github.ref == 'refs/heads/main'"
     steps:
       - uses: actions/checkout@v4
       - name: Run CodeQL (quick)
