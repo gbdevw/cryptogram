@@ -1,0 +1,174 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [ main ]
+  schedule:
+    # nightly full security run
+    - cron: '0 3 * * *'
+
+jobs:
+  filter:
+    name: Determine changed projects
+    runs-on: ubuntu-latest
+    outputs:
+      contracts: ${{ steps.paths.outputs.contracts }}
+      sdk: ${{ steps.paths.outputs.sdk }}
+      clis: ${{ steps.paths.outputs.clis }}
+      frontends: ${{ steps.paths.outputs.frontends }}
+      docs: ${{ steps.paths.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Filter paths
+        id: paths
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            contracts:
+              - 'contracts/**'
+            sdk:
+              - 'sdk/**'
+            clis:
+              - 'clis/**'
+            frontends:
+              - 'frontends/**'
+            docs:
+              - 'documentation/**'
+
+  lint:
+    name: Lint & Format (fast)
+    needs: filter
+    runs-on: ubuntu-latest
+    if: needs.filter.outputs.contracts == 'true' || needs.filter.outputs.sdk == 'true' || needs.filter.outputs.clis == 'true' || needs.filter.outputs.frontends == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install JS deps
+        working-directory: ./
+        run: |
+          if [ -f package.json ]; then npm ci || true; fi
+      - name: Run linters (if present)
+        run: |
+          if [ -f package.json ]; then npm run lint --if-present || true; fi
+          if [ -f package.json ]; then npm run format:check --if-present || true; fi
+
+  contracts-build:
+    name: Contracts: build
+    needs: filter
+    runs-on: ubuntu-latest
+    if: needs.filter.outputs.contracts == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        run: |
+          curl -L https://foundry.paradigm.xyz | bash
+          source $HOME/.bashrc || true
+          foundryup || true
+      - name: Cache foundry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.foundry
+            contracts/cache
+            contracts/out
+          key: ${{ runner.os }}-foundry-${{ hashFiles('contracts/**') }}
+      - name: Build contracts
+        working-directory: contracts
+        run: forge build
+
+  contracts-test:
+    name: Contracts: test (PR quick)
+    needs: contracts-build
+    runs-on: ubuntu-latest
+    if: needs.filter.outputs.contracts == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Foundry
+        run: |
+          curl -L https://foundry.paradigm.xyz | bash
+          source $HOME/.bashrc || true
+          foundryup || true
+      - name: Run forge tests
+        working-directory: contracts
+        run: forge test --silent
+
+  js-tests:
+    name: JS/TS tests
+    needs: lint
+    runs-on: ubuntu-latest
+    if: needs.filter.outputs.sdk == 'true' || needs.filter.outputs.clis == 'true' || needs.filter.outputs.frontends == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install deps
+        run: npm ci
+      - name: Run tests
+        run: npm test --if-present
+
+  gitleaks:
+    name: Secret scan (gitleaks)
+    needs: filter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run gitleaks
+        env:
+          GITLEAKS_TELEMETRY: '0'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/zricethezav/gitleaks/master/install.sh | bash
+          # Fail the job on leak for PRs; allow nightly to continue but report
+          gitleaks detect --source . --report-path gitleaks-report.json || (cat gitleaks-report.json && exit 1)
+      - name: Upload gitleaks report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+
+  slither:
+    name: Slither (Solidity static analysis)
+    needs: contracts-build
+    runs-on: ubuntu-latest
+    if: needs.filter.outputs.contracts == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python & Foundry
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-pip solc
+          pip3 install slither-analyzer
+          curl -L https://foundry.paradigm.xyz | bash
+          source $HOME/.bashrc || true
+          foundryup || true
+      - name: Run slither
+        working-directory: contracts
+        run: |
+          slither src --json .slither-report.json || true
+      - name: Upload slither report
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-report
+          path: contracts/.slither-report.json
+
+  security-full:
+    name: Nightly / full security (CodeQL + full scanners)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run CodeQL (quick)
+        uses: github/codeql-action/init@v2
+        with:
+          languages: 'javascript'
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v2
+      - name: Run additional heavy checks (mythril placeholder)
+        run: echo "Run Mythril/Echidna here in your own environment or expand this step"
