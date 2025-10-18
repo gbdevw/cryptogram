@@ -1,5 +1,6 @@
 import * as openpgp from 'openpgp';
 import * as pLimit from 'p-limit';
+import { to0x, toBytes32, InvalidHexError, HexTooLongError } from './0xstr';
 
 /**
  * Result of verifying a revocation certificate.
@@ -13,23 +14,84 @@ export interface RevocationVerificationResult {
     invalidReason: string;
 }
 
+
+export class SubkeyNotFoundError extends Error {
+    constructor(fingerprint: string) {
+        super(`Subkey with fingerprint ${fingerprint} not found in the provided key`);
+    }
+}
+
+export class KeySanitizationError extends Error {
+    constructor(message: string, input?: string) {
+        super(message);
+    }
+}
+
 /**
  * Utility functions for OpenPGP operations
  */
 export class OpenPGPUtils {
 
     /**
-     * Sanitize a primary key and prepare it for publication by removing any private key material
-     * and removing all subkeys.
-     * 
-     * @param key The public key to sanitize
-     * @returns The sanitized public key ready for publication
+     * Prepare a primary key for blockchain publication by creating a copy of its without
+     * private key material and subkeys. The resulting certificate contains only the primary
+     * key with its user IDs for identity verification.
+     *
+     * Can also be used to sanitize certificates retrieved from blockchain: The smart contract
+     * only validates fingerprint uniqueness but not OpenPGP certificate validity and content. 
+     *
+     * @param key The key to prepare (can be private or public)
+     * @returns A sanitized primary key certificate ready for blockchain storage
      */
     static sanitizePrimaryKey(key: openpgp.Key): openpgp.Key {
-        // Create a copy of the public key material and remove subkeys
-        const copy = key.toPublic();
-        copy.subkeys = [];
-        return copy;
+        // Create a copy of the public key and remove subkeys
+        const publicKey = key.toPublic();
+        publicKey.subkeys = [];
+        return publicKey;
+    }
+
+    /**
+     * Prepare a specific subkey for blockchain publication by isolating it and removing
+     * user IDs to prevent identity collisions.
+     *
+     * The resulting certificate contains the primary key (for signature verification
+     * interoperability) plus exactly one subkey. User IDs are removed to avoid
+     * conflicts with the primary key certificate stored separately.
+     *
+     * This creates a "subkey certificate" that can be combined with the primary
+     * key certificate using key.update() for full key reconstruction.
+     *
+     * Can also be used to sanitize certificates retrieved from blockchain for security,
+     * as the smart contract only validates fingerprint uniqueness but not OpenPGP
+     * certificate validity. While cryptographic verification of subkeys provides
+     * inherent security, this sanitization ensures clean certificate reconstruction.
+     *
+     * @param key The key containing the target subkey
+     * @param fingerprint The subkey fingerprint that will be padded (bytes32 format, with or without 0x prefix)
+     * @returns A sanitized subkey certificate ready for blockchain storage
+     * @throws Error if the specified subkey fingerprint is not found
+     */
+    static sanitizeSubkey(key: openpgp.Key, fingerprint: `0x${string}`): openpgp.Key;
+    static sanitizeSubkey(key: openpgp.Key, fingerprint: string): openpgp.Key {
+        // Convert and validate fingerprint format
+        const targetFingerprint = toBytes32(to0x(fingerprint));
+
+        // Create a copy of the public key
+        const publicKey = key.toPublic();
+
+        // Find target subkey
+        const targetSubkey = publicKey.subkeys.find(
+            sub => toBytes32(to0x(sub.getFingerprint())) === targetFingerprint
+        );
+
+        if (!targetSubkey) {
+            throw new SubkeyNotFoundError(targetFingerprint);
+        }
+
+        // Keep only the target subkey and remove user IDs to prevent identity collision
+        publicKey.subkeys = [targetSubkey];
+        publicKey.users = [];
+        return publicKey;
     }
 
     /**
