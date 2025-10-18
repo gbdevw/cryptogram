@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       contracts_changed: ${{ steps.filter.outputs.contracts }}
-      sdk_changed: ${{ steps.filter.outputs.sdk }}
+      sdks_changed: ${{ steps.filter.outputs.sdks }}
       clis_changed: ${{ steps.filter.outputs.clis }}
       frontends_changed: ${{ steps.filter.outputs.frontends }}
       docs_only: ${{ steps.filter.outputs.docs_only }}
@@ -28,8 +28,8 @@ jobs:
           filters: |
             contracts:
               - 'contracts/**'
-            sdk:
-              - 'sdk/**'
+            sdks:
+              - 'sdks/**'
             clis:
               - 'clis/**'
             frontends:
@@ -55,10 +55,10 @@ jobs:
           detect-secrets scan > .secrets.baseline
           detect-secrets audit .secrets.baseline || true
 
-      - name: Run npm audit for sdk
+      - name: Run npm audit for sdks
         run: |
-          if [ -f sdk/package.json ]; then
-            cd sdk
+          if [ -f sdks/typescript/package.json ]; then
+            cd sdks/typescript
             npm ci
             npm audit --audit-level=moderate || true
             cd -
@@ -96,12 +96,12 @@ jobs:
           cd contracts
           forge test -v
 
-  sdk:
-    name: SDK - build & tests
+  sdks:
+    name: SDKs - build & tests
     runs-on: ubuntu-latest
     needs: [filter, contracts, devsecops]
     if: |
-      needs.filter.outputs.sdk_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
+      needs.filter.outputs.sdks_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -114,16 +114,16 @@ jobs:
 
       - name: Install and test
         run: |
-          cd sdk
+          cd sdks/typescript
           npm ci
           npm test
 
   clis:
     name: CLIs - build & tests
     runs-on: ubuntu-latest
-    needs: [filter, sdk, contracts, devsecops]
+    needs: [filter, sdks, contracts, devsecops]
     if: |
-      needs.filter.outputs.clis_changed == 'true' || needs.filter.outputs.sdk_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
+      needs.filter.outputs.clis_changed == 'true' || needs.filter.outputs.sdks_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -143,9 +143,9 @@ jobs:
   frontends:
     name: Frontends - build & tests
     runs-on: ubuntu-latest
-    needs: [filter, sdk, contracts, devsecops]
+    needs: [filter, sdks, contracts, devsecops]
     if: |
-      needs.filter.outputs.frontends_changed == 'true' || needs.filter.outputs.sdk_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
+      needs.filter.outputs.frontends_changed == 'true' || needs.filter.outputs.sdks_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
     steps:
       - uses: actions/checkout@v4
         with:

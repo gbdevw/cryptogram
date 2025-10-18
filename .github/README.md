@@ -94,7 +94,7 @@ Notes:
 
 3) Test on a branch/PR (recommended)
 
-- Create a feature branch and make a small change that should only trigger some jobs (for example, update a file in `sdk/` to trigger only JS jobs).
+- Create a feature branch and make a small change that should only trigger some jobs (for example, update a file in `sdks/` to trigger only JS jobs).
 - Push the branch and open a Pull Request. Inspect the `Actions` tab and confirm only the relevant jobs ran (the `filter` job in CI sets conditional outputs).
 
 4) Force-run jobs on GitHub

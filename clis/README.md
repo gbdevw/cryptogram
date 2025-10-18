@@ -1,3 +1,3 @@
 # CLIs
 
-This directory contains TypeScript CLIs that use the `sdk` library. Each CLI is in its own subfolder.
+This directory contains TypeScript CLIs that use the `sdks/typescript` library. Each CLI is in its own subfolder.

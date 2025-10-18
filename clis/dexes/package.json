@@ -1,5 +1,5 @@
 {
-  "name": "clis-dexes",
+  "name": "dexes",
   "version": "0.1.0",
   "description": "CLI tools for interacting with DEX metadata (cryptogram project)",
   "main": "dist/index.js",
@@ -16,6 +16,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "sdk": "file:../../sdk"
+    "dexes": "file:../../sdks/typescript"
   }
 }

@@ -23,7 +23,8 @@ We are creating a PKI (Public Key Infrastructure) and EDI (Electronic Data Inter
 - `specifications/`: Markdown files with requirements, specifications, and coding plans
 - `documentation/`: Project documentation in Markdown format
 - `contracts/`: Foundry project containing Solidity smart contracts
-- `sdk/`: TypeScript library used by frontends and CLIs
+- `sdks/`: Directory for SDKs in multiple languages
+  - `sdks/typescript/`: TypeScript library used by frontends and CLIs
 - `clis/`: Directory containing one or more TypeScript CLIs that utilize the SDK
 - `frontends/`: Multiple frontend applications
 - `tmp/`: Local temporary folder containing temporary files like summaries, decision logs, reports, etc. (ignored by git)
