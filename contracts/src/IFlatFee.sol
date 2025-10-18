@@ -4,11 +4,10 @@ pragma solidity ^0.8.24;
 /**
  * @title IFlatFee
  * @author degengineering.eth
- * @notice Interface for contract which is meant to collect a flat fee for payable operations. The interface provides 
+ * @notice Interface for contract which is meant to collect a flat fee for payable operations. The interface provides
  * methods for fee management and withdrawal. The same fee is applied to all operations (no tiering).
  */
 interface IFlatFee {
-
     /*****************************************************************************************************************/
     /* CUSTOM ERRORS                                                                                                 */
     /*****************************************************************************************************************/

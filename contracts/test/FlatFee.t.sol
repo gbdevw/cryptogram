@@ -26,12 +26,15 @@ contract FailReceiver {
 // Helper contract that forwards payment to impl and reverts on refund
 contract RefundFailer {
     FlatFeeImpl impl;
+
     constructor(address _impl) payable {
         impl = FlatFeeImpl(payable(_impl));
     }
+
     function doPay() external payable {
         impl.pay{value: msg.value}();
     }
+
     receive() external payable {
         revert();
     }
@@ -89,9 +92,9 @@ contract FlatFeeTest is Test {
         vm.prank(alice);
         impl.pay{value: 1 ether}();
 
-    // expect FeesWithdrawn event emitted by the impl contract: check only indexed recipient topic
-    vm.expectEmit(true, false, false, false, address(impl));
-    emit FeesWithdrawn(address(this), 0);
+        // expect FeesWithdrawn event emitted by the impl contract: check only indexed recipient topic
+        vm.expectEmit(true, false, false, false, address(impl));
+        emit FeesWithdrawn(address(this), 0);
 
         uint256 balBefore = address(this).balance;
         // owner (test contract) withdraws
@@ -100,11 +103,9 @@ contract FlatFeeTest is Test {
         assertEq(address(this).balance, balBefore + 1 ether);
     }
 
-    
-
     function testNoDirectPaymentsAllowed() public {
         // Attempt to send ETH directly should fail because receive() reverts
-        (bool ok, ) = address(impl).call{value: 1 ether}("");
+        (bool ok,) = address(impl).call{value: 1 ether}("");
         assertFalse(ok);
     }
 

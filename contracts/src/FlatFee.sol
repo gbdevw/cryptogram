@@ -9,18 +9,18 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 /**
  * @title FlatFee
  * @author degengineering.eth
- * @notice This contract provides basic fee management functionalities restricted to the owner of the contract (see 
+ * @notice This contract provides basic fee management functionalities restricted to the owner of the contract (see
  * OpenZeppelin's OwnableUpgradeable) and a collectFee modifier which can be used by payable functions to require and
  * collect a flat service fee.
  */
 abstract contract FlatFee is IFlatFee, Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
-
     /*****************************************************************************************************************/
     /* CONTRACT STORAGE                                                                                              */
     /*****************************************************************************************************************/
 
     /// @custom:storage-location erc7201:openzeppelin.storage.FlatFee
     struct FlatFeeStorage {
+
 
         /**
          * @notice The requested fee in wei.
@@ -29,7 +29,8 @@ abstract contract FlatFee is IFlatFee, Initializable, OwnableUpgradeable, Reentr
     }
 
     /// @dev keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.FlatFee")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant FLATFEE_STORAGE_LOCATION = 0x060494ace66486b9030a50a0eec9dbc9490088260059ffa4002babe907b7a400;
+    bytes32 private constant FLATFEE_STORAGE_LOCATION =
+        0x060494ace66486b9030a50a0eec9dbc9490088260059ffa4002babe907b7a400;
 
     /**
      * @notice Returns the storage slot for the FlatFeeStorage.
@@ -71,7 +72,7 @@ abstract contract FlatFee is IFlatFee, Initializable, OwnableUpgradeable, Reentr
      * @notice Modifier to collect a service fee for contract execution and return excess of funds. The fee remains in
      * the contract and is not transferred to the owner until withdrawn.
      *
-     * @dev This modifier ensures a sufficient service fee is provided by the sender before executing the contract 
+     * @dev This modifier ensures a sufficient service fee is provided by the sender before executing the contract
      * logic. The excess amount is refunded to the sender after the execution of the contract logic.
      */
     modifier collectFee() {
@@ -86,7 +87,7 @@ abstract contract FlatFee is IFlatFee, Initializable, OwnableUpgradeable, Reentr
         _;
         // Refund any excess directly to the sender
         if (msg.value > $._requestedFee) {
-            (bool success, ) = payable(msg.sender).call{value: msg.value - $._requestedFee}("");
+            (bool success,) = payable(msg.sender).call{value: msg.value - $._requestedFee}("");
             require(success, "Refund failed");
         }
     }

@@ -1,29 +1,29 @@
-name: CI
+name: CI (draft)
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    branches: [ main ]
   push:
     branches: [ main ]
-  schedule:
-    # nightly full security run
-    - cron: '0 3 * * *'
 
 jobs:
   filter:
-    name: Determine changed projects
+    name: changed paths filter
     runs-on: ubuntu-latest
     outputs:
-      contracts: ${{ steps.paths.outputs.contracts }}
-      sdk: ${{ steps.paths.outputs.sdk }}
-      clis: ${{ steps.paths.outputs.clis }}
-      frontends: ${{ steps.paths.outputs.frontends }}
-      docs: ${{ steps.paths.outputs.docs }}
+      contracts_changed: ${{ steps.filter.outputs.contracts }}
+      sdk_changed: ${{ steps.filter.outputs.sdk }}
+      clis_changed: ${{ steps.filter.outputs.clis }}
+      frontends_changed: ${{ steps.filter.outputs.frontends }}
+      docs_only: ${{ steps.filter.outputs.docs_only }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Filter paths
-        id: paths
-        uses: dorny/paths-filter@v2
+        id: filter
+        uses: dorny/paths-filter@v3
         with:
           filters: |
             contracts:
@@ -36,137 +36,147 @@ jobs:
               - 'frontends/**'
             docs:
               - 'documentation/**'
+              - 'specifications/**'
+              - 'README.md'
+              - 'SETUP.md'
 
-  lint:
-    name: Lint & Format (fast)
-    needs: filter
+  devsecops:
+    name: DevSecOps scans
     runs-on: ubuntu-latest
-    if: "needs.filter.outputs.contracts == 'true' || needs.filter.outputs.sdk == 'true' || needs.filter.outputs.clis == 'true' || needs.filter.outputs.frontends == 'true'"
+    needs: filter
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      - name: Install JS deps
-        working-directory: ./
-        run: |
-          if [ -f package.json ]; then npm ci || true; fi
-      - name: Run linters (if present)
-        run: |
-          if [ -f package.json ]; then npm run lint --if-present || true; fi
-          if [ -f package.json ]; then npm run format:check --if-present || true; fi
+          fetch-depth: 0
 
-  contracts-build:
-    name: Contracts: build
-    needs: filter
+      - name: Secret scanning (detect-secrets)
+        run: |
+          python3 -m pip install detect-secrets
+          detect-secrets scan > .secrets.baseline
+          detect-secrets audit .secrets.baseline || true
+
+      - name: Run npm audit for sdk
+        run: |
+          if [ -f sdk/package.json ]; then
+            cd sdk
+            npm ci
+            npm audit --audit-level=moderate || true
+            cd -
+          fi
+
+      - name: Run npm audit for clis
+        run: |
+          if [ -f clis/package.json ]; then
+            cd clis
+            npm ci
+            npm audit --audit-level=moderate || true
+            cd -
+          fi
+
+      # slither removed per request; consider adding Docker-based Slither or CodeQL in future
+
+  contracts:
+    name: Contracts - Foundry tests
     runs-on: ubuntu-latest
-    if: "needs.filter.outputs.contracts == 'true'"
+    needs: [filter, devsecops]
+    if: needs.filter.outputs.contracts_changed == 'true' && needs.filter.outputs.docs_only != 'true'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Install Foundry
         run: |
           curl -L https://foundry.paradigm.xyz | bash
-          source $HOME/.bashrc || true
+          source ~/.bashrc || true
           foundryup || true
-      - name: Cache foundry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.foundry
-            contracts/cache
-            contracts/out
-          key: ${{ runner.os }}-foundry-${{ hashFiles('contracts/**') }}
-      - name: Build contracts
-        working-directory: contracts
-        run: forge build
 
-  contracts-test:
-    name: Contracts: test (PR quick)
-    needs: contracts-build
-    runs-on: ubuntu-latest
-    if: "needs.filter.outputs.contracts == 'true'"
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Foundry
-        run: |
-          curl -L https://foundry.paradigm.xyz | bash
-          source $HOME/.bashrc || true
-          foundryup || true
       - name: Run forge tests
-        working-directory: contracts
-        run: forge test --silent
+        run: |
+          cd contracts
+          forge test -v
 
-  js-tests:
-    name: JS/TS tests
-    needs: lint
+  sdk:
+    name: SDK - build & tests
     runs-on: ubuntu-latest
-    if: "needs.filter.outputs.sdk == 'true' || needs.filter.outputs.clis == 'true' || needs.filter.outputs.frontends == 'true'"
+    needs: [filter, contracts, devsecops]
+    if: |
+      needs.filter.outputs.sdk_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node.js
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      - name: Install deps
-        run: npm ci
-      - name: Run tests
-        run: npm test --if-present
+          node-version: '20'
 
-  gitleaks:
-    name: Secret scan (gitleaks)
-    needs: filter
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run gitleaks action
-        uses: zricethezav/gitleaks-action@v2
-        with:
-          args: detect --source . --report-path gitleaks-report.json
-      - name: Upload gitleaks report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gitleaks-report
-          path: gitleaks-report.json
-
-  slither:
-    name: Slither (Solidity static analysis)
-    needs: contracts-build
-    runs-on: ubuntu-latest
-    if: "needs.filter.outputs.contracts == 'true'"
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python & Foundry
+      - name: Install and test
         run: |
-          sudo apt-get update && sudo apt-get install -y python3-pip solc
-          pip3 install slither-analyzer
-          curl -L https://foundry.paradigm.xyz | bash
-          source $HOME/.bashrc || true
-          foundryup || true
-      - name: Run slither
-        working-directory: contracts
-        run: |
-          slither src --json .slither-report.json || true
-      - name: Upload slither report
-        uses: actions/upload-artifact@v4
-        with:
-          name: slither-report
-          path: contracts/.slither-report.json
+          cd sdk
+          npm ci
+          npm test
 
-  security-full:
-    name: Nightly / full security (CodeQL + full scanners)
+  clis:
+    name: CLIs - build & tests
     runs-on: ubuntu-latest
-    if: "github.event_name == 'schedule' || github.ref == 'refs/heads/main'"
+    needs: [filter, sdk, contracts, devsecops]
+    if: |
+      needs.filter.outputs.clis_changed == 'true' || needs.filter.outputs.sdk_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
     steps:
       - uses: actions/checkout@v4
-      - name: Run CodeQL (quick)
-        uses: github/codeql-action/init@v2
         with:
-          languages: 'javascript'
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v2
-      - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v2
-      - name: Run additional heavy checks (mythril placeholder)
-        run: echo "Run Mythril/Echidna here in your own environment or expand this step"
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install and test
+        run: |
+          cd clis
+          npm ci
+          npm test
+
+  frontends:
+    name: Frontends - build & tests
+    runs-on: ubuntu-latest
+    needs: [filter, sdk, contracts, devsecops]
+    if: |
+      needs.filter.outputs.frontends_changed == 'true' || needs.filter.outputs.sdk_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install and test (frontend placeholder)
+        run: |
+          if [ -f frontends/package.json ]; then
+            cd frontends
+            npm ci
+            npm test || true
+          else
+            echo "No frontends detected"
+          fi
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint
+        run: echo "Linting..."

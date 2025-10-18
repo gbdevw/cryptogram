@@ -12,12 +12,26 @@ contract Web3DocTest is Test {
     Web3PGP pgp;
 
     // declare events to allow vm.expectEmit + emit(...) pattern
-    event Publication(uint256 indexed id, bytes32 indexed emitter, bytes32 indexed dochash, bytes signature, bytes document, string uri, string mimeType);
+    event Publication(
+        uint256 indexed id,
+        bytes32 indexed emitter,
+        bytes32 indexed dochash,
+        bytes signature,
+        bytes document,
+        string uri,
+        string mimeType
+    );
     event Copy(uint256 indexed docId, uint256 original, bytes32 indexed emitter, bytes document, string uri);
     event Signature(uint256 indexed id, bytes32 indexed emitter, bytes signature);
     event Timestamp(uint256 indexed id, bytes32 indexed emitter, bytes32 indexed dochash, bytes signature);
     event Response(uint256 indexed response, uint256 indexed original, bytes32 indexed emitter);
-    event Notification(uint256 indexed id, bytes32 emitter, bytes32 indexed recipient, IWeb3Doc.EventType source, bool indexed signatureRequested);
+    event Notification(
+        uint256 indexed id,
+        bytes32 emitter,
+        bytes32 indexed recipient,
+        IWeb3Doc.EventType source,
+        bool indexed signatureRequested
+    );
 
     function _deployPGP() internal returns (Web3PGP) {
         Web3PGP impl = new Web3PGP();
@@ -175,16 +189,16 @@ contract Web3DocTest is Test {
         IWeb3Doc.Recipient[] memory recs = new IWeb3Doc.Recipient[](1);
         recs[0] = IWeb3Doc.Recipient({fingerprint: recipientFp, signatureRequested: false});
 
-    vm.expectEmit(true, true, true, false, address(doc));
-    emit Publication(2, emitter, keccak256("dr2"), "sig2", new bytes(0), "uri", "text/plain");
+        vm.expectEmit(true, true, true, false, address(doc));
+        emit Publication(2, emitter, keccak256("dr2"), "sig2", new bytes(0), "uri", "text/plain");
 
-    vm.expectEmit(true, true, false, false, address(doc));
-    emit Response(2, 1, emitter);
+        vm.expectEmit(true, true, false, false, address(doc));
+        emit Response(2, 1, emitter);
 
-    vm.expectEmit(true, false, true, false, address(doc));
-    emit Notification(2, emitter, recipientFp, IWeb3Doc.EventType.RESPONSE, false);
+        vm.expectEmit(true, false, true, false, address(doc));
+        emit Notification(2, emitter, recipientFp, IWeb3Doc.EventType.RESPONSE, false);
 
-    doc.respondOffChain(1, emitter, recs, keccak256("dr2"), "sig2", "uri", "text/plain");
+        doc.respondOffChain(1, emitter, recs, keccak256("dr2"), "sig2", "uri", "text/plain");
     }
 
     function testCopyOnChainRevertsWhenOriginalNotFound() public {
@@ -338,6 +352,4 @@ contract Web3DocTest is Test {
         vm.expectRevert();
         doc.sendOnChain(emitter, recs, keccak256("d-rec"), "s", "doc-rec", "text/plain");
     }
-
 }
-

@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 // Uncomment this line to use console.log
-import './FlatFee.sol';
-import './IWeb3Doc.sol';
-import './IWeb3PGP.sol';
+import "./FlatFee.sol";
+import "./IWeb3Doc.sol";
+import "./IWeb3PGP.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 // RESUME HERE - Impl. the interface
@@ -52,11 +52,7 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     bytes32 private constant WEB3DOC_STORAGE_LOCATION =
         0x126b4ad6791ca5ab4e9a2b6bda753a1b72d59cc8959232491e0a27e873933a00;
 
-    function _getWeb3DocStorage()
-        private
-        pure
-        returns (Web3DocStorage storage $)
-    {
+    function _getWeb3DocStorage() private pure returns (Web3DocStorage storage $) {
         assembly {
             $.slot := WEB3DOC_STORAGE_LOCATION
         }
@@ -131,12 +127,7 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
             mimeType
         );
         // Emit a Notification event for each recipient
-        _notifyRecipients(
-            nextDocId,
-            emitter,
-            recipients,
-            EventType.PUBLICATION
-        );
+        _notifyRecipients(nextDocId, emitter, recipients, EventType.PUBLICATION);
         // Increase the document ID counter
         _increaseDocId();
     }
@@ -171,12 +162,7 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
             mimeType
         );
         // Emit a Notification event for each recipient
-        _notifyRecipients(
-            nextDocId,
-            emitter,
-            recipients,
-            EventType.PUBLICATION
-        );
+        _notifyRecipients(nextDocId, emitter, recipients, EventType.PUBLICATION);
         // Increase the document ID counter
         _increaseDocId();
     }
@@ -184,12 +170,13 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function copyOnChain(
-        uint256 original,
-        bytes32 emitter,
-        Recipient[] calldata recipients,
-        bytes calldata document
-    ) external payable override nonReentrant collectFee {
+    function copyOnChain(uint256 original, bytes32 emitter, Recipient[] calldata recipients, bytes calldata document)
+        external
+        payable
+        override
+        nonReentrant
+        collectFee
+    {
         // Check if the emitter exists in W3PGP contract
         _checkEmitter(emitter);
         // Check if all recipients exist in W3PGP contract
@@ -215,12 +202,13 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function copyOffChain(
-        uint256 original,
-        bytes32 emitter,
-        Recipient[] calldata recipients,
-        string calldata uri
-    ) external payable override nonReentrant collectFee {
+    function copyOffChain(uint256 original, bytes32 emitter, Recipient[] calldata recipients, string calldata uri)
+        external
+        payable
+        override
+        nonReentrant
+        collectFee
+    {
         // Check if the emitter exists in W3PGP contract
         _checkEmitter(emitter);
         // Check if all recipients exist in W3PGP contract
@@ -336,11 +324,13 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function sign(
-        uint256 id,
-        bytes32 emitter,
-        bytes calldata signature
-    ) external payable override nonReentrant collectFee {
+    function sign(uint256 id, bytes32 emitter, bytes calldata signature)
+        external
+        payable
+        override
+        nonReentrant
+        collectFee
+    {
         // Check if the ID of the document exists
         _checkDocumentExists(id);
         // Check if the emitter exists in W3PGP contract
@@ -354,11 +344,13 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function timestamp(
-        bytes32 emitter,
-        bytes32 dochash,
-        bytes calldata signature
-    ) external payable override nonReentrant collectFee {
+    function timestamp(bytes32 emitter, bytes32 dochash, bytes calldata signature)
+        external
+        payable
+        override
+        nonReentrant
+        collectFee
+    {
         // Check if the emitter exists in W3PGP contract
         _checkEmitter(emitter);
         // Get the next document ID to assign to the timestamp
@@ -398,9 +390,7 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function isResponseTo(
-        uint256 response
-    ) external view override returns (uint256) {
+    function isResponseTo(uint256 response) external view override returns (uint256) {
         // Check if the response exists
         Web3DocStorage storage $ = _getWeb3DocStorage();
         _checkDocumentExists(response);
@@ -411,10 +401,7 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function rewindResponseThread(
-        uint256 response,
-        uint256 limit
-    ) external view override returns (uint256[] memory) {
+    function rewindResponseThread(uint256 response, uint256 limit) external view override returns (uint256[] memory) {
         // Check if the response exists
         Web3DocStorage storage $ = _getWeb3DocStorage();
         _checkDocumentExists(response);
@@ -438,7 +425,7 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
         // Traverse the response thread up to the original document that is the start of the thread
         uint256[] memory thread = new uint256[](depth);
         cur = response;
-        for (uint256 i; i < depth; ) {
+        for (uint256 i; i < depth;) {
             cur = $.responseToSubject[cur];
             thread[i] = cur;
             unchecked {
@@ -452,9 +439,7 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function getDocumentBlockNumberByID(
-        uint256 id
-    ) external view override returns (uint256) {
+    function getDocumentBlockNumberByID(uint256 id) external view override returns (uint256) {
         Web3DocStorage storage $ = _getWeb3DocStorage();
         return $.docIdToBlockNumber[id];
     }
@@ -462,9 +447,7 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function getDocumentBlockNumberByIDBatch(
-        uint256[] calldata id
-    ) external view override returns (uint256[] memory) {
+    function getDocumentBlockNumberByIDBatch(uint256[] calldata id) external view override returns (uint256[] memory) {
         Web3DocStorage storage $ = _getWeb3DocStorage();
         uint256[] memory blockNumbers = new uint256[](id.length);
         for (uint256 i = 0; i < id.length; i++) {
@@ -476,11 +459,12 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function listSignatures(
-        uint256 id,
-        uint256 start,
-        uint256 limit
-    ) external view override returns (uint256[] memory) {
+    function listSignatures(uint256 id, uint256 start, uint256 limit)
+        external
+        view
+        override
+        returns (uint256[] memory)
+    {
         // Get a pointer to the storage of the contract
         Web3DocStorage storage $ = _getWeb3DocStorage();
         // Check the document exists
@@ -505,14 +489,9 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /* UUPS PROXY FUNCTIONS                                                                                          */
     /*****************************************************************************************************************/
 
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal virtual override onlyOwner {
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {
         // Ensure the new implementation is not the zero address
-        require(
-            newImplementation != address(0),
-            "New implementation cannot be the zero address"
-        );
+        require(newImplementation != address(0), "New implementation cannot be the zero address");
     }
 
     /*****************************************************************************************************************/
@@ -635,21 +614,12 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
      * @param recipients The array of recipients to notify.
      * @param eventType The type of the event.
      */
-    function _notifyRecipients(
-        uint256 docId,
-        bytes32 emitter,
-        Recipient[] calldata recipients,
-        EventType eventType
-    ) internal {
+    function _notifyRecipients(uint256 docId, bytes32 emitter, Recipient[] calldata recipients, EventType eventType)
+        internal
+    {
         // Emit a Notification event for each recipient
         for (uint256 i = 0; i < recipients.length; i++) {
-            emit Notification(
-                docId,
-                emitter,
-                recipients[i].fingerprint,
-                eventType,
-                recipients[i].signatureRequested
-            );
+            emit Notification(docId, emitter, recipients[i].fingerprint, eventType, recipients[i].signatureRequested);
         }
     }
 }

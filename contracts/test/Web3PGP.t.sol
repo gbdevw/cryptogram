@@ -178,7 +178,9 @@ contract Web3PGPTest is Test {
         pgp.registerPublicKey(c, "C");
 
         bytes32[] memory ids = new bytes32[](3);
-        ids[0] = a; ids[1] = b; ids[2] = c;
+        ids[0] = a;
+        ids[1] = b;
+        ids[2] = c;
         uint256[] memory pubs = pgp.getKeyPublicationBatch(ids);
         assertEq(pubs.length, 3);
         assertTrue(pubs[0] != 0);
@@ -258,8 +260,8 @@ contract Web3PGPTest is Test {
         // deploy attacker
         ReentrancyAttacker attacker = (new ReentrancyAttacker){value: 0}(address(local), f);
 
-    // call attacker.attack sending 1 wei so collectFee will refund (fee is 0) and trigger fallback
-    attacker.attack{value: 1}();
+        // call attacker.attack sending 1 wei so collectFee will refund (fee is 0) and trigger fallback
+        attacker.attack{value: 1}();
 
         // registration should have succeeded for the outer call
         assertTrue(local.exist(f));

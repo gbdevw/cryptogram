@@ -4,11 +4,10 @@ pragma solidity ^0.8.24;
 /**
  * @title IWeb3PGP
  * @author degengineering.ink
- * @notice This interface defines events and functions used to publish and search OpenPGP public keys, sub-keys 
+ * @notice This interface defines events and functions used to publish and search OpenPGP public keys, sub-keys
  * and revocation certificates. It also provides a RFC compliant enum for hashing algorithms used in OpenPGP.
  */
 interface IWeb3PGP {
-
     /*****************************************************************************************************************/
     /* ERRORS                                                                                                        */
     /*****************************************************************************************************************/
@@ -41,8 +40,8 @@ interface IWeb3PGP {
      * @param fingerprint The declared fingerprint of the public key.
      * @param openPGPMsg A binary OpenPGP message which contains the public key, its binding signature and metadata.
      *
-     * @notice This event is used to publish and persist a public key within the blockchain. 
-     * 
+     * @notice This event is used to publish and persist a public key within the blockchain.
+     *
      * The contract enforces the uniqueness of the fingerprints: Once a fingerprint is registered, it cannot be changed
      * or reused. The smart contract does not verify the validity of the data that are published: Users are expected to
      * validate the OpenPGP message and the public key. Please refer to OpenPGP RFC 9580 for more information about the
@@ -54,24 +53,21 @@ interface IWeb3PGP {
      * public key and a valid signature from the corresponding private key to prove its ownership and allow other users
      * to verify the public key and its metadata. It is up to the users to verify the validity of the public key before
      * using it. Please refer to the OpenPGP RFC 9580 for more information about how to validate and verify these data.
-     * 
+     *
      * bytes32 is the type used for fingerprints as the length of the fingerprints ranges from 20 bytes to 32 bytes
      * dependending on the key version (v4 vs v6). If the fingerprint is less than 32 bytes, it is zero-padded on the
      * left to match the length of 32 bytes.
      *
-     * @custom:implnotes The event logs are used as a cost-effective storage to publish and persist public keys on the 
+     * @custom:implnotes The event logs are used as a cost-effective storage to publish and persist public keys on the
      * blockchain. For feasibility and gas-efficiency reasons, the smart contract itself does not validate the OpenPGP
-     * messages or the declared fingerprint. Future improvements may introduce off-chain validation mechanisms, for 
+     * messages or the declared fingerprint. Future improvements may introduce off-chain validation mechanisms, for
      * example through Chainlink Automation & Function to automatically verify published keys and maintain indexes of
      * valid, revoked or otherwise annotated keys.
-     * 
+     *
      * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
      * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
      */
-    event NewPublicKey(
-        bytes32 indexed fingerprint,
-        bytes openPGPMsg
-    );
+    event NewPublicKey(bytes32 indexed fingerprint, bytes openPGPMsg);
 
     /**
      * Event emitted when a new public subkey has been registered.
@@ -80,8 +76,8 @@ interface IWeb3PGP {
      * @param subkeyFingerprint The fingerprint of the subkey.
      * @param openPGPMsg A binary OpenPGP message which contains the subkey and its key binding signatures.
      *
-     * @notice This event is used to publish a public key as a subkey of a parent key. 
-     * 
+     * @notice This event is used to publish a public key as a subkey of a parent key.
+     *
      * The contract enforces the uniqueness of the fingerprints and verifies the parent key has been registered and is
      * not a subkey itself as multiple levels of subkeys is not explicitly supported by the OpenPGP RFC 9580. The smart
      * contract does not verify the validity of the data that are published: Users are expected to validate the OpenPGP
@@ -91,31 +87,27 @@ interface IWeb3PGP {
      * Only full length fingerprint must be used.
      *
      * @dev The OpenPGP message can be compressed and should not be encrypted. The message must contain at least the
-     * public subkey, a valid key binding signature from the corresponding private key to prove its ownership and the 
+     * public subkey, a valid key binding signature from the corresponding private key to prove its ownership and the
      * key binding signature from the parent key. However, as most OpenPGP implementation do not support publishing
      * subkeys without the parent key, the message can also contain the parent key.
-     * 
+     *
      * bytes32 is the type used for fingerprints as the length of the fingerprints ranges from 20 bytes to 32 bytes
      * dependending on the key version (v4 vs v6). If the fingerprint is less than 32 bytes, it is zero-padded on the
      * left to match the length of 32 bytes.
-     * 
-     * @custom:implnotes The event logs are used as a cost-effective storage to publish and persist public keys on the 
+     *
+     * @custom:implnotes The event logs are used as a cost-effective storage to publish and persist public keys on the
      * blockchain. For feasibility and gas-efficiency reasons, the smart contract itself does not validate the OpenPGP
-     * messages or the declared fingerprint. Future improvements may introduce off-chain validation mechanisms, for 
+     * messages or the declared fingerprint. Future improvements may introduce off-chain validation mechanisms, for
      * example through Chainlink Automation & Function to automatically verify published keys and maintain indexes of
      * valid, revoked or otherwise annotated keys.
-     * 
-     * Put the parent key fingerprint as topic[1] in order to allow to find the publication, subkeys and revocations 
+     *
+     * Put the parent key fingerprint as topic[1] in order to allow to find the publication, subkeys and revocations
      * logs for a given key fingerprint with a single request.
-     * 
+     *
      * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
      * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
      */
-    event NewPublicSubkey(
-        bytes32 indexed parentKeyFingerprint,
-        bytes32 indexed subkeyFingerprint,
-        bytes openPGPMsg
-    );
+    event NewPublicSubkey(bytes32 indexed parentKeyFingerprint, bytes32 indexed subkeyFingerprint, bytes openPGPMsg);
 
     /**
      * Event emitted when a key revocation certificate is published for a target public key.
@@ -123,8 +115,8 @@ interface IWeb3PGP {
      * @param fingerprint The fingerprint of the key to be revoked.
      * @param revocationCertificate The binary OpenPGP message which contains key revocation certificate.
      *
-     * @notice This event is used to publish the revocation certificate for a target public key. 
-     * 
+     * @notice This event is used to publish the revocation certificate for a target public key.
+     *
      * The smart contract verifies the target public key has been registered. It does not verify the OpenPGP message
      * mor the validity of the key revocation certificate. Users are expected to verify the key revocation certificate
      * validity by using the registered public key to verify the revocation signature. Once verified, users must stop
@@ -135,11 +127,11 @@ interface IWeb3PGP {
      * dependending on the key version (v4 vs v6). If the fingerprint is less than 32 bytes, it is zero-padded on the
      * left to match the length of 32 bytes.
      *
-     * @dev The OpenPGP message can be compressed and should not be encrypted. The message should at least contain a 
+     * @dev The OpenPGP message can be compressed and should not be encrypted. The message should at least contain a
      * Key Revocation Signature packet (Type ID 0x20) or a Subkey Revocation Signature packet (Type ID 0x28). However,
      * as most OpenPGP implementations do not support even reading standalone key revocation certificates, the message
      * can also include the public key that is revoked.
-     * 
+     *
      * bytes32 is the type used for fingerprints as the length of the fingerprints ranges from 20 bytes to 32 bytes
      * dependending on the key version (v4 vs v6). If the fingerprint is less than 32 bytes, it is zero-padded on the
      * left to match the length of 32 bytes.
@@ -147,10 +139,7 @@ interface IWeb3PGP {
      * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
      * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
      */
-    event NewRevocationCertificate(
-        bytes32 indexed fingerprint,
-        bytes revocationCertificate
-    );
+    event NewRevocationCertificate(bytes32 indexed fingerprint, bytes revocationCertificate);
 
     /*****************************************************************************************************************/
     /* WRITE FUNCTIONS                                                                                               */
@@ -163,7 +152,7 @@ interface IWeb3PGP {
      * @param openPGPMsg A binary OpenPGP message which contains the public key, its signature and its optional metadata.
      *
      * @notice This function allows users and PGP servers to publish and register a new public key.
-     * 
+     *
      * The contract enforces the uniqueness of the fingerprints: Once a fingerprint is registered, it cannot be changed
      * or reused. The smart contract does not verify the validity of the data that are published: Users are expected to
      * validate the OpenPGP message and the public key. Please refer to OpenPGP RFC 9580 for more information about the
@@ -175,31 +164,28 @@ interface IWeb3PGP {
      * public key and a valid signature from the corresponding private key to prove its ownership and allow other users
      * to verify the public key and its metadata. It is up to the users to verify the validity of the public key before
      * using it. Please refer to the OpenPGP RFC 9580 for more information about how to validate and verify these data.
-     * 
+     *
      * bytes32 is the type used for fingerprints as the length of the fingerprints ranges from 20 bytes to 32 bytes
      * dependending on the key version (v4 vs v6). If the fingerprint is less than 32 bytes, it is zero-padded on the
      * left to match the length of 32 bytes.
      *
-     * @custom:implnotes The event logs are used as a cost-effective storage to publish and persist public keys on the 
+     * @custom:implnotes The event logs are used as a cost-effective storage to publish and persist public keys on the
      * blockchain. For feasibility and gas-efficiency reasons, the smart contract itself does not validate the OpenPGP
-     * messages or the declared fingerprint. Future improvements may introduce off-chain validation mechanisms, for 
+     * messages or the declared fingerprint. Future improvements may introduce off-chain validation mechanisms, for
      * example through Chainlink Automation & Function to automatically verify published keys and maintain indexes of
      * valid, revoked or otherwise annotated keys.
      */
-    function registerPublicKey(
-        bytes32 fingerprint,
-        bytes calldata openPGPMsg
-    ) external payable;
+    function registerPublicKey(bytes32 fingerprint, bytes calldata openPGPMsg) external payable;
 
     /**
      * Publish and register a subkey bound to a parent key.
-     * 
+     *
      * @param parentKeyFingerprint The fingerprint of the parent key.
      * @param subkeyFingerprint The fingerprint of the subkey.
      * @param openPGPMsg A binary OpenPGP message which contains the subkey and its key binding signatures.
      *
-     * @notice This event is used to publish a public key as a subkey of a parent key. 
-     * 
+     * @notice This event is used to publish a public key as a subkey of a parent key.
+     *
      * The contract enforces the uniqueness of the fingerprints and verifies the parent key has been registered and is
      * not a subkey itself as multiple levels of subkeys is not explicitly supported by the OpenPGP RFC 9580. The smart
      * contract does not verify the validity of the data that are published: Users are expected to validate the OpenPGP
@@ -209,31 +195,29 @@ interface IWeb3PGP {
      * Only full length fingerprint must be used.
      *
      * @dev The OpenPGP message can be compressed and should not be encrypted. The message must contain at least the
-     * public subkey, a valid key binding signature from the corresponding private key to prove its ownership and the 
+     * public subkey, a valid key binding signature from the corresponding private key to prove its ownership and the
      * key binding signature from the parent key. However, as most OpenPGP implementation do not support publishing
      * subkeys without the parent key, the message can also contain the parent key.
-     * 
+     *
      * bytes32 is the type used for fingerprints as the length of the fingerprints ranges from 20 bytes to 32 bytes
      * dependending on the key version (v4 vs v6). If the fingerprint is less than 32 bytes, it is zero-padded on the
      * left to match the length of 32 bytes.
-     * 
-     * @custom:implnotes The event logs are used as a cost-effective storage to publish and persist public keys on the 
+     *
+     * @custom:implnotes The event logs are used as a cost-effective storage to publish and persist public keys on the
      * blockchain. For feasibility and gas-efficiency reasons, the smart contract itself does not validate the OpenPGP
-     * messages or the declared fingerprint. Future improvements may introduce off-chain validation mechanisms, for 
+     * messages or the declared fingerprint. Future improvements may introduce off-chain validation mechanisms, for
      * example through Chainlink Automation & Function to automatically verify published keys and maintain indexes of
      * valid, revoked or otherwise annotated keys.
-     * 
-     * Put the parent key fingerprint as topic[1] in order to allow to find the publication, subkeys and revocations 
+     *
+     * Put the parent key fingerprint as topic[1] in order to allow to find the publication, subkeys and revocations
      * logs for a given key fingerprint with a single request.
-     * 
+     *
      * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
      * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
      */
-    function registerPublicSubkey(
-        bytes32  parentKeyFingerprint,
-        bytes32  subkeyFingerprint,
-        bytes calldata openPGPMsg
-    ) external payable;
+    function registerPublicSubkey(bytes32 parentKeyFingerprint, bytes32 subkeyFingerprint, bytes calldata openPGPMsg)
+        external
+        payable;
 
     /**
      * Publish a key revocation certificate for a target public key.
@@ -241,8 +225,8 @@ interface IWeb3PGP {
      * @param fingerprint The fingerprint of the key to be revoked.
      * @param revocationCertificate The binary OpenPGP message which contains key revocation certificate.
      *
-     * @notice This event is used to publish the revocation certificate for a target public key. 
-     * 
+     * @notice This event is used to publish the revocation certificate for a target public key.
+     *
      * The smart contract verifies the target public key has been registered. It does not verify the OpenPGP message
      * mor the validity of the key revocation certificate. Users are expected to verify the key revocation certificate
      * validity by using the registered public key to verify the revocation signature. Once verified, users must stop
@@ -253,11 +237,11 @@ interface IWeb3PGP {
      * dependending on the key version (v4 vs v6). If the fingerprint is less than 32 bytes, it is zero-padded on the
      * left to match the length of 32 bytes.
      *
-     * @dev The OpenPGP message can be compressed and should not be encrypted. The message should at least contain a 
+     * @dev The OpenPGP message can be compressed and should not be encrypted. The message should at least contain a
      * Key Revocation Signature packet (Type ID 0x20) or a Subkey Revocation Signature packet (Type ID 0x28). However,
      * as most OpenPGP implementations do not support even reading standalone key revocation certificates, the message
      * can also include the public key that is revoked.
-     * 
+     *
      * bytes32 is the type used for fingerprints as the length of the fingerprints ranges from 20 bytes to 32 bytes
      * dependending on the key version (v4 vs v6). If the fingerprint is less than 32 bytes, it is zero-padded on the
      * left to match the length of 32 bytes.
@@ -265,10 +249,7 @@ interface IWeb3PGP {
      * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
      * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
      */
-    function revokeKey(
-        bytes32 fingerprint,
-        bytes calldata revocationCertificate
-    ) external payable;
+    function revokeKey(bytes32 fingerprint, bytes calldata revocationCertificate) external payable;
 
     /*****************************************************************************************************************/
     /* WRITE FUNCTIONS                                                                                               */
@@ -319,11 +300,7 @@ interface IWeb3PGP {
      * where a parent key has a large number of subkeys. Loop until an empty array is returned or until the length of
      * the returned array is less than the limit.
      */
-    function listRevocations(
-        bytes32 fingerprint,
-        uint256 start,
-        uint256 limit
-    ) external view returns (uint256[] memory);
+    function listRevocations(bytes32 fingerprint, uint256 start, uint256 limit) external view returns (uint256[] memory);
 
     /**
      * @notice Returns a list of subkeys for a given parent key.
@@ -335,9 +312,8 @@ interface IWeb3PGP {
      * where a parent key has a large number of subkeys. Loop until an empty array is returned or until the length of
      * the returned array is less than the limit.
      */
-    function listSubkeys(
-        bytes32 parentKeyFingerprint, 
-        uint256 start, 
-        uint256 limit
-    ) external view returns (bytes32[] memory);
+    function listSubkeys(bytes32 parentKeyFingerprint, uint256 start, uint256 limit)
+        external
+        view
+        returns (bytes32[] memory);
 }
