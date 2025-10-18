@@ -165,4 +165,3 @@ jobs:
           else
             echo "No frontends detected"
           fi
-

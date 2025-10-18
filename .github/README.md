@@ -110,6 +110,29 @@ Notes:
 - High/critical secret or SAST findings: block merge, rotate secrets immediately, and follow the incident runbook.
 - Medium/low findings: create an issue and assign to the security maintainer. Tune rules to avoid noisy failures on PRs.
 
+## detect-secrets pre-commit baseline (audit & update)
+
+This repository uses `detect-secrets` via `.pre-commit-config.yaml` to block commits that introduce high-confidence secrets. The pre-commit hook uses the `.secrets.baseline` file to record known/allowed findings.
+
+How to audit and update the baseline:
+
+1. Run a fresh scan and audit interactive prompts:
+
+```bash
+python3 -m pip install --user detect-secrets
+detect-secrets scan > .secrets.baseline.new
+detect-secrets audit .secrets.baseline.new
+# inspect and confirm, then move into place:
+mv .secrets.baseline.new .secrets.baseline
+git add .secrets.baseline && git commit -m "chore(secrets): update detect-secrets baseline"
+```
+
+2. Or use the helper script `scripts/audit-secrets.sh` which runs the scan and prints next steps.
+
+Notes:
+- Only add findings to the baseline after manually confirming they are not real secrets (e.g., test fixtures, intentionally included keys).
+- If you accidentally commit a secret, rotate it immediately and follow the incident runbook.
+
 ## Additions / next steps
 
 - If you'd like, I can add a `workflow_dispatch` entry to the daily security workflow for manual trigger. I can also add a short `scripts/ci-local.sh` to wrap the above local commands for convenience.
