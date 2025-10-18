@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc -p .",
+    "clean": "find . -name '*.js' -o -name '*.d.ts' -o -name '*.map' | grep -E '(src|__tests__)' | xargs rm -f",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand"
   },
@@ -200,6 +201,7 @@
     "unrs-resolver": "^1.11.1",
     "update-browserslist-db": "^1.1.3",
     "v8-to-istanbul": "^9.3.0",
+    "viem": "^2.38.3",
     "walker": "^1.0.8",
     "which": "^2.0.2",
     "wordwrap": "^1.0.0",
