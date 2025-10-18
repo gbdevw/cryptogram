@@ -165,18 +165,4 @@ jobs:
           else
             echo "No frontends detected"
           fi
-name: CI
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Lint
-        run: echo "Linting..."
