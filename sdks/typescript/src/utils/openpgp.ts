@@ -1,6 +1,6 @@
 import * as openpgp from 'openpgp';
 import * as pLimit from 'p-limit';
-import { to0x, toBytes32, InvalidHexError, HexTooLongError } from './0xstr';
+import { to0x, toBytes32 } from './0xstr';
 
 /**
  * Result of verifying a revocation certificate.
@@ -69,7 +69,7 @@ export class OpenPGPUtils {
      * @param key The key containing the target subkey
      * @param fingerprint The subkey fingerprint that will be padded (bytes32 format, with or without 0x prefix)
      * @returns A sanitized subkey certificate ready for blockchain storage
-     * @throws Error if the specified subkey fingerprint is not found
+     * @throws - SubkeyNotFoundError Error if the specified subkey fingerprint is not found
      */
     static sanitizeSubkey(key: openpgp.Key, fingerprint: `0x${string}`): openpgp.Key;
     static sanitizeSubkey(key: openpgp.Key, fingerprint: string): openpgp.Key {
@@ -199,7 +199,7 @@ export class OpenPGPUtils {
                         }
 
                         // No matching subkey found
-                        return { isValid: false, revokedKeyFingerprint: '', invalidReason: 'no matching subkey found' };
+                        return { isValid: false, revokedKeyFingerprint: '', invalidReason: 'no matching key found for the certificate' };
 
                     } else {
                         // Unsupported revocation type
@@ -208,7 +208,7 @@ export class OpenPGPUtils {
 
                 } catch (error) {
                     // Verification failed for this packet
-                    return { isValid: false, revokedKeyFingerprint: '', invalidReason: 'signature verification failed' };
+                    return { isValid: false, revokedKeyFingerprint: '', invalidReason: 'revocation certificate verification failed' };
                 }
             })
         );
