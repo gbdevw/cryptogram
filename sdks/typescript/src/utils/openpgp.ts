@@ -1,5 +1,5 @@
 import * as openpgp from 'openpgp';
-import * as pLimit from 'p-limit';
+import pLimit from 'p-limit';
 import { to0x, toBytes32 } from './0xstr';
 
 /**
