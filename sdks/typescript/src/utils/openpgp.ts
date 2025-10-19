@@ -73,8 +73,7 @@ export class OpenPGPUtils {
      * @returns A sanitized subkey certificate ready for blockchain storage
      * @throws - SubkeyNotFoundError Error if the specified subkey fingerprint is not found
      */
-    static sanitizeSubkey(key: openpgp.Key, fingerprint: `0x${string}`): openpgp.Key;
-    static sanitizeSubkey(key: openpgp.Key, fingerprint: string): openpgp.Key {
+    static sanitizeSubkey(key: openpgp.Key, fingerprint: `0x${string}`): openpgp.Key {
         // Convert and validate fingerprint format
         const targetFingerprint = toBytes32(to0x(fingerprint));
 
@@ -149,7 +148,7 @@ export class OpenPGPUtils {
     static async verifyRevocationCertificate(
         primaryKey: openpgp.Key,
         signaturePacket: openpgp.Signature,
-        date: Date
+        date: Date = new Date()
     ): Promise<RevocationVerificationResult[]> {
         // Limit concurrency to 3 simultaneous signature verifications
         const limit = pLimit(3);
