@@ -18,12 +18,14 @@ export interface RevocationVerificationResult {
 export class SubkeyNotFoundError extends Error {
     constructor(fingerprint: string) {
         super(`Subkey with fingerprint ${fingerprint} not found in the provided key`);
+        this.name = 'SubkeyNotFoundError';
     }
 }
 
 export class KeySanitizationError extends Error {
     constructor(message: string, input?: string) {
         super(message);
+        this.name = 'KeySanitizationError';
     }
 }
 
