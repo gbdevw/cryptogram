@@ -17,7 +17,7 @@ jobs:
       frontends_changed: ${{ steps.filter.outputs.frontends }}
       docs_only: ${{ steps.filter.outputs.docs_only }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: filter
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -81,7 +81,7 @@ jobs:
     needs: [filter, devsecops]
     if: needs.filter.outputs.contracts_changed == 'true' && needs.filter.outputs.docs_only != 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -103,7 +103,7 @@ jobs:
     if: |
       needs.filter.outputs.sdks_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -125,7 +125,7 @@ jobs:
     if: |
       needs.filter.outputs.clis_changed == 'true' || needs.filter.outputs.sdks_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -147,7 +147,7 @@ jobs:
     if: |
       needs.filter.outputs.frontends_changed == 'true' || needs.filter.outputs.sdks_changed == 'true' || needs.filter.outputs.contracts_changed == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
