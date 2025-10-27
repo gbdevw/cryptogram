@@ -1,5 +1,5 @@
 import * as openpgp from 'openpgp';
-import pLimit from 'p-limit';
+import Bottleneck from 'bottleneck';
 import { to0x, toBytes32 } from './0xstr';
 
 /**
@@ -96,6 +96,59 @@ export class OpenPGPUtils {
     }
 
     /**
+     * Generate a revocation certificate for a subkey in the specified format. The provided subkey is not revoked.
+     * 
+     * @param privateKey The private key that owns the subkey
+     * @param sub The subkey to generate the revocation certificate for
+     * @param format The desired output format: 'armored' or 'binary' (default: 'binary')
+     * @returns The revocation certificate in the specified format
+     * @throws Error if the subkey has no revocation signatures
+     */
+    static async getSubkeyRevocationCertificate(
+        privateKey: openpgp.PrivateKey, 
+        target: openpgp.Subkey,
+        format?: 'armored',
+        reasonForRevocation?: openpgp.ReasonForRevocation, 
+        date?: Date, 
+        config?: openpgp.Config,
+        ): Promise<string>;
+    static async getSubkeyRevocationCertificate(
+        privateKey: openpgp.PrivateKey, 
+        target: openpgp.Subkey,
+        format?: 'binary',
+        reasonForRevocation?: openpgp.ReasonForRevocation, 
+        date?: Date, 
+        config?: openpgp.Config,
+        ): Promise<Uint8Array>;
+    static async getSubkeyRevocationCertificate(
+        privateKey: openpgp.PrivateKey, 
+        target: openpgp.Subkey, 
+        format?: 'armored' | 'binary',
+        reasonForRevocation?: openpgp.ReasonForRevocation, 
+        date?: Date, 
+        config?: openpgp.Config,
+        ): Promise<string | Uint8Array> {
+        // Revoke the subkey to generate revocation signatures
+        const sub = await target.revoke(privateKey.keyPacket as openpgp.SecretKeyPacket, reasonForRevocation, date, config);
+
+        // Serialize all revocation signatures
+        const packets: Uint8Array[] = sub.revocationSignatures.map((s: any) => s.write());
+        const buffer = new Uint8Array(packets.reduce((acc, curr) => acc + curr.length, 0));
+        let offset = 0;
+        for (const packet of packets) {
+            buffer.set(packet, offset);
+            offset += packet.length;
+        }
+
+        // Combine all serialized signatures into a single buffer
+        if (format === 'armored') {
+            return openpgp.armor(openpgp.enums.armor.signature, buffer);
+        } else {
+            return buffer;
+        }
+    }
+
+    /**
      * Check if a subkey is revoked by verifying its revocation certificates.
      *
      * @param sub The subkey to check
@@ -105,6 +158,17 @@ export class OpenPGPUtils {
      * @returns True if the subkey is revoked, false otherwise
      */
     static async isSubkeyRevoked(sub: openpgp.Subkey, primaryKey: openpgp.Key, date: Date = new Date()): Promise<boolean> {
+
+        // Check if subkey belongs to the primary key
+        if (primaryKey.getFingerprint() !== sub.mainKey.getFingerprint()) {
+            throw new Error('The provided primary key does not own the specified subkey');
+        }
+
+        // Check if the primary key is revoked
+        if (await primaryKey.isRevoked(undefined, undefined, date)) {
+            return true; // Subkey is revoked because primary is revoked
+        }
+
         // Check if subkey has revocation signatures
         if (sub.revocationSignatures.length === 0) {
             return false;
@@ -119,9 +183,9 @@ export class OpenPGPUtils {
                 // Verify the revocation signature
                 // OpenPGP.js signature verification requires signature type and other parameters
                 await revocationSig.verify(
-                    sub.keyPacket,           // signed data (the subkey)
+                    primaryPublicKey.keyPacket,        // verification key
                     openpgp.enums.signature.subkeyRevocation,  // signature type
-                    primaryPublicKey,        // verification key
+                    sub.keyPacket,           // signed data (the subkey)
                     date                     // verification date
                 );
 
@@ -134,6 +198,7 @@ export class OpenPGPUtils {
             }
         }
 
+        // No valid revocation signature found, subkey is not revoked
         return false;
     }
 
@@ -141,24 +206,32 @@ export class OpenPGPUtils {
      * Verify a standalone key revocation certificate.
      *
      * @param primaryKey The primary key that should have issued the revocation
-     * @param signaturePacket The signature packet containing the revocation certificate
+     * @param revocationCertificate the revocation certificate
      * @param date The date to check against for signature validity
      * @returns Array of verification results for all signature packets
      */
     static async verifyRevocationCertificate(
         primaryKey: openpgp.Key,
-        signaturePacket: openpgp.Signature,
+        revocationCertificate: openpgp.Signature | openpgp.SignaturePacket[],
         date: Date = new Date()
     ): Promise<RevocationVerificationResult[]> {
         // Limit concurrency to 3 simultaneous signature verifications
-        const limit = pLimit(3);
+        const limiter = new Bottleneck({ maxConcurrent: 3 });
 
         // Get the primary key's public key for verification
         const primaryPublicKey = primaryKey.toPublic();
 
+        // Extract signature packets from the revocation certificate
+        let sigPackets: openpgp.SignaturePacket[] = [];
+        if (revocationCertificate instanceof openpgp.Signature) {
+            sigPackets = revocationCertificate.packets;
+        } else {
+            sigPackets = revocationCertificate as openpgp.SignaturePacket[];
+        }
+
         // Create verification tasks for each signature packet
-        const verificationTasks = signaturePacket.packets.map((sigPacket) =>
-            limit(async (): Promise<RevocationVerificationResult> => {
+        const verificationTasks = sigPackets.map((sigPacket) =>
+            limiter.schedule(async (): Promise<RevocationVerificationResult> => {
                 try {
                     const sigType = sigPacket.signatureType;
 
@@ -185,9 +258,9 @@ export class OpenPGPUtils {
                             try {
                                 // Try to verify the signature against this subkey's key material
                                 await sigPacket.verify(
-                                    subkey.keyPacket,
+                                    primaryPublicKey.keyPacket,
                                     sigType,
-                                    primaryPublicKey,
+                                    subkey.keyPacket,
                                     date
                                 );
 

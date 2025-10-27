@@ -19,9 +19,10 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "bottleneck": "^2.19.5",
     "openpgp": "^6.1.0",
-    "viem": "^2.21.0",
-    "p-limit": "^6.1.0"
+    "p-limit": "^6.1.0",
+    "viem": "^2.21.0"
   },
   "description": ""
 }
