@@ -1,33 +1,5 @@
 import * as openpgp from 'openpgp';
-import Bottleneck from 'bottleneck';
 import { to0x, toBytes32 } from './0xstr';
-
-/**
- * Result of verifying a revocation certificate.
- */
-export interface RevocationVerificationResult {
-    /** Whether the revocation certificate is valid */
-    isValid: boolean;
-    /** Fingerprint of the key being revoked (empty string if invalid) */
-    revokedKeyFingerprint: string;
-    /** Reason why the verification is invalid (empty string if valid) */
-    invalidReason: string;
-}
-
-
-export class SubkeyNotFoundError extends Error {
-    constructor(fingerprint: string) {
-        super(`Subkey with fingerprint ${fingerprint} not found in the provided key`);
-        this.name = 'SubkeyNotFoundError';
-    }
-}
-
-export class KeySanitizationError extends Error {
-    constructor(message: string, input?: string) {
-        super(message);
-        this.name = 'KeySanitizationError';
-    }
-}
 
 /**
  * Utility functions for OpenPGP operations
@@ -71,7 +43,7 @@ export class OpenPGPUtils {
      * @param key The key containing the target subkey
      * @param fingerprint The subkey fingerprint that will be padded (bytes32 format, with or without 0x prefix)
      * @returns A sanitized subkey certificate ready for blockchain storage
-     * @throws - SubkeyNotFoundError Error if the specified subkey fingerprint is not found
+     * @throws - Error if the specified subkey fingerprint is not found
      */
     static sanitizeSubkey(key: openpgp.Key, fingerprint: `0x${string}`): openpgp.Key {
         // Convert and validate fingerprint format
@@ -86,66 +58,13 @@ export class OpenPGPUtils {
         );
 
         if (!targetSubkey) {
-            throw new SubkeyNotFoundError(targetFingerprint);
+            throw new Error(`No subkey with fingerprint ${fingerprint} found in the provided key`);
         }
 
         // Keep only the target subkey and remove user IDs to prevent identity collision
         publicKey.subkeys = [targetSubkey];
         publicKey.users = [];
         return publicKey;
-    }
-
-    /**
-     * Generate a revocation certificate for a subkey in the specified format. The provided subkey is not revoked.
-     * 
-     * @param privateKey The private key that owns the subkey
-     * @param sub The subkey to generate the revocation certificate for
-     * @param format The desired output format: 'armored' or 'binary' (default: 'binary')
-     * @returns The revocation certificate in the specified format
-     * @throws Error if the subkey has no revocation signatures
-     */
-    static async getSubkeyRevocationCertificate(
-        privateKey: openpgp.PrivateKey, 
-        target: openpgp.Subkey,
-        format?: 'armored',
-        reasonForRevocation?: openpgp.ReasonForRevocation, 
-        date?: Date, 
-        config?: openpgp.Config,
-        ): Promise<string>;
-    static async getSubkeyRevocationCertificate(
-        privateKey: openpgp.PrivateKey, 
-        target: openpgp.Subkey,
-        format?: 'binary',
-        reasonForRevocation?: openpgp.ReasonForRevocation, 
-        date?: Date, 
-        config?: openpgp.Config,
-        ): Promise<Uint8Array>;
-    static async getSubkeyRevocationCertificate(
-        privateKey: openpgp.PrivateKey, 
-        target: openpgp.Subkey, 
-        format?: 'armored' | 'binary',
-        reasonForRevocation?: openpgp.ReasonForRevocation, 
-        date?: Date, 
-        config?: openpgp.Config,
-        ): Promise<string | Uint8Array> {
-        // Revoke the subkey to generate revocation signatures
-        const sub = await target.revoke(privateKey.keyPacket as openpgp.SecretKeyPacket, reasonForRevocation, date, config);
-
-        // Serialize all revocation signatures
-        const packets: Uint8Array[] = sub.revocationSignatures.map((s: any) => s.write());
-        const buffer = new Uint8Array(packets.reduce((acc, curr) => acc + curr.length, 0));
-        let offset = 0;
-        for (const packet of packets) {
-            buffer.set(packet, offset);
-            offset += packet.length;
-        }
-
-        // Combine all serialized signatures into a single buffer
-        if (format === 'armored') {
-            return openpgp.armor(openpgp.enums.armor.signature, buffer);
-        } else {
-            return buffer;
-        }
     }
 
     /**
@@ -200,107 +119,6 @@ export class OpenPGPUtils {
 
         // No valid revocation signature found, subkey is not revoked
         return false;
-    }
-
-    /**
-     * Verify a standalone key revocation certificate.
-     *
-     * @param primaryKey The primary key that should have issued the revocation
-     * @param revocationCertificate the revocation certificate
-     * @param date The date to check against for signature validity
-     * @returns Array of verification results for all signature packets
-     */
-    static async verifyRevocationCertificate(
-        primaryKey: openpgp.Key,
-        revocationCertificate: openpgp.Signature | openpgp.SignaturePacket[],
-        date: Date = new Date()
-    ): Promise<RevocationVerificationResult[]> {
-        // Limit concurrency to 3 simultaneous signature verifications
-        const limiter = new Bottleneck({ maxConcurrent: 3 });
-
-        // Get the primary key's public key for verification
-        const primaryPublicKey = primaryKey.toPublic();
-
-        // Extract signature packets from the revocation certificate
-        let sigPackets: openpgp.SignaturePacket[] = [];
-        if (revocationCertificate instanceof openpgp.Signature) {
-            sigPackets = revocationCertificate.packets;
-        } else {
-            sigPackets = revocationCertificate as openpgp.SignaturePacket[];
-        }
-
-        // Create verification tasks for each signature packet
-        const verificationTasks = sigPackets.map((sigPacket) =>
-            limiter.schedule(async (): Promise<RevocationVerificationResult> => {
-                try {
-                    const sigType = sigPacket.signatureType;
-
-                    if (sigType === openpgp.enums.signature.keyRevocation) {
-                        // Primary key revocation
-                        const fingerprint = primaryKey.getFingerprint();
-
-                        // Verify the signature against the primary key
-                        await sigPacket.verify(
-                            primaryKey.keyPacket,
-                            sigType,
-                            primaryPublicKey,
-                            date
-                        );
-
-                        return { isValid: true, revokedKeyFingerprint: fingerprint, invalidReason: '' };
-
-                    } else if (sigType === openpgp.enums.signature.subkeyRevocation) {
-                        // Subkey revocation - the signature is made over the subkey's key material
-                        // We need to find which subkey by trying to verify against each subkey
-                        const subkeys = primaryKey.getSubkeys();
-
-                        for (const subkey of subkeys) {
-                            try {
-                                // Try to verify the signature against this subkey's key material
-                                await sigPacket.verify(
-                                    primaryPublicKey.keyPacket,
-                                    sigType,
-                                    subkey.keyPacket,
-                                    date
-                                );
-
-                                // If verification succeeds, this is the revoked subkey
-                                return { isValid: true, revokedKeyFingerprint: subkey.getFingerprint(), invalidReason: '' };
-                            } catch (error) {
-                                // This subkey doesn't match, try the next one
-                                continue;
-                            }
-                        }
-
-                        // No matching subkey found
-                        return { isValid: false, revokedKeyFingerprint: '', invalidReason: 'no matching key found for the certificate' };
-
-                    } else {
-                        // Unsupported revocation type
-                        return { isValid: false, revokedKeyFingerprint: '', invalidReason: 'unsupported revocation type' };
-                    }
-
-                } catch (error) {
-                    // Verification failed for this packet
-                    return { isValid: false, revokedKeyFingerprint: '', invalidReason: 'revocation certificate verification failed' };
-                }
-            })
-        );
-
-        // Execute all verification tasks and collect results
-        const settledResults = await Promise.allSettled(verificationTasks);
-
-        // Extract the actual results, flattening any nested arrays
-        const results: RevocationVerificationResult[] = settledResults.map((result) => {
-            if (result.status === 'fulfilled') {
-                return result.value;
-            } else {
-                // If the task itself failed (shouldn't happen with our try/catch, but just in case)
-                return { isValid: false, revokedKeyFingerprint: '', invalidReason: 'task execution failed' };
-            }
-        });
-
-        return results;
     }
 
     /**

@@ -55,12 +55,12 @@ describe('OpenPGPUtils', () => {
       expect(result.getSubkeys()[0]!.getFingerprint()).toBe(privateKey.getSubkeys()[0]!.getFingerprint());
     });
 
-    test('throws SubkeyNotFoundError for non-existent subkey', async () => {
+    test('throws error for non-existent subkey', async () => {
       const fingerprint = '0x1234567890abcdef' as `0x${string}`;
       const [privateKey] = await generateTestKeyPair();
       expect(() => {
         OpenPGPUtils.sanitizeSubkey(privateKey, fingerprint);
-      }).toThrow(SubkeyNotFoundError);
+      }).toThrow(/.*0x1234567890abcdef.*found.*/);
     });
   });
 
@@ -90,10 +90,11 @@ describe('OpenPGPUtils', () => {
       const revokedSubkey = await privateKey1.getSubkeys()[0]!.revoke(privateKey1.keyPacket as openpgp.SecretKeyPacket);
       const result = await OpenPGPUtils.isSubkeyRevoked(revokedSubkey, privateKey1);
       expect(result).toBe(true);
-      // Let's use a different primary key to verify the signature and expect an InvalidSignature error
+      // Let's use a different primary key to verify the signature and expect an Error to be thrown
+      // because the subkey does not belong to the primary key.
       expect(async () => {
         await OpenPGPUtils.isSubkeyRevoked(revokedSubkey, privateKey2);
-      }).rejects.toThrow('InvalidSignature');
+      }).rejects.toThrow('The provided primary key does not own the specified subkey');
     });
 
     test('uses provided date for verification', async () => {
@@ -121,81 +122,6 @@ describe('OpenPGPUtils', () => {
       // Now check if the subkey is considered revoked due to primary key revocation
       const result = await OpenPGPUtils.isSubkeyRevoked(revoked.privateKey.getSubkeys()[0]!, revoked.privateKey);
       expect(result).toBe(true);
-    });
-  });
-
-  describe('verifyRevocationCertificate', () => {
-    test('returns empty array for signature with no packets', async () => {
-      const [privateKey] = await generateTestKeyPair();
-      const emptySignature = new openpgp.Signature(new openpgp.PacketList(0));
-      const result = await OpenPGPUtils.verifyRevocationCertificate(privateKey, emptySignature);
-      expect(result).toEqual([]);
-    });
-
-    test('verifies primary key revocation successfully', async () => {
-      const [privateKey, _, revocationCertificate] = await generateTestKeyPair();
-      const revocationSig = await openpgp.readSignature({ armoredSignature: revocationCertificate });
-      const result = await OpenPGPUtils.verifyRevocationCertificate(privateKey, revocationSig, new Date());
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
-        isValid: true,
-        revokedKeyFingerprint: privateKey.getFingerprint(),
-        invalidReason: ''
-      });
-    });
-
-    test('verifies primary key revocation successfully with date', async () => {
-      const [privateKey] = await generateTestKeyPair();
-      /// TODO: revoker la cle
-      const revocationCertificate = await privateKey.getRevocationCertificate(new Date('2023-01-01'));
-      const revocationSig = await openpgp.readSignature({ binarySignature: revocationCertificate });
-      const result = await OpenPGPUtils.verifyRevocationCertificate(privateKey, revocationSig, new Date());
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
-        isValid: true, // Revocation is after the provided date
-        revokedKeyFingerprint: privateKey.getFingerprint(),
-        invalidReason: ''
-      });
-    });
-
-    test('verification fails because the certificate creation date is older than the date provided to the function', async () => {
-      const [privateKey] = await generateTestKeyPair();
-      const revocationCertificate = await privateKey.getRevocationCertificate(new Date('2023-01-01'));
-      const revocationSig = await openpgp.readSignature({ binarySignature: revocationCertificate });
-      const result = await OpenPGPUtils.verifyRevocationCertificate(privateKey, revocationSig, new Date('2022-12-31'));
-      expect(result).toHaveLength(1);
-      expect(result[0]?.isValid).toBeFalsy();
-      expect(result[0]?.invalidReason).toBe('revocation certificate is not valid at the provided date');
-      expect(result[0]?.revokedKeyFingerprint).toBe(privateKey.getFingerprint());
-    });
-
-    test('verifies subkey revocation successfully', async () => {
-      const [privateKey] = await generateTestKeyPair();
-      const revokedSubkey = await privateKey.getSubkeys()[0]!.revoke(privateKey.keyPacket as openpgp.SecretKeyPacket);
-      const result = await OpenPGPUtils.verifyRevocationCertificate(privateKey, revokedSubkey.revocationSignatures);
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
-        isValid: true,
-        revokedKeyFingerprint: revokedSubkey.getFingerprint(),
-        invalidReason: ''
-      });
-    });
-
-    test('handles verification failure', async () => {
-      const [privateKey1] = await generateTestKeyPair();
-      const [privateKey2] = await generateTestKeyPair();
-      const revoked = await privateKey1.revoke();
-      const revocationCertificate = await revoked.getRevocationCertificate();
-      const revocationSig = await openpgp.readSignature({ armoredSignature: revocationCertificate });
-      const result = await OpenPGPUtils.verifyRevocationCertificate(privateKey2, revocationSig, new Date());
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
-        isValid: false,
-        revokedKeyFingerprint: '',
-        invalidReason: 'revocation certificate verification failed'
-      });
     });
   });
 
@@ -244,89 +170,5 @@ describe('OpenPGPUtils', () => {
       const result = OpenPGPUtils.listAllFingerprints(privateKey);
       expect(result).toEqual([privateKey.getFingerprint(), privateKey.getSubkeys().map(sub => sub.getFingerprint())].flat());
     });
-  });
-});
-
-describe('getSubkeyRevocationCertificate', () => {
-  test('returns revocation certificate for revoked subkey in armored format', async () => {
-    const [privateKey] = await generateTestKeyPair();
-    const revocationCert = await OpenPGPUtils.getSubkeyRevocationCertificate(privateKey, privateKey.getSubkeys()[0]!, 'armored');
-    const revocationSig = await openpgp.readSignature({ armoredSignature: revocationCert });
-    // Verify the revocation certificate
-    const verified = await OpenPGPUtils.verifyRevocationCertificate(privateKey, revocationSig);
-    expect(verified).toHaveLength(1);
-    expect(verified[0]?.isValid).toBe(true);
-    expect(verified[0]?.revokedKeyFingerprint).toBe(privateKey.getSubkeys()[0]!.getFingerprint());
-    // Apply the revocation to the subkey
-    const revoked = await openpgp.revokeKey({key: privateKey, revocationCertificate: revocationCert, format: 'object'});
-    const result = await OpenPGPUtils.isSubkeyRevoked(revoked.privateKey.getSubkeys()[0]!, revoked.privateKey);
-    expect(result).toBe(true);
-  });
-
-  test('returns revocation certificate for revoked subkey in binary format', async () => {
-    const [privateKey] = await generateTestKeyPair();
-    const revocationCert = await OpenPGPUtils.getSubkeyRevocationCertificate(privateKey, privateKey.getSubkeys()[0]!, 'binary');
-    const revokedKey = await openpgp.readKey({ binaryKey: revocationCert });
-    
-    const revocationSig = await openpgp.readSignature({ binarySignature: revocationCert });
-    // Verify the revocation certificate
-    const verified = await OpenPGPUtils.verifyRevocationCertificate(privateKey, revocationSig);
-    expect(verified).toHaveLength(1);
-    expect(verified[0]?.isValid).toBe(true);
-    expect(verified[0]?.revokedKeyFingerprint).toBe(privateKey.getSubkeys()[0]!.getFingerprint());
-    // Apply the revocation to the subkey
-    const revoked = await openpgp.revokeKey({key: privateKey, revocationCertificate: revocationSig.armor(), format: 'object'});
-    const result = await OpenPGPUtils.isSubkeyRevoked(revoked.privateKey.getSubkeys()[0]!, revoked.privateKey);
-    expect(result).toBe(true);
-  });
-
-  test('test with the wrong primary key', async () => {
-    const [privateKey1] = await generateTestKeyPair();
-    const [privateKey2] = await generateTestKeyPair();
-    const revocationCert = await OpenPGPUtils.getSubkeyRevocationCertificate(privateKey1, privateKey1.getSubkeys()[0]!, 'armored');
-    expect(async () => {
-      await openpgp.revokeKey({key: privateKey2, revocationCertificate: revocationCert, format: 'object'});
-    }).rejects.toThrow();
-  });
-});
-
-describe('Error Classes', () => {
-  describe('SubkeyNotFoundError', () => {
-    test('creates error with correct message', () => {
-      const fingerprint = 'ABC123';
-      const error = new SubkeyNotFoundError(fingerprint);
-      expect(error.message).toBe(`Subkey with fingerprint ${fingerprint} not found in the provided key`);
-      expect(error.name).toBe('SubkeyNotFoundError');
-    });
-  });
-
-  describe('KeySanitizationError', () => {
-    test('creates error with message', () => {
-      const message = 'Sanitization failed';
-      const error = new KeySanitizationError(message);
-      expect(error.message).toBe(message);
-      expect(error.name).toBe('KeySanitizationError');
-    });
-
-    test('creates error with message and input', () => {
-      const message = 'Sanitization failed';
-      const input = 'invalid-key';
-      const error = new KeySanitizationError(message, input);
-      expect(error.message).toBe(message);
-    });
-  });
-});
-
-describe('RevocationVerificationResult Interface', () => {
-  test('has correct structure', () => {
-    const result: RevocationVerificationResult = {
-      isValid: true,
-      revokedKeyFingerprint: 'ABC123',
-      invalidReason: ''
-    };
-
-    expect(result.isValid).toBe(true);
-    expect(result.revokedKeyFingerprint).toBe('ABC123');
-    expect(result.invalidReason).toBe('');
   });
 });
