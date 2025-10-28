@@ -1,5 +1,5 @@
 import * as openpgp from 'openpgp';
-import { OpenPGPUtils, SubkeyNotFoundError, KeySanitizationError, RevocationVerificationResult } from '../src/utils/openpgp';
+import { OpenPGPUtils } from '../src/utils/openpgp';
 
 /*********************************************************************************************************************/
 /* FIXTURES                                                                                                          */
