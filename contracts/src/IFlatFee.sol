@@ -8,6 +8,7 @@ pragma solidity ^0.8.24;
  * methods for fee management and withdrawal. The same fee is applied to all operations (no tiering).
  */
 interface IFlatFee {
+
     /*****************************************************************************************************************/
     /* CUSTOM ERRORS                                                                                                 */
     /*****************************************************************************************************************/
@@ -27,7 +28,7 @@ interface IFlatFee {
     /**
      * @notice Error emitted when the transfer of the fees fails.
      */
-    error FeeWithdrawalFailed();
+    error FeesWithdrawalFailed();
 
     /**
      * @notice Error emitted when a direct payment to the smart contract is attempted.
@@ -70,8 +71,9 @@ interface IFlatFee {
     function requestedFee() external view returns (uint256);
 
     /**
-     * @notice Withdraws the full contract balance to the owner.
+     * @notice Withdraws the full contract balance to the specified address.
+     * @param to The address to which the fees are withdrawn.
      * @dev This function should be restricted to authorized users.
      */
-    function withdrawFees() external;
+    function withdrawFees(address to) external;
 }
