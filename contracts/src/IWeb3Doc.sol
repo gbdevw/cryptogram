@@ -538,12 +538,12 @@ interface IWeb3Doc {
     /**
      * @notice Returns the block numbers in which the documents or timestamps with the given IDs were published.
      *
-     * @param id The IDs of the documents whose block numbers are to be retrieved.
+     * @param ids The IDs of the documents whose block numbers are to be retrieved.
      *
      * @return The block numbers in which the documents were published. The order of the block numbers corresponds to
      * the order of the document IDs in the input array. If a document does not exist, its block number will be 0.
      */
-    function getDocumentBlockNumberByIDBatch(uint256[] calldata id) external view returns (uint256[] memory);
+    function getDocumentBlockNumberByIDBatch(uint256[] calldata ids) external view returns (uint256[] memory);
 
     /**
      * @notice Lists the block numbers when were published the signatures associated with the given document.
