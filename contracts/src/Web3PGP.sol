@@ -5,13 +5,31 @@ import "./FlatFee.sol";
 import "./IWeb3PGP.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-// Import Hardhat's console
-// import "hardhat/console.sol";
-
 /**
  * @title Web3PGP
- * @author degengineering.ink
+ * @author degengineering.eth
  * @notice This contract allows users and PGP servers to publish, retrieve and manage OpenPGP public keys (RFC9580).
+ * 
+ * @dev Design Philosophy:
+ * This contract serves as a minimal, gas-efficient registry for OpenPGP public keys on Ethereum.
+ * It intentionally does NOT:
+ * - Validate OpenPGP message format or cryptographic signatures (client-side responsibility)
+ * - Enforce identity verification or access control on key registration (composability)
+ * - Store complete key data on-chain (uses event logs for cost efficiency)
+ * 
+ * Instead, it provides:
+ * - Immutable publication records via event logs
+ * - Efficient key discovery through indexed events
+ * - Relationship tracking (primary keys and subkeys)
+ * - Revocation certificate publication
+ * 
+ * Higher-level systems can build on this foundation to add:
+ * - Identity verification and attestation
+ * - Trust scoring and reputation
+ * - Enterprise PKI hierarchies
+ * - Automated key rotation systems
+ * 
+ * @custom:security All OpenPGP validation MUST be performed off-chain before using published keys.
  */
 contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
 
