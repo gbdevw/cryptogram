@@ -92,6 +92,8 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
      * @param manager The address of the AccessManager contract that manages access control for this contract.
      */
     function initialize(uint256 fee, address manager) external initializer {
+        // Check that the AccessManager address is not the zero address
+        require(manager != address(0), "AccessManager address cannot be zero");
         __FlatFee_init(fee, manager); 
         __UUPSUpgradeable_init();
     }
