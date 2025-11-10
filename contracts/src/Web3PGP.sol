@@ -14,13 +14,13 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
  * @notice This contract allows users and PGP servers to publish, retrieve and manage OpenPGP public keys (RFC9580).
  */
 contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
+
     /*****************************************************************************************************************/
     /* CONTRACT STORAGE                                                                                              */
     /*****************************************************************************************************************/
 
     /// @custom:storage-location erc7201:openzeppelin.storage.Web3PGP
     struct Web3PGPStorage {
-
 
         /**
          * @notice Map used to register when a key was published (block number).
@@ -71,18 +71,19 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
     /**
      * Initialize the contract with _msgSender() asx owner and fee as the required service fee.
      * @param fee The service fee required to execute payable functions, expressed in weis.
+     * @param manager The address of the AccessManager contract that manages access control for this contract.
      */
-    function initialize(uint256 fee) external initializer {
-        __FlatFee_initialize(fee);
+    function initialize(uint256 fee, address manager) external initializer {
+        __FlatFee_init(fee, manager); 
         __UUPSUpgradeable_init();
     }
 
     /**
      * @notice Reinitializes the contract after an upgrade.
      * @dev This function is used to reinitialize the contract after an upgrade.
-     * It is marked as reinitializer(3) to allow for a second initialization.
+     * It is marked as reinitializer(2) to allow for a second initialization.
      */
-    function initializeUpgrade() external reinitializer(3) {
+    function initializeUpgrade() external reinitializer(2) {
         // Add reinitialization logic here and increase the number of reinitializations
     }
 
@@ -93,68 +94,63 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3PGP
      */
-    function registerPublicKey(bytes32 fingerprint, bytes calldata openPGPMsg)
-        external
-        payable
+    function register(bytes32 primaryKeyFingerprint, bytes32[] calldata subkeyFingerprints, bytes calldata openPGPMsg) 
+        external payable
         override
         nonReentrant
         collectFee
     {
-        // Get a pointer to the contract storage slot
-        Web3PGPStorage storage $ = _getWeb3PGPStorage();
         // Check if the public key fingerprint is not already registered
-        if ($.keysToPublicationBlockNumber[fingerprint] != 0) revert AlreadyRegistered(fingerprint);
-        // Update the publication block number in the key lifecycle using the current block number
-        $.keysToPublicationBlockNumber[fingerprint] = uint256(block.number);
-        // Emit the NewPublicKey event to signal that a new public key has been registered and store the provided
-        // OpenPGP message as is in the Ethereum log system.
-        emit NewPublicKey(fingerprint, openPGPMsg);
+        _checkKeyNotRegistered(primaryKeyFingerprint);
+        // For each subkey fingerprint, check if it is not already registered and link it to the parent key
+        _checkSubkeysNotRegistered(primaryKeyFingerprint, subkeyFingerprints);
+        // Register the primary key and its subkeys
+        _registerKeys(primaryKeyFingerprint, subkeyFingerprints);
+        // Emit the KeyRegistered event to signal that a new public key (primary key + subkeys) has been registered
+        // and to store the provided OpenPGP message as is in the Ethereum log system.
+        emit KeyRegistered(primaryKeyFingerprint, subkeyFingerprints, openPGPMsg);
     }
 
     /**
      * @inheritdoc IWeb3PGP
      */
-    function registerPublicSubkey(bytes32 parentKeyFingerprint, bytes32 subkeyFingerprint, bytes calldata openPGPMsg)
+    function addSubkey(bytes32 primaryKeyFingerprint, bytes32 subkeyFingerprint, bytes calldata openPGPMsg)
         external
         payable
         override
         nonReentrant
         collectFee
     {
-        // Get a pointer to the contract storage slot
-        Web3PGPStorage storage $ = _getWeb3PGPStorage();
         // Check if the public subkey fingerprint is not already registered
-        if ($.keysToPublicationBlockNumber[subkeyFingerprint] != 0) revert AlreadyRegistered(subkeyFingerprint);
+        _checkKeyNotRegistered(subkeyFingerprint);
         // Check if the parent key is registered
-        if ($.keysToPublicationBlockNumber[parentKeyFingerprint] == 0) revert NotRegistered(parentKeyFingerprint);
+        _checkKeyIsRegistered(primaryKeyFingerprint);
         // Check if the parent key is not already a subkey
-        if ($.subKeyToParent[parentKeyFingerprint] != bytes32(0)) revert ParentIsASubkey(parentKeyFingerprint);
-        // Update the mappings
-        $.keysToPublicationBlockNumber[subkeyFingerprint] = uint256(block.number);
-        $.subKeyToParent[subkeyFingerprint] = parentKeyFingerprint;
-        $.parentToSubKeys[parentKeyFingerprint].push(subkeyFingerprint);
-        // Register the subkey and emit a NewPublicSubkey event
-        emit NewPublicSubkey(parentKeyFingerprint, subkeyFingerprint, openPGPMsg);
+        _checkIsNotSubkey(primaryKeyFingerprint);
+        // Register the subkey
+        _registerSubkey(primaryKeyFingerprint, subkeyFingerprint, block.number);
+        // Emit a SubkeyAdded event to store the provided OpenPGP subkey message as is in the Ethereum log system
+        // and signal other users a new subkey is available for the primary key.
+        emit SubkeyAdded(primaryKeyFingerprint, subkeyFingerprint, openPGPMsg);
     }
 
     /**
      * @inheritdoc IWeb3PGP
      */
-    function revokeKey(bytes32 fingerprint, bytes calldata revocationCertificate)
+    function revoke(bytes32 fingerprint, bytes calldata revocationCertificate)
         external
         payable
         override
         nonReentrant
         collectFee
     {
-        // Check if the public key fingerprint is registered
-        Web3PGPStorage storage $ = _getWeb3PGPStorage();
         // Check if the target key is registered
-        if ($.keysToPublicationBlockNumber[fingerprint] == 0) revert NotRegistered(fingerprint);
+        _checkKeyIsRegistered(fingerprint);
         // Store the block number when the revocation certificate was published for the key
-        $.keysToRevocations[fingerprint].push(block.number);
-        // Emit a NewRevocationCertificate event for the key
-        emit NewRevocationCertificate(fingerprint, revocationCertificate);
+        _registerRevocation(fingerprint, block.number);
+        // Emit a KeyRevoked event for the key to store the provided revocation certificate as is in the Ethereum log system
+        // and signal other users that the key has been revoked (primary key or subkey).
+        emit KeyRevoked(fingerprint, revocationCertificate);
     }
 
     /*****************************************************************************************************************/
@@ -164,7 +160,7 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3PGP
      */
-    function exist(bytes32 fingerprint) external view returns (bool isUsed) {
+    function exists(bytes32 fingerprint) external view returns (bool isUsed) {
         Web3PGPStorage storage $ = _getWeb3PGPStorage();
         return $.keysToPublicationBlockNumber[fingerprint] != 0;
     }
@@ -188,7 +184,7 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3PGP
      */
-    function getKeyPublication(bytes32 fingerprint) external view override returns (uint256) {
+    function getKeyPublicationBlock(bytes32 fingerprint) external view override returns (uint256) {
         Web3PGPStorage storage $ = _getWeb3PGPStorage();
         return $.keysToPublicationBlockNumber[fingerprint];
     }
@@ -196,10 +192,11 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3PGP
      */
-    function getKeyPublicationBatch(bytes32[] calldata fingerprints) external view override returns (uint256[] memory) {
+    function getKeyPublicationBlock(bytes32[] calldata fingerprints) external view override returns (uint256[] memory) {
         Web3PGPStorage storage $ = _getWeb3PGPStorage();
-        uint256[] memory publications = new uint256[](fingerprints.length);
-        for (uint256 i = 0; i < fingerprints.length; i++) {
+        uint256 length = fingerprints.length;
+        uint256[] memory publications = new uint256[](length);
+        for (uint256 i = 0; i < length; ++i) {
             publications[i] = $.keysToPublicationBlockNumber[fingerprints[i]];
         }
         return publications;
@@ -260,8 +257,69 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
     /* UUPS PROXY FUNCTIONS                                                                                          */
     /*****************************************************************************************************************/
 
-    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {
+    function _authorizeUpgrade(address newImplementation) internal virtual override restricted {
         // Ensure the new implementation is not the zero address
         require(newImplementation != address(0), "New implementation cannot be the zero address");
+    }
+
+    /*****************************************************************************************************************/
+    /* INTERNAL FUNCTIONS                                                                                            */
+    /*****************************************************************************************************************/
+
+    function _checkKeyNotRegistered(bytes32 fingerprint) internal view {
+        Web3PGPStorage storage $ = _getWeb3PGPStorage();
+        if ($.keysToPublicationBlockNumber[fingerprint] != 0) {
+            revert AlreadyRegistered(fingerprint);
+        }
+    }
+
+    function _checkKeyIsRegistered(bytes32 fingerprint) internal view {
+        Web3PGPStorage storage $ = _getWeb3PGPStorage();
+        if ($.keysToPublicationBlockNumber[fingerprint] == 0) {
+            revert NotRegistered(fingerprint);
+        }
+    }
+
+    function _checkIsNotSubkey(bytes32 fingerprint) internal view {
+        Web3PGPStorage storage $ = _getWeb3PGPStorage();
+        if ($.subKeyToParent[fingerprint] != bytes32(0)) {
+            revert ParentIsASubkey(fingerprint);
+        }
+    }
+
+    function _checkSubkeysNotRegistered(bytes32 primaryKeyFingerprint, bytes32[] calldata subkeyFingerprints) internal view {
+        Web3PGPStorage storage $ = _getWeb3PGPStorage();
+        uint256 length = subkeyFingerprints.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if ($.keysToPublicationBlockNumber[subkeyFingerprints[i]] != 0 || subkeyFingerprints[i] == primaryKeyFingerprint) {
+                revert AlreadyRegistered(subkeyFingerprints[i]);
+            }
+        }
+    }
+
+    function _registerKeys(bytes32 primaryKeyFingerprint, bytes32[] calldata subkeyFingerprints) internal {
+        Web3PGPStorage storage $ = _getWeb3PGPStorage();
+        uint256 blockNumber = uint256(block.number);
+        uint256 length = subkeyFingerprints.length;
+        // Register the primary key
+        $.keysToPublicationBlockNumber[primaryKeyFingerprint] = blockNumber;
+        // Register each subkey
+        for (uint256 i = 0; i < length; ++i) {
+            _registerSubkey(primaryKeyFingerprint, subkeyFingerprints[i], blockNumber);
+        }
+    }
+
+    function _registerSubkey(bytes32 primaryKeyFingerprint, bytes32 subkeyFingerprint, uint256 blockNumber) internal {
+        Web3PGPStorage storage $ = _getWeb3PGPStorage();
+        // Register the subkey fingerprint and its publication block number using the provided block number
+        $.keysToPublicationBlockNumber[subkeyFingerprint] = blockNumber;
+        // Link the subkey to its parent key
+        $.subKeyToParent[subkeyFingerprint] = primaryKeyFingerprint;
+        $.parentToSubKeys[primaryKeyFingerprint].push(subkeyFingerprint);
+    }
+
+    function _registerRevocation(bytes32 fingerprint, uint256 blockNumber) internal {
+        Web3PGPStorage storage $ = _getWeb3PGPStorage();
+        $.keysToRevocations[fingerprint].push(blockNumber);
     }
 }

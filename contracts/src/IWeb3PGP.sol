@@ -78,7 +78,7 @@ interface IWeb3PGP {
      * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
      * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
      */
-    event PublicKeyRegistered(bytes32 indexed primaryKeyFingerprint, bytes32[] subkeyFingerprints, bytes openPGPMsg);
+    event KeyRegistered(bytes32 indexed primaryKeyFingerprint, bytes32[] subkeyFingerprints, bytes openPGPMsg);
 
     /**
      * Event emitted when a new public subkey has been registered and added to a primary key.
@@ -136,7 +136,7 @@ interface IWeb3PGP {
      * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
      * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
      */
-    event NewRevocationCertificate(bytes32 indexed fingerprint, bytes revocationCertificate);
+    event KeyRevoked(bytes32 indexed fingerprint, bytes revocationCertificate);
 
     /*****************************************************************************************************************/
     /* WRITE FUNCTIONS                                                                                               */
@@ -291,7 +291,7 @@ interface IWeb3PGP {
      * @return The block numbers when the specified public keys were published in the same order as the input array.
      * If a key was not published, the corresponding block number will be 0.
      */
-    function getKeyPublicationBlockBatch(bytes32[] calldata fingerprints) external view returns (uint256[] memory);
+    function getKeyPublicationBlock(bytes32[] calldata fingerprints) external view returns (uint256[] memory);
 
     /**
      * @notice Returns a list of block numbers when revocation certificates were published for a given key.
