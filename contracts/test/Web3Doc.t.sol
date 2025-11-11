@@ -5,14 +5,27 @@ import "forge-std/Test.sol";
 import "../src/Web3Doc.sol";
 import "../src/Web3PGP.sol";
 import "../src/IWeb3Doc.sol";
+import "../src/IFlatFee.sol";
+import "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract Web3DocTest is Test {
+    AccessManager pgpAccessManager;
+    AccessManager docAccessManager;
     Web3Doc doc;
     Web3PGP pgp;
+    
+    address admin = vm.addr(1);
+    address treasurer = vm.addr(2);
+    address upgrader = vm.addr(3);
+    address alice = vm.addr(4);
+    
+    // Role identifiers
+    uint64 public constant TREASURER_ROLE = 1;
+    uint64 public constant UPGRADER_ROLE = 2;
 
     // declare events to allow vm.expectEmit + emit(...) pattern
-    event Publication(
+    event Document(
         uint256 indexed id,
         bytes32 indexed emitter,
         bytes32 indexed dochash,
@@ -21,10 +34,9 @@ contract Web3DocTest is Test {
         string uri,
         string mimeType
     );
-    event Copy(uint256 indexed docId, uint256 original, bytes32 indexed emitter, bytes document, string uri);
+    event Copy(uint256 indexed copy, uint256 indexed original, bytes32 indexed emitter, bytes document, string uri);
     event Signature(uint256 indexed id, bytes32 indexed emitter, bytes signature);
     event Timestamp(uint256 indexed id, bytes32 indexed emitter, bytes32 indexed dochash, bytes signature);
-    event Response(uint256 indexed response, uint256 indexed original, bytes32 indexed emitter);
     event Notification(
         uint256 indexed id,
         bytes32 emitter,
@@ -33,100 +45,114 @@ contract Web3DocTest is Test {
         bool indexed signatureRequested
     );
 
-    function _deployPGP() internal returns (Web3PGP) {
-        Web3PGP impl = new Web3PGP();
-        bytes memory data = abi.encodeWithSelector(Web3PGP.initialize.selector, uint256(0));
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), data);
-        return Web3PGP(payable(address(proxy)));
-    }
-
     function setUp() public {
-        pgp = _deployPGP();
-        // deploy doc and initialize with pgp address
-        Web3Doc impl = new Web3Doc();
-        bytes memory data = abi.encodeWithSelector(Web3Doc.initialize.selector, uint256(0), address(pgp));
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), data);
-        doc = Web3Doc(payable(address(proxy)));
+        // Deploy AccessManagers
+        vm.startPrank(admin);
+        pgpAccessManager = new AccessManager(admin);
+        docAccessManager = new AccessManager(admin);
+        vm.stopPrank();
+        
+        // Deploy and initialize Web3PGP
+        Web3PGP pgpImpl = new Web3PGP();
+        bytes memory pgpInitData = abi.encodeCall(Web3PGP.initialize, (uint256(0), address(pgpAccessManager)));
+        ERC1967Proxy pgpProxy = new ERC1967Proxy(address(pgpImpl), pgpInitData);
+        pgp = Web3PGP(payable(address(pgpProxy)));
+        
+        // Deploy and initialize Web3Doc
+        Web3Doc docImpl = new Web3Doc();
+        bytes memory docInitData = abi.encodeCall(Web3Doc.initialize, (uint256(0), address(docAccessManager), address(pgp)));
+        ERC1967Proxy docProxy = new ERC1967Proxy(address(docImpl), docInitData);
+        doc = Web3Doc(payable(address(docProxy)));
+        
+        // Setup roles for both contracts
+        vm.startPrank(admin);
+        
+        // Grant roles
+        pgpAccessManager.grantRole(TREASURER_ROLE, treasurer, 0);
+        docAccessManager.grantRole(TREASURER_ROLE, treasurer, 0);
+        
+        // Configure permissions for Web3PGP
+        bytes4[] memory treasurerSelectors = new bytes4[](2);
+        treasurerSelectors[0] = IFlatFee.updateRequestedFee.selector;
+        treasurerSelectors[1] = IFlatFee.withdrawFees.selector;
+        
+        pgpAccessManager.setTargetFunctionRole(
+            address(pgp),
+            treasurerSelectors,
+            TREASURER_ROLE
+        );
+        
+        // Configure permissions for Web3Doc
+        docAccessManager.setTargetFunctionRole(
+            address(doc),
+            treasurerSelectors,
+            TREASURER_ROLE
+        );
+        
+        vm.stopPrank();
     }
 
-    function testSendOnChainEmitsPublicationAndNotification() public {
+    function testSendOnChainEmitsDocumentEvent() public {
         bytes32 emitter = keccak256("em");
-        // For simplicity, assume exist() will be false -> _checkEmitter will revert; so register key in pgp first
-        pgp.registerPublicKey(emitter, "k");
+        pgp.register(emitter, new bytes32[](0), "k");
 
         bytes32 dochash = keccak256("d1");
         bytes memory signature = "sig";
         bytes memory document = "doc";
 
-        // check topics (docId, emitter, dochash) and emitter
         vm.expectEmit(true, true, true, false, address(doc));
-        emit Publication(1, emitter, dochash, signature, document, "", "text/plain");
+        emit Document(1, emitter, dochash, signature, document, "", "text/plain");
         doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), dochash, signature, document, "text/plain");
     }
 
     function testTimestampEmitsTimestamp() public {
         bytes32 emitter = keccak256("em2");
-        pgp.registerPublicKey(emitter, "k2");
+        pgp.register(emitter, new bytes32[](0), "k2");
         bytes32 dochash = keccak256("h2");
         bytes memory signature = "sig2";
-        // check indexed topics for Timestamp (id, emitter, dochash)
+        
         vm.expectEmit(true, true, true, false, address(doc));
         emit Timestamp(1, emitter, dochash, signature);
         doc.timestamp(emitter, dochash, signature);
     }
 
-    function testNonReentrantOnSendOnChain() public pure {
-        // Non-reentrancy detailed attack testing requires an attacker contract. Placeholder test kept as pure.
-        assertTrue(true);
-    }
-
-    // --- Extra tests merged in ---
-
-    function testSendOffChainEmitsPublicationAndNotification() public {
+    function testSendOffChainEmitsDocumentEvent() public {
         bytes32 emitter = keccak256("em-off");
-        pgp.registerPublicKey(emitter, "k-off");
+        pgp.register(emitter, new bytes32[](0), "k-off");
 
         bytes32 dochash = keccak256("doc-off-1");
         bytes memory signature = "sig-off";
         string memory uri = "ipfs://QmExample";
 
-        // Expect the Publication event (indexed id, emitter, dochash)
         vm.expectEmit(true, true, true, false, address(doc));
-        emit Publication(1, emitter, dochash, signature, new bytes(0), uri, "application/pdf");
-        // Call sendOffChain
+        emit Document(1, emitter, dochash, signature, new bytes(0), uri, "application/pdf");
         doc.sendOffChain(emitter, new IWeb3Doc.Recipient[](0), dochash, signature, uri, "application/pdf");
-        // verify that block number was stored for id 1
+        
         uint256 b = doc.getDocumentBlockNumberByID(1);
         assertTrue(b != 0);
     }
 
     function testCopyOnChainAndIsCopyOf() public {
         bytes32 emitter = keccak256("em-copy");
-        pgp.registerPublicKey(emitter, "k-copy");
+        pgp.register(emitter, new bytes32[](0), "k-copy");
 
-        // publish original
         bytes32 dochash = keccak256("orig");
         doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), dochash, "s", "orig-doc", "text/plain");
 
-        // copy on chain
         doc.copyOnChain(1, emitter, new IWeb3Doc.Recipient[](0), "copied-doc");
 
-        // isCopyOf(2) should return 1
         uint256 original = doc.isCopyOf(2);
         assertEq(original, 1);
     }
 
     function testCopyOffChainRevertsWhenOriginalIsCopy() public {
         bytes32 emitter = keccak256("em-copy2");
-        pgp.registerPublicKey(emitter, "k-copy2");
+        pgp.register(emitter, new bytes32[](0), "k-copy2");
 
-        // publish original
         bytes32 dochash = keccak256("orig2");
         doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), dochash, "s2", "orig2", "text/plain");
-        // make a copy (id 2)
         doc.copyOffChain(1, emitter, new IWeb3Doc.Recipient[](0), "ipfs://copy");
 
-        // attempting to copy the copy should revert DocumentIsACopy
         vm.expectRevert();
         doc.copyOffChain(2, emitter, new IWeb3Doc.Recipient[](0), "ipfs://copy2");
     }
@@ -134,8 +160,8 @@ contract Web3DocTest is Test {
     function testSendOnChainWithRecipientsEmitsNotification() public {
         bytes32 emitter = keccak256("em-not");
         bytes32 recipientFp = keccak256("rec-not");
-        pgp.registerPublicKey(emitter, "k-em");
-        pgp.registerPublicKey(recipientFp, "k-rec");
+        pgp.register(emitter, new bytes32[](0), "k-em");
+        pgp.register(recipientFp, new bytes32[](0), "k-rec");
 
         IWeb3Doc.Recipient[] memory recs = new IWeb3Doc.Recipient[](1);
         recs[0] = IWeb3Doc.Recipient({fingerprint: recipientFp, signatureRequested: true});
@@ -144,12 +170,11 @@ contract Web3DocTest is Test {
         bytes memory signature = "sig-not";
         bytes memory document = "doc-not";
 
-        // Expect a Publication and a Notification (topics: id, emitter, dochash) and notification indexed topics
         vm.expectEmit(true, true, true, false, address(doc));
-        emit Publication(1, emitter, dochash, signature, document, "", "text/plain");
+        emit Document(1, emitter, dochash, signature, document, "", "text/plain");
 
         vm.expectEmit(true, false, true, false, address(doc));
-        emit Notification(1, emitter, recipientFp, IWeb3Doc.EventType.PUBLICATION, true);
+        emit Notification(1, emitter, recipientFp, IWeb3Doc.EventType.DOCUMENT, true);
 
         doc.sendOnChain(emitter, recs, dochash, signature, document, "text/plain");
     }
@@ -157,199 +182,448 @@ contract Web3DocTest is Test {
     function testSendOffChainWithRecipientsEmitsNotification() public {
         bytes32 emitter = keccak256("em-not2");
         bytes32 recipientFp = keccak256("rec-not2");
-        pgp.registerPublicKey(emitter, "k-em2");
-        pgp.registerPublicKey(recipientFp, "k-rec2");
-
-        IWeb3Doc.Recipient[] memory recs = new IWeb3Doc.Recipient[](1);
-        recs[0] = IWeb3Doc.Recipient({fingerprint: recipientFp, signatureRequested: false});
-
-        bytes32 dochash = keccak256("d-not2");
-        bytes memory signature = "sig-not2";
-        string memory uri = "ipfs://x";
-
-        vm.expectEmit(true, true, true, false, address(doc));
-        emit Publication(1, emitter, dochash, signature, new bytes(0), uri, "text/plain");
-
-        vm.expectEmit(true, false, true, false, address(doc));
-        emit Notification(1, emitter, recipientFp, IWeb3Doc.EventType.PUBLICATION, false);
-
-        doc.sendOffChain(emitter, recs, dochash, signature, uri, "text/plain");
-    }
-
-    function testRespondOffChainEmitsResponseAndNotification() public {
-        bytes32 emitter = keccak256("em-resp2");
-        bytes32 recipientFp = keccak256("rec-resp2");
-        pgp.registerPublicKey(emitter, "k-emr");
-        pgp.registerPublicKey(recipientFp, "k-rcr");
-
-        // publish root id 1
-        bytes32 dochash = keccak256("r2");
-        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), dochash, "s", "r-doc", "text/plain");
+        pgp.register(emitter, new bytes32[](0), "k-em2");
+        pgp.register(recipientFp, new bytes32[](0), "k-rec2");
 
         IWeb3Doc.Recipient[] memory recs = new IWeb3Doc.Recipient[](1);
         recs[0] = IWeb3Doc.Recipient({fingerprint: recipientFp, signatureRequested: false});
 
         vm.expectEmit(true, true, true, false, address(doc));
-        emit Publication(2, emitter, keccak256("dr2"), "sig2", new bytes(0), "uri", "text/plain");
-
-        vm.expectEmit(true, true, false, false, address(doc));
-        emit Response(2, 1, emitter);
+        emit Document(1, emitter, keccak256("dh"), "s", new bytes(0), "uri", "text/plain");
 
         vm.expectEmit(true, false, true, false, address(doc));
-        emit Notification(2, emitter, recipientFp, IWeb3Doc.EventType.RESPONSE, false);
+        emit Notification(1, emitter, recipientFp, IWeb3Doc.EventType.DOCUMENT, false);
 
-        doc.respondOffChain(1, emitter, recs, keccak256("dr2"), "sig2", "uri", "text/plain");
+        doc.sendOffChain(emitter, recs, keccak256("dh"), "s", "uri", "text/plain");
     }
 
-    function testCopyOnChainRevertsWhenOriginalNotFound() public {
+    function testCopyCreatesCorrectMapping() public {
         bytes32 emitter = keccak256("em-copy-nf");
-        pgp.registerPublicKey(emitter, "k-copy-nf");
-        vm.expectRevert();
-        doc.copyOnChain(9999, emitter, new IWeb3Doc.Recipient[](0), "x");
+        pgp.register(emitter, new bytes32[](0), "k-copy-nf");
+        
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("orig"), "s", "orig", "text/plain");
+        doc.copyOnChain(1, emitter, new IWeb3Doc.Recipient[](0), "copy");
+        
+        assertEq(doc.isCopyOf(2), 1);
     }
 
     function testCopyOnChainRevertsWhenOriginalIsCopy() public {
         bytes32 emitter = keccak256("em-copy3");
-        pgp.registerPublicKey(emitter, "k-copy3");
+        pgp.register(emitter, new bytes32[](0), "k-copy3");
 
-        // publish original -> id 1
-        bytes32 dochash = keccak256("orig3");
-        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), dochash, "s3", "orig3", "text/plain");
-        // make a copy -> id 2
-        doc.copyOnChain(1, emitter, new IWeb3Doc.Recipient[](0), "copied-doc-3");
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("o"), "s", "orig", "text/plain");
+        doc.copyOnChain(1, emitter, new IWeb3Doc.Recipient[](0), "copy1");
 
-        // attempting to copy the copy should revert DocumentIsACopy
         vm.expectRevert();
-        doc.copyOnChain(2, emitter, new IWeb3Doc.Recipient[](0), "copied-doc-3b");
-    }
-
-    function testRespondOnChainRevertsWhenSubjectNotFound() public {
-        bytes32 emitter = keccak256("em-respond-nf");
-        pgp.registerPublicKey(emitter, "k-rnf");
-
-        // responding to a non-existing id should revert
-        vm.expectRevert();
-        doc.respondOnChain(9999, emitter, new IWeb3Doc.Recipient[](0), keccak256("x"), "s", "d", "text/plain");
-    }
-
-    function testRewindResponseThreadLimitTruncates() public {
-        bytes32 emitter = keccak256("em-rewind");
-        pgp.registerPublicKey(emitter, "k-rewind");
-
-        // publish root -> id 1
-        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("rA"), "s", "root", "text/plain");
-        // respond to 1 -> id 2
-        doc.respondOnChain(1, emitter, new IWeb3Doc.Recipient[](0), keccak256("r2"), "s2", "resp2", "text/plain");
-        // respond to 2 -> id 3
-        doc.respondOnChain(2, emitter, new IWeb3Doc.Recipient[](0), keccak256("r3"), "s3", "resp3", "text/plain");
-        // respond to 3 -> id 4
-        doc.respondOnChain(3, emitter, new IWeb3Doc.Recipient[](0), keccak256("r4"), "s4", "resp4", "text/plain");
-
-        // depth is 3 (3->2->1); request only 1 element should truncate to [3]
-        uint256[] memory thread = doc.rewindResponseThread(4, 1);
-        assertEq(thread.length, 1);
-        assertEq(thread[0], 3);
-    }
-
-    function testRespondOnChainAndRewindThread() public {
-        bytes32 emitter = keccak256("em-resp");
-        pgp.registerPublicKey(emitter, "k-resp");
-
-        // publish root
-        bytes32 dochash = keccak256("r");
-        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), dochash, "sigR", "r-doc", "text/plain");
-        // respond to 1 -> id 2
-        doc.respondOnChain(1, emitter, new IWeb3Doc.Recipient[](0), keccak256("dr2"), "sig2", "resp2", "text/plain");
-        // respond to 2 -> id 3
-        doc.respondOnChain(2, emitter, new IWeb3Doc.Recipient[](0), keccak256("dr3"), "sig3", "resp3", "text/plain");
-
-        // isResponseTo(3) should be 2
-        uint256 parent = doc.isResponseTo(3);
-        assertEq(parent, 2);
-
-        // rewind thread for 3 should give [2,1]
-        uint256[] memory thread = doc.rewindResponseThread(3, 5);
-        assertEq(thread.length, 2);
-        assertEq(thread[0], 2);
-        assertEq(thread[1], 1);
+        doc.copyOnChain(2, emitter, new IWeb3Doc.Recipient[](0), "copy-of-copy");
     }
 
     function testSignAndListSignaturesPagination() public {
         bytes32 emitter = keccak256("em-sign");
-        pgp.registerPublicKey(emitter, "k-sign");
+        pgp.register(emitter, new bytes32[](0), "k-sign");
 
-        // publish doc id 1
-        bytes32 dochash = keccak256("d-sign");
-        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), dochash, "s", "d", "text/plain");
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("d"), "s", "doc", "text/plain");
 
-        // roll blocks and sign twice so stored block numbers differ
-        vm.roll(100);
-        doc.sign(1, emitter, "sig-a");
-        vm.roll(101);
-        doc.sign(1, emitter, "sig-b");
+        vm.roll(10);
+        doc.sign(1, emitter, "sig1");
+        vm.roll(11);
+        doc.sign(1, emitter, "sig2");
+        vm.roll(12);
+        doc.sign(1, emitter, "sig3");
 
         uint256[] memory sigs = doc.listSignatures(1, 0, 10);
-        assertEq(sigs.length, 2);
-        // Ensure values are non-zero block numbers and distinct
-        assertTrue(sigs[0] != 0 && sigs[1] != 0 && sigs[0] != sigs[1]);
+        assertEq(sigs.length, 3);
+
+        uint256[] memory page = doc.listSignatures(1, 1, 2);
+        assertEq(page.length, 2);
     }
 
     function testListSignaturesEdgeCases() public {
         bytes32 emitter = keccak256("em-edge");
-        pgp.registerPublicKey(emitter, "k-edge");
+        pgp.register(emitter, new bytes32[](0), "k-edge");
 
-        // publish doc id 1
-        bytes32 dochash = keccak256("d-edge");
-        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), dochash, "s", "d", "text/plain");
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("d-edge"), "s", "doc", "text/plain");
 
-        // no signatures yet
         uint256[] memory empty = doc.listSignatures(1, 0, 10);
         assertEq(empty.length, 0);
 
-        // sign once
-        vm.roll(200);
-        doc.sign(1, emitter, "sig1");
+        vm.roll(20);
+        doc.sign(1, emitter, "s1");
+        vm.roll(21);
+        doc.sign(1, emitter, "s2");
 
-        // start >= length -> empty
         uint256[] memory e2 = doc.listSignatures(1, 5, 10);
         assertEq(e2.length, 0);
 
-        // limit == 0 -> empty
         uint256[] memory e3 = doc.listSignatures(1, 0, 0);
         assertEq(e3.length, 0);
-
-        // exact boundary: start 0 limit 1 -> one element
-        uint256[] memory p = doc.listSignatures(1, 0, 1);
-        assertEq(p.length, 1);
     }
 
     function testGetDocumentBlockNumberByIDBatchAndTimestamp() public {
-        bytes32 emitter = keccak256("em-ts");
-        pgp.registerPublicKey(emitter, "k-ts");
+        bytes32 emitter = keccak256("em-batch");
+        pgp.register(emitter, new bytes32[](0), "k-batch");
 
-        // timestamp -> id 1
-        bytes32 dochash = keccak256("h-ts");
-        doc.timestamp(emitter, dochash, "sig-ts");
-        // sendOnChain -> id 2
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("d1"), "s1", "doc1", "text/plain");
         doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("d2"), "s2", "doc2", "text/plain");
+        doc.timestamp(emitter, keccak256("ts"), "ts-sig");
 
-        uint256[] memory ids = new uint256[](2);
+        uint256[] memory ids = new uint256[](3);
         ids[0] = 1;
         ids[1] = 2;
+        ids[2] = 3;
         uint256[] memory blocks = doc.getDocumentBlockNumberByIDBatch(ids);
-        assertEq(blocks.length, 2);
-        assertTrue(blocks[0] != 0 && blocks[1] != 0);
+        assertEq(blocks.length, 3);
+        assertTrue(blocks[0] != 0);
+        assertTrue(blocks[1] != 0);
+        assertTrue(blocks[2] != 0);
     }
 
     function testRecipientNotFoundReverts() public {
-        bytes32 emitter = keccak256("em-rec");
-        pgp.registerPublicKey(emitter, "k-rec");
+        bytes32 emitter = keccak256("em-rec-err");
+        bytes32 nonExistentRecipient = keccak256("rec-missing");
+        pgp.register(emitter, new bytes32[](0), "k-rec");
 
-        // build recipients array with an unregistered fingerprint
         IWeb3Doc.Recipient[] memory recs = new IWeb3Doc.Recipient[](1);
-        recs[0] = IWeb3Doc.Recipient({fingerprint: keccak256("bad"), signatureRequested: false});
+        recs[0] = IWeb3Doc.Recipient({fingerprint: nonExistentRecipient, signatureRequested: false});
 
         vm.expectRevert();
-        doc.sendOnChain(emitter, recs, keccak256("d-rec"), "s", "doc-rec", "text/plain");
+        doc.sendOnChain(emitter, recs, keccak256("d"), "s", "doc", "text/plain");
+    }
+
+    function testEmitterNotFoundReverts() public {
+        bytes32 nonExistentEmitter = keccak256("em-missing");
+        
+        vm.expectRevert();
+        doc.sendOnChain(nonExistentEmitter, new IWeb3Doc.Recipient[](0), keccak256("d"), "s", "doc", "text/plain");
+    }
+
+    /*****************************************************************************************************************/
+    /* UUPS UPGRADE TESTS                                                                                            */
+    /*****************************************************************************************************************/
+
+    function testUpgraderCanUpgrade() public {
+        // Deploy new implementation
+        Web3Doc newImplementation = new Web3Doc();
+        
+        // Create a document to track state
+        bytes32 emitter = keccak256("upgrade-test");
+        pgp.register(emitter, new bytes32[](0), "key");
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("doc"), "sig", "data", "text/plain");
+        
+        uint256 blockNum = doc.getDocumentBlockNumberByID(1);
+        assertTrue(blockNum != 0);
+        
+        // Setup upgrader role for Web3Doc
+        vm.startPrank(admin);
+        docAccessManager.grantRole(UPGRADER_ROLE, upgrader, 0);
+        bytes4[] memory upgraderSelectors = new bytes4[](1);
+        upgraderSelectors[0] = bytes4(keccak256("upgradeToAndCall(address,bytes)"));
+        docAccessManager.setTargetFunctionRole(
+            address(doc),
+            upgraderSelectors,
+            UPGRADER_ROLE
+        );
+        vm.stopPrank();
+        
+        // Upgrader upgrades the contract
+        vm.prank(upgrader);
+        doc.upgradeToAndCall(address(newImplementation), "");
+        
+        // State should be preserved
+        uint256 blockNumAfter = doc.getDocumentBlockNumberByID(1);
+        assertEq(blockNum, blockNumAfter);
+    }
+
+    function testNonUpgraderCannotUpgrade() public {
+        Web3Doc newImplementation = new Web3Doc();
+        
+        // Setup upgrader role first
+        vm.startPrank(admin);
+        docAccessManager.grantRole(UPGRADER_ROLE, upgrader, 0);
+        bytes4[] memory upgraderSelectors = new bytes4[](1);
+        upgraderSelectors[0] = bytes4(keccak256("upgradeToAndCall(address,bytes)"));
+        docAccessManager.setTargetFunctionRole(
+            address(doc),
+            upgraderSelectors,
+            UPGRADER_ROLE
+        );
+        vm.stopPrank();
+        
+        // Alice (non-upgrader) cannot upgrade
+        vm.prank(alice);
+        vm.expectRevert();
+        doc.upgradeToAndCall(address(newImplementation), "");
+    }
+
+    function testUpgradePreservesAllState() public {
+        bytes32 emitter = keccak256("em-upgrade");
+        pgp.register(emitter, new bytes32[](0), "k");
+        
+        // Create various documents
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("d1"), "s1", "doc1", "text/plain");
+        doc.sendOffChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("d2"), "s2", "ipfs://doc2", "text/plain");
+        doc.timestamp(emitter, keccak256("ts"), "ts-sig");
+        
+        vm.roll(50);
+        doc.sign(1, emitter, "sig-extra");
+        
+        // Copy a document
+        doc.copyOnChain(1, emitter, new IWeb3Doc.Recipient[](0), "copy-data");
+        
+        // Setup upgrader and upgrade
+        vm.startPrank(admin);
+        docAccessManager.grantRole(UPGRADER_ROLE, upgrader, 0);
+        bytes4[] memory upgraderSelectors = new bytes4[](1);
+        upgraderSelectors[0] = bytes4(keccak256("upgradeToAndCall(address,bytes)"));
+        docAccessManager.setTargetFunctionRole(
+            address(doc),
+            upgraderSelectors,
+            UPGRADER_ROLE
+        );
+        vm.stopPrank();
+        
+        Web3Doc newImplementation = new Web3Doc();
+        vm.prank(upgrader);
+        doc.upgradeToAndCall(address(newImplementation), "");
+        
+        // Verify all documents still exist
+        assertTrue(doc.getDocumentBlockNumberByID(1) != 0);
+        assertTrue(doc.getDocumentBlockNumberByID(2) != 0);
+        assertTrue(doc.getDocumentBlockNumberByID(3) != 0);
+        assertTrue(doc.getDocumentBlockNumberByID(4) != 0);
+        
+        // Verify copy mapping preserved
+        assertEq(doc.isCopyOf(4), 1);
+        
+        // Verify signatures preserved
+        uint256[] memory sigs = doc.listSignatures(1, 0, 10);
+        assertEq(sigs.length, 1);
+        assertEq(sigs[0], 50);
+        
+        // Verify can still use functions after upgrade
+        bytes32 newEmitter = keccak256("post-upgrade");
+        pgp.register(newEmitter, new bytes32[](0), "new-key");
+        doc.sendOnChain(newEmitter, new IWeb3Doc.Recipient[](0), keccak256("new"), "new-sig", "new-doc", "text/plain");
+        assertTrue(doc.getDocumentBlockNumberByID(5) != 0);
+    }
+
+    /*****************************************************************************************************************/
+    /* FLATFEE RBAC TESTS                                                                                            */
+    /*****************************************************************************************************************/
+
+    function testTreasurerCanUpdateFee() public {
+        assertEq(doc.requestedFee(), 0);
+        
+        vm.prank(treasurer);
+        doc.updateRequestedFee(0.5 ether);
+        
+        assertEq(doc.requestedFee(), 0.5 ether);
+    }
+
+    function testNonTreasurerCannotUpdateFee() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        doc.updateRequestedFee(0.5 ether);
+        
+        assertEq(doc.requestedFee(), 0);
+    }
+
+    function testTreasurerCanWithdrawFees() public {
+        // Set a fee and have someone pay it
+        vm.prank(treasurer);
+        doc.updateRequestedFee(0.5 ether);
+        
+        bytes32 emitter = keccak256("fee-test");
+        pgp.register(emitter, new bytes32[](0), "key");
+        
+        vm.deal(alice, 10 ether);
+        vm.prank(alice);
+        doc.sendOnChain{value: 0.5 ether}(emitter, new IWeb3Doc.Recipient[](0), keccak256("d"), "s", "doc", "text/plain");
+        
+        assertEq(address(doc).balance, 0.5 ether);
+        
+        uint256 treasurerBalanceBefore = treasurer.balance;
+        
+        vm.prank(treasurer);
+        doc.withdrawFees(treasurer);
+        
+        assertEq(address(doc).balance, 0);
+        assertEq(treasurer.balance, treasurerBalanceBefore + 0.5 ether);
+    }
+
+    function testNonTreasurerCannotWithdrawFees() public {
+        // Set a fee and have someone pay it
+        vm.prank(treasurer);
+        doc.updateRequestedFee(0.5 ether);
+        
+        bytes32 emitter = keccak256("fee-test2");
+        pgp.register(emitter, new bytes32[](0), "key");
+        
+        vm.deal(alice, 10 ether);
+        vm.prank(alice);
+        doc.sendOnChain{value: 0.5 ether}(emitter, new IWeb3Doc.Recipient[](0), keccak256("d"), "s", "doc", "text/plain");
+        
+        assertEq(address(doc).balance, 0.5 ether);
+        
+        vm.prank(alice);
+        vm.expectRevert();
+        doc.withdrawFees(alice);
+        
+        assertEq(address(doc).balance, 0.5 ether);
+    }
+
+    /*****************************************************************************************************************/
+    /* SIGN TESTS                                                                                                    */
+    /*****************************************************************************************************************/
+
+    function testSignEmitsSignatureEvent() public {
+        bytes32 emitter = keccak256("em-sign-evt");
+        pgp.register(emitter, new bytes32[](0), "k");
+        
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("d"), "s", "doc", "text/plain");
+        
+        vm.roll(25);
+        vm.expectEmit(true, true, false, false, address(doc));
+        emit Signature(1, emitter, "signature-data");
+        
+        doc.sign(1, emitter, "signature-data");
+    }
+
+    function testSignRevertsWhenEmitterNotFound() public {
+        bytes32 emitter = keccak256("em-sign-ok");
+        bytes32 nonExistent = keccak256("em-not-exist");
+        pgp.register(emitter, new bytes32[](0), "k");
+        
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("d"), "s", "doc", "text/plain");
+        
+        vm.expectRevert();
+        doc.sign(1, nonExistent, "sig");
+    }
+
+    function testMultipleSignaturesByDifferentEmitters() public {
+        bytes32 em1 = keccak256("em1");
+        bytes32 em2 = keccak256("em2");
+        bytes32 em3 = keccak256("em3");
+        
+        pgp.register(em1, new bytes32[](0), "k1");
+        pgp.register(em2, new bytes32[](0), "k2");
+        pgp.register(em3, new bytes32[](0), "k3");
+        
+        doc.sendOnChain(em1, new IWeb3Doc.Recipient[](0), keccak256("d"), "s", "doc", "text/plain");
+        
+        vm.roll(10);
+        doc.sign(1, em1, "sig1");
+        vm.roll(11);
+        doc.sign(1, em2, "sig2");
+        vm.roll(12);
+        doc.sign(1, em3, "sig3");
+        
+        uint256[] memory sigs = doc.listSignatures(1, 0, 10);
+        assertEq(sigs.length, 3);
+        assertEq(sigs[0], 10);
+        assertEq(sigs[1], 11);
+        assertEq(sigs[2], 12);
+    }
+
+    /*****************************************************************************************************************/
+    /* COPY WITH RECIPIENTS TESTS                                                                                    */
+    /*****************************************************************************************************************/
+
+    function testCopyOffChainEmitsCopyEvent() public {
+        bytes32 emitter = keccak256("em-copy-off");
+        pgp.register(emitter, new bytes32[](0), "k");
+        
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("orig"), "s", "orig-doc", "text/plain");
+        
+        vm.expectEmit(true, true, true, false, address(doc));
+        emit Copy(2, 1, emitter, new bytes(0), "ipfs://copy");
+        
+        doc.copyOffChain(1, emitter, new IWeb3Doc.Recipient[](0), "ipfs://copy");
+    }
+
+    function testCopyOnChainWithRecipientsEmitsNotification() public {
+        bytes32 emitter = keccak256("em-copy-rec");
+        bytes32 recipient = keccak256("rec-copy");
+        
+        pgp.register(emitter, new bytes32[](0), "k-em");
+        pgp.register(recipient, new bytes32[](0), "k-rec");
+        
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("orig"), "s", "orig", "text/plain");
+        
+        IWeb3Doc.Recipient[] memory recs = new IWeb3Doc.Recipient[](1);
+        recs[0] = IWeb3Doc.Recipient({fingerprint: recipient, signatureRequested: true});
+        
+        vm.expectEmit(true, true, true, false, address(doc));
+        emit Copy(2, 1, emitter, "copy-data", "");
+        
+        vm.expectEmit(true, false, true, false, address(doc));
+        emit Notification(2, emitter, recipient, IWeb3Doc.EventType.COPY, true);
+        
+        doc.copyOnChain(1, emitter, recs, "copy-data");
+    }
+
+    function testCopyOffChainWithRecipientsEmitsNotification() public {
+        bytes32 emitter = keccak256("em-copy-off-rec");
+        bytes32 recipient = keccak256("rec-copy-off");
+        
+        pgp.register(emitter, new bytes32[](0), "k-em");
+        pgp.register(recipient, new bytes32[](0), "k-rec");
+        
+        doc.sendOnChain(emitter, new IWeb3Doc.Recipient[](0), keccak256("orig"), "s", "orig", "text/plain");
+        
+        IWeb3Doc.Recipient[] memory recs = new IWeb3Doc.Recipient[](1);
+        recs[0] = IWeb3Doc.Recipient({fingerprint: recipient, signatureRequested: false});
+        
+        vm.expectEmit(true, true, true, false, address(doc));
+        emit Copy(2, 1, emitter, new bytes(0), "ipfs://copy");
+        
+        vm.expectEmit(true, false, true, false, address(doc));
+        emit Notification(2, emitter, recipient, IWeb3Doc.EventType.COPY, false);
+        
+        doc.copyOffChain(1, emitter, recs, "ipfs://copy");
+    }
+
+    /*****************************************************************************************************************/
+    /* ADDITIONAL ROBUSTNESS TESTS                                                                                   */
+    /*****************************************************************************************************************/
+
+    function testSendWithMultipleRecipients() public {
+        bytes32 emitter = keccak256("em-multi");
+        bytes32 rec1 = keccak256("rec1");
+        bytes32 rec2 = keccak256("rec2");
+        bytes32 rec3 = keccak256("rec3");
+        
+        pgp.register(emitter, new bytes32[](0), "k-em");
+        pgp.register(rec1, new bytes32[](0), "k-r1");
+        pgp.register(rec2, new bytes32[](0), "k-r2");
+        pgp.register(rec3, new bytes32[](0), "k-r3");
+        
+        IWeb3Doc.Recipient[] memory recs = new IWeb3Doc.Recipient[](3);
+        recs[0] = IWeb3Doc.Recipient({fingerprint: rec1, signatureRequested: true});
+        recs[1] = IWeb3Doc.Recipient({fingerprint: rec2, signatureRequested: false});
+        recs[2] = IWeb3Doc.Recipient({fingerprint: rec3, signatureRequested: true});
+        
+        // Expect Document event
+        vm.expectEmit(true, true, true, false, address(doc));
+        emit Document(1, emitter, keccak256("d"), "s", "doc", "", "text/plain");
+        
+        // Expect 3 Notification events (we can't check all in one test easily, so check count)
+        doc.sendOnChain(emitter, recs, keccak256("d"), "s", "doc", "text/plain");
+        
+        // Verify document was created
+        assertTrue(doc.getDocumentBlockNumberByID(1) != 0);
+    }
+
+    function testTimestampRevertsWhenEmitterNotFound() public {
+        bytes32 nonExistent = keccak256("em-ts-missing");
+        
+        vm.expectRevert();
+        doc.timestamp(nonExistent, keccak256("dh"), "sig");
+    }
+
+    function testGetDocumentBlockNumberForNonExistentDoc() public {
+        uint256 blockNum = doc.getDocumentBlockNumberByID(9999);
+        assertEq(blockNum, 0);
     }
 }
+

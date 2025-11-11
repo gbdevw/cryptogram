@@ -332,4 +332,201 @@ contract Web3PGPTest is Test {
         // innerSucceeded should be false because nonReentrant prevented reentry
         assertTrue(!attacker.innerSucceeded());
     }
+
+    /*****************************************************************************************************************/
+    /* UUPS UPGRADE TESTS                                                                                            */
+    /*****************************************************************************************************************/
+
+    function testUpgraderCanUpgrade() public {
+        // Deploy new implementation (using same contract for simplicity)
+        Web3PGP newImplementation = new Web3PGP();
+        
+        // Register a key to track state
+        bytes32 fp = keccak256("upgrade-test");
+        pgp.register(fp, new bytes32[](0), "key");
+        assertTrue(pgp.exists(fp));
+        
+        // Upgrader upgrades the contract
+        vm.prank(upgrader);
+        pgp.upgradeToAndCall(address(newImplementation), "");
+        
+        // State should be preserved
+        assertTrue(pgp.exists(fp));
+    }
+
+    function testNonUpgraderCannotUpgrade() public {
+        Web3PGP newImplementation = new Web3PGP();
+        
+        // Alice (non-upgrader) cannot upgrade
+        vm.prank(alice);
+        vm.expectRevert();
+        pgp.upgradeToAndCall(address(newImplementation), "");
+    }
+
+    function testUpgradePreservesAllState() public {
+        // Register keys with subkeys
+        bytes32 parent = keccak256("parent-upgrade");
+        bytes32 sub1 = keccak256("sub1-upgrade");
+        pgp.register(parent, new bytes32[](0), "parent-key");
+        pgp.addSubkey(parent, sub1, "sub1-key");
+        
+        // Revoke the parent
+        vm.roll(100);
+        pgp.revoke(parent, "revocation");
+        
+        // Deploy and upgrade
+        Web3PGP newImplementation = new Web3PGP();
+        vm.prank(upgrader);
+        pgp.upgradeToAndCall(address(newImplementation), "");
+        
+        // Verify all state preserved
+        assertTrue(pgp.exists(parent));
+        assertTrue(pgp.isSubKey(sub1));
+        assertEq(pgp.parentOf(sub1), parent);
+        
+        // Verify revocations preserved
+        uint256[] memory revs = pgp.listRevocations(parent, 0, 10);
+        assertEq(revs.length, 1);
+        assertEq(revs[0], 100);
+        
+        // Verify subkeys preserved
+        bytes32[] memory subs = pgp.listSubkeys(parent, 0, 10);
+        assertEq(subs.length, 1);
+        assertEq(subs[0], sub1);
+        
+        // Verify can still use functions after upgrade
+        bytes32 newKey = keccak256("post-upgrade");
+        pgp.register(newKey, new bytes32[](0), "new-key");
+        assertTrue(pgp.exists(newKey));
+    }
+
+    /*****************************************************************************************************************/
+    /* FLATFEE RBAC TESTS                                                                                            */
+    /*****************************************************************************************************************/
+
+    function testTreasurerCanUpdateFee() public {
+        assertEq(pgp.requestedFee(), 0);
+        
+        vm.prank(treasurer);
+        pgp.updateRequestedFee(1 ether);
+        
+        assertEq(pgp.requestedFee(), 1 ether);
+    }
+
+    function testNonTreasurerCannotUpdateFee() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        pgp.updateRequestedFee(1 ether);
+        
+        assertEq(pgp.requestedFee(), 0);
+    }
+
+    function testTreasurerCanWithdrawFees() public {
+        // Set a fee and have alice pay it
+        vm.prank(treasurer);
+        pgp.updateRequestedFee(1 ether);
+        
+        bytes32 fp = keccak256("fee-test");
+        vm.prank(alice);
+        pgp.register{value: 1 ether}(fp, new bytes32[](0), "key");
+        
+        assertEq(address(pgp).balance, 1 ether);
+        
+        uint256 treasurerBalanceBefore = treasurer.balance;
+        
+        vm.prank(treasurer);
+        pgp.withdrawFees(treasurer);
+        
+        assertEq(address(pgp).balance, 0);
+        assertEq(treasurer.balance, treasurerBalanceBefore + 1 ether);
+    }
+
+    function testNonTreasurerCannotWithdrawFees() public {
+        // Set a fee and have alice pay it
+        vm.prank(treasurer);
+        pgp.updateRequestedFee(1 ether);
+        
+        bytes32 fp = keccak256("fee-test2");
+        vm.prank(alice);
+        pgp.register{value: 1 ether}(fp, new bytes32[](0), "key");
+        
+        assertEq(address(pgp).balance, 1 ether);
+        
+        vm.prank(alice);
+        vm.expectRevert();
+        pgp.withdrawFees(alice);
+        
+        assertEq(address(pgp).balance, 1 ether);
+    }
+
+    /*****************************************************************************************************************/
+    /* REGISTER WITH SUBKEYS TESTS                                                                                   */
+    /*****************************************************************************************************************/
+
+    function testRegisterWithInitialSubkeys() public {
+        bytes32 parent = keccak256("parent-init");
+        bytes32 sub1 = keccak256("sub1-init");
+        bytes32 sub2 = keccak256("sub2-init");
+        
+        bytes32[] memory subkeys = new bytes32[](2);
+        subkeys[0] = sub1;
+        subkeys[1] = sub2;
+        
+        // Expect KeyRegistered event with subkeys
+        vm.expectEmit(true, false, false, true, address(pgp));
+        emit KeyRegistered(parent, subkeys, "parent-with-subs");
+        
+        pgp.register(parent, subkeys, "parent-with-subs");
+        
+        // Verify parent exists
+        assertTrue(pgp.exists(parent));
+        
+        // Verify subkeys are registered
+        assertTrue(pgp.isSubKey(sub1));
+        assertTrue(pgp.isSubKey(sub2));
+        assertEq(pgp.parentOf(sub1), parent);
+        assertEq(pgp.parentOf(sub2), parent);
+        
+        // Verify listSubkeys returns them
+        bytes32[] memory listed = pgp.listSubkeys(parent, 0, 10);
+        assertEq(listed.length, 2);
+        assertEq(listed[0], sub1);
+        assertEq(listed[1], sub2);
+    }
+
+    function testAddSubkeyEmitsEvent() public {
+        bytes32 parent = keccak256("parent-event");
+        bytes32 sub = keccak256("sub-event");
+        
+        pgp.register(parent, new bytes32[](0), "parent");
+        
+        // Expect SubkeyAdded event
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit SubkeyAdded(parent, sub, "subkey-data");
+        
+        pgp.addSubkey(parent, sub, "subkey-data");
+        
+        assertTrue(pgp.isSubKey(sub));
+        assertEq(pgp.parentOf(sub), parent);
+    }
+
+    function testMultipleRevocationsOfSameKey() public {
+        bytes32 fp = keccak256("multi-rev");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Issue multiple revocations at different blocks
+        vm.roll(100);
+        pgp.revoke(fp, "rev1");
+        vm.roll(200);
+        pgp.revoke(fp, "rev2");
+        vm.roll(300);
+        pgp.revoke(fp, "rev3");
+        
+        // Verify all revocations are recorded
+        uint256[] memory revs = pgp.listRevocations(fp, 0, 10);
+        assertEq(revs.length, 3);
+        assertEq(revs[0], 100);
+        assertEq(revs[1], 200);
+        assertEq(revs[2], 300);
+    }
 }
