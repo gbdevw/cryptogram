@@ -1,8 +1,6 @@
 import { Web3PGP as Web3PGPABI }  from '../abis/Web3PGP';
-import * as openpgp from 'openpgp';
-import { OpenPGPUtils } from '../utils/openpgp';
-import { toBytes32, to0x } from '../utils/0xstr';
-import { Address, PublicClient, TransactionReceipt, WalletClient, getContract, GetContractReturnType } from 'viem';
+import { toBytes32 } from '../utils/0xstr';
+import { Address, PublicClient, TransactionReceipt, WalletClient } from 'viem';
 import { IWeb3PGP } from './web3pgp.interface';
 
 export class Web3PGP implements IWeb3PGP {
