@@ -1,4 +1,5 @@
 import { Address, TransactionReceipt } from 'viem';
+import { KeyRegisteredLog, KeyRevokedLog, SubkeyAddedLog } from './types/types';
 
 /**
  * Interface for the Web3PGP contract methods.
@@ -150,4 +151,77 @@ export interface IWeb3PGP {
      * @return Transaction receipt after upgrade.
      */
     upgradeToAndCall(newImplementation: Address, data: `0x${string}`): Promise<TransactionReceipt>;
+
+    /*****************************************************************************************************************/
+    /* LOGS FUNCTIONS                                                                                                */
+    /*****************************************************************************************************************/
+
+    /**
+     * Get the log of a key registration event using the provided primary key fingerprint and block number.
+     *
+     * @param primaryKeyFingerprint The fingerprint of the primary key to retrieve the log for.
+     * @param blockNumber The block number where the event was emitted.
+     * @throws Error if the event log cannot be found.
+     * @return The KeyRegisteredLog object containing event details.
+     */
+    getKeyRegisteredLog(primaryKeyFingerprint: `0x${string}`, blockNumber: bigint): Promise<KeyRegisteredLog>;
+
+    /**
+     * Search for KeyRegistered event logs.
+     *
+     * @param primaryKeyFingerprint The fingerprint(s) of the primary key to search logs for. Default to all keys.
+     * @param fromBlock The starting block number of the search range. 0 is used by default.
+     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @return An array of KeyRegisteredLog objects matching the search criteria.
+     */
+    searchKeyRegisteredLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRegisteredLog[]>;
+
+    /**
+     * Get the log of a subkey addition event using the provided primary key fingerprint, subkey fingerprint, and block number.
+     * @param primaryKeyFingerprint The fingerprint of the primary key.
+     * @param subkeyFingerprint The fingerprint of the subkey.
+     * @param blockNumber The block number where the event was emitted.
+     * @throws Error if the event log cannot be found.
+     * @return The SubkeyAddedLog object containing event details.
+     */
+    getSubkeyAddedLog(primaryKeyFingerprint: `0x${string}`, subkeyFingerprint: `0x${string}`, blockNumber: bigint): Promise<SubkeyAddedLog>;
+
+    /**
+     * Search for SubkeyAdded event logs.
+     * @param primaryKeyFingerprint The fingerprint(s) of the primary key to search logs for. Default to all keys.
+     * @param subkeyFingerprint The fingerprint(s) of the subkey to search logs for. Default to all subkeys.
+     * @param fromBlock The starting block number of the search range. 0 is used by default.
+     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @return An array of SubkeyAddedLog objects matching the search criteria.
+     */
+    searchSubkeyAddedLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], subkeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<SubkeyAddedLog[]>;
+
+    /**
+     * Get the log of a key revocation event using the provided fingerprint and block number.
+     * @param fingerprint The fingerprint of the key to retrieve the log for.
+     * @param blockNumber The block number where the event was emitted.
+     * @throws Error if the event log cannot be found.
+     * @return The KeyRevokedLog object containing event details.
+     */
+    getKeyRevokedLog(fingerprint: `0x${string}`, blockNumber: bigint): Promise<KeyRevokedLog>;
+
+    /**
+     * Search for KeyRevoked event logs.
+     * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
+     * @param fromBlock The starting block number of the search range. 0 is used by default.
+     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @return An array of KeyRevokedLog objects matching the search criteria.
+     */
+    searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRevokedLog[]>;
+
+    /*****************************************************************************************************************/
+    /* UTILITY FUNCTIONS                                                                                             */
+    /*****************************************************************************************************************/
+
+    /**
+     * Get the timestamp of a specific block.
+     * @param block The block to get the timestamp for (block number or block hash).
+     * @return The Date object representing the block timestamp.
+     */
+    getBlockTimestamp(block: bigint | `0x${string}`): Promise<Date>;
 }
