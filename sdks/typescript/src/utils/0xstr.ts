@@ -22,6 +22,7 @@ export class HexTooLongError extends Error {
     }
 }
 
+export const BYTES32_ZERO = '0x' + '00'.repeat(32) as `0x${string}`;
 /**
  * Normalize a hex fingerprint into a valid bytes32.
  * Pads left with zeros if it's shorter than 32 bytes.
