@@ -2,6 +2,7 @@ import { Web3PGP as Web3PGPABI }  from '../abis/Web3PGP';
 import { toBytes32 } from '../utils/0xstr';
 import { Address, PublicClient, TransactionReceipt, WalletClient } from 'viem';
 import { IWeb3PGP } from './web3pgp.interface';
+import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog } from './types/types';
 
 export class Web3PGP implements IWeb3PGP {
 
@@ -376,5 +377,165 @@ export class Web3PGP implements IWeb3PGP {
         const txhash = await this.walletClient!.writeContract(request);
         // Wait for transaction to be mined and return the receipt
         return this.client.waitForTransactionReceipt({ hash: txhash });
+    }
+
+    /*****************************************************************************************************************/
+    /* LOGS FUNCTIONS                                                                                                */
+    /*****************************************************************************************************************/
+
+    /**
+     * Get the log of a key registration event using the provided primary key fingerprint and block number.
+     *
+     * @param primaryKeyFingerprint The fingerprint of the primary key to retrieve the log for.
+     * @param blockNumber The block number where the event was emitted.
+     * @throws Error if the event log cannot be found.
+     * @return The KeyRegisteredLog object containing event details.
+     */
+    public async getKeyRegisteredLog(primaryKeyFingerprint: `0x${string}`, blockNumber: bigint): Promise<KeyRegisteredLog> {
+        const logs = await this.searchKeyRegisteredLogs(primaryKeyFingerprint, blockNumber, blockNumber);
+        if (logs.length === 0 || !logs[0]) {
+            throw new Error(`KeyRegistered event log not found for primaryKeyFingerprint ${primaryKeyFingerprint} at block ${blockNumber}`);
+        }
+        return logs[0];
+    }
+
+    /**
+     * Search for KeyRegistered event logs.
+     *
+     * @param primaryKeyFingerprint The fingerprint(s) of the primary key to search logs for. Default to all keys.
+     * @param fromBlock The starting block number of the search range. 0 is used by default.
+     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @return An array of KeyRegisteredLog objects matching the search criteria.
+     */
+    public async searchKeyRegisteredLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRegisteredLog[]> {
+        const logs = await this.client.getLogs({
+            address: this.address,
+            event: Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRegistered')!,
+            fromBlock,
+            toBlock,
+            args: primaryKeyFingerprint ? {
+                primaryKeyFingerprint: Array.isArray(primaryKeyFingerprint) ? primaryKeyFingerprint.map(toBytes32) : toBytes32(primaryKeyFingerprint)
+            } : undefined
+        });
+        
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            transactionHash: log.transactionHash,
+            primaryKeyFingerprint: log.args.primaryKeyFingerprint,
+            subkeyFingerprints: log.args.subkeyFingerprints,
+            openPGPMsg: log.args.openPGPMsg
+        }));
+    }
+
+    /**
+     * Get the log of a subkey addition event using the provided primary key fingerprint, subkey fingerprint, and block number.
+     * @param primaryKeyFingerprint The fingerprint of the primary key.
+     * @param subkeyFingerprint The fingerprint of the subkey.
+     * @param blockNumber The block number where the event was emitted.
+     * @throws Error if the event log cannot be found.
+     * @return The SubkeyAddedLog object containing event details.
+     */
+    public async getSubkeyAddedLog(primaryKeyFingerprint: `0x${string}`, subkeyFingerprint: `0x${string}`, blockNumber: bigint): Promise<SubkeyAddedLog> {
+        const logs = await this.searchSubkeyAddedLogs(primaryKeyFingerprint, subkeyFingerprint, blockNumber, blockNumber);
+        if (logs.length === 0 || !logs[0]) {
+            throw new Error(`SubkeyAdded event log not found for primaryKeyFingerprint ${primaryKeyFingerprint}, subkeyFingerprint ${subkeyFingerprint} at block ${blockNumber}`);
+        }
+        return logs[0];
+    }
+
+    /**
+     * Search for SubkeyAdded event logs.
+     * @param primaryKeyFingerprint The fingerprint(s) of the primary key to search logs for. Default to all keys.
+     * @param subkeyFingerprint The fingerprint(s) of the subkey to search logs for. Default to all subkeys.
+     * @param fromBlock The starting block number of the search range. 0 is used by default.
+     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @return An array of SubkeyAddedLog objects matching the search criteria.
+     */
+    public async searchSubkeyAddedLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], subkeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<SubkeyAddedLog[]> {
+        const logs = await this.client.getLogs({
+            address: this.address,
+            event: Web3PGPABI.find(item => item.type === 'event' && item.name === 'SubkeyAdded')!,
+            fromBlock,
+            toBlock,
+            args: {
+                ...(primaryKeyFingerprint ? {
+                    primaryKeyFingerprint: Array.isArray(primaryKeyFingerprint) ? primaryKeyFingerprint.map(toBytes32) : toBytes32(primaryKeyFingerprint)
+                } : {}),
+                ...(subkeyFingerprint ? {
+                    subkeyFingerprint: Array.isArray(subkeyFingerprint) ? subkeyFingerprint.map(toBytes32) : toBytes32(subkeyFingerprint)
+                } : {})
+            }
+        });
+        
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            transactionHash: log.transactionHash,
+            primaryKeyFingerprint: log.args.primaryKeyFingerprint,
+            subkeyFingerprint: log.args.subkeyFingerprint,
+            openPGPMsg: log.args.openPGPMsg
+        }));
+    }
+
+    /**
+     * Get the log of a key revocation event using the provided fingerprint and block number.
+     * @param fingerprint The fingerprint of the key to retrieve the log for.
+     * @param blockNumber The block number where the event was emitted.
+     * @throws Error if the event log cannot be found.
+     * @return The KeyRevokedLog object containing event details.
+     */
+    public async getKeyRevokedLog(fingerprint: `0x${string}`, blockNumber: bigint): Promise<KeyRevokedLog> {
+        const logs = await this.searchKeyRevokedLogs(fingerprint, blockNumber, blockNumber);
+        if (logs.length === 0 || !logs[0]) {
+            throw new Error(`KeyRevoked event log not found for fingerprint ${fingerprint} at block ${blockNumber}`);
+        }
+        return logs[0];
+    }
+
+    /**
+     * Search for KeyRevoked event logs.
+     * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
+     * @param fromBlock The starting block number of the search range. 0 is used by default.
+     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @return An array of KeyRevokedLog objects matching the search criteria.
+     */
+    public async searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRevokedLog[]> {
+        const logs = await this.client.getLogs({
+            address: this.address,
+            event: Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRevoked')!,
+            fromBlock,
+            toBlock,
+            args: fingerprint ? {
+                fingerprint: Array.isArray(fingerprint) ? fingerprint.map(toBytes32) : toBytes32(fingerprint)
+            } : undefined
+        });
+        
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            revocationCertificate: log.args.revocationCertificate
+        }));
+    }
+
+    /*****************************************************************************************************************/
+    /* UTILITY FUNCTIONS                                                                                             */
+    /*****************************************************************************************************************/
+
+    /**
+     * Get the timestamp of a specific block.
+     * @param block The block to get the timestamp for (block number or block hash).
+     * @return The Date object representing the block timestamp.
+     */
+    public async getBlockTimestamp(block: bigint | `0x${string}`): Promise<Date> {
+        if (typeof block === 'bigint') {
+            const b = await this.client.getBlock({ blockNumber: block });
+            return new Date(Number(b.timestamp) * 1000);
+        } else {
+            const b = await this.client.getBlock({ blockHash: block });
+            return new Date(Number(b.timestamp) * 1000);
+        }
     }
 }
