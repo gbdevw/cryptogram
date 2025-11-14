@@ -7,6 +7,9 @@ const createMockPublicClient = (): PublicClient => ({
     readContract: jest.fn(),
     simulateContract: jest.fn(),
     waitForTransactionReceipt: jest.fn(),
+    getLogs: jest.fn(),
+    getBlock: jest.fn(),
+    getBlockNumber: jest.fn().mockResolvedValue(1000n),
 } as unknown as PublicClient);
 
 const createMockWalletClient = (): WalletClient => ({
@@ -556,6 +559,459 @@ describe('Web3PGP', () => {
                     })
                 );
                 expect(result).toEqual(mockReceipt);
+            });
+        });
+    });
+
+    describe('LOG FUNCTIONS', () => {
+        const mockBlockNumber = BigInt(12345);
+        const mockBlockHash = '0x' + '1'.repeat(64) as `0x${string}`;
+        const mockTxHash = '0x' + '2'.repeat(64) as `0x${string}`;
+
+        describe('searchKeyRegisteredLogs', () => {
+            test('should search logs with single fingerprint', async () => {
+                const mockLogs = [{
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    args: {
+                        primaryKeyFingerprint: mockFingerprint,
+                        subkeyFingerprints: [mockFingerprint2],
+                        openPGPMsg: mockOpenPGPMsg
+                    }
+                }];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.searchKeyRegisteredLogs(mockFingerprint, BigInt(0), BigInt(1000));
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith({
+                    address: contractAddress,
+                    event: expect.objectContaining({ name: 'KeyRegistered' }),
+                    fromBlock: BigInt(0),
+                    toBlock: BigInt(1000),
+                    args: {
+                        primaryKeyFingerprint: toBytes32(mockFingerprint)
+                    }
+                });
+                expect(result).toHaveLength(1);
+                expect(result[0]).toEqual({
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    primaryKeyFingerprint: mockFingerprint,
+                    subkeyFingerprints: [mockFingerprint2],
+                    openPGPMsg: mockOpenPGPMsg
+                });
+            });
+
+            test('should search logs with multiple fingerprints', async () => {
+                const mockLogs = [{
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    args: {
+                        primaryKeyFingerprint: mockFingerprint,
+                        subkeyFingerprints: [],
+                        openPGPMsg: mockOpenPGPMsg
+                    }
+                }];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const fingerprints = [mockFingerprint, mockFingerprint2];
+                const result = await web3pgp.searchKeyRegisteredLogs(fingerprints, BigInt(0), BigInt(1000));
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith({
+                    address: contractAddress,
+                    event: expect.objectContaining({ name: 'KeyRegistered' }),
+                    fromBlock: BigInt(0),
+                    toBlock: BigInt(1000),
+                    args: {
+                        primaryKeyFingerprint: fingerprints.map(toBytes32)
+                    }
+                });
+                expect(result).toHaveLength(1);
+            });
+
+            test('should search all logs when no fingerprint specified', async () => {
+                const mockLogs: any[] = [];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.searchKeyRegisteredLogs();
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith({
+                    address: contractAddress,
+                    event: expect.objectContaining({ name: 'KeyRegistered' }),
+                    fromBlock: 0n,
+                    toBlock: 1000n
+                });
+                expect(result).toEqual([]);
+            });
+
+            test('should handle logs with empty subkeys', async () => {
+                const mockLogs = [{
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    args: {
+                        primaryKeyFingerprint: mockFingerprint,
+                        subkeyFingerprints: [],
+                        openPGPMsg: mockOpenPGPMsg
+                    }
+                }];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.searchKeyRegisteredLogs(mockFingerprint);
+
+                expect(result).toHaveLength(1);
+                expect(result[0]!.subkeyFingerprints).toEqual([]);
+            });
+        });
+
+        describe('getKeyRegisteredLog', () => {
+            test('should get specific log by fingerprint and block', async () => {
+                const mockLogs = [{
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    args: {
+                        primaryKeyFingerprint: mockFingerprint,
+                        subkeyFingerprints: [mockFingerprint2],
+                        openPGPMsg: mockOpenPGPMsg
+                    }
+                }];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.getKeyRegisteredLog(mockFingerprint, mockBlockNumber);
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        fromBlock: mockBlockNumber,
+                        toBlock: mockBlockNumber,
+                    })
+                );
+                expect(result).toEqual({
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    primaryKeyFingerprint: mockFingerprint,
+                    subkeyFingerprints: [mockFingerprint2],
+                    openPGPMsg: mockOpenPGPMsg
+                });
+            });
+
+            test('should throw error when log not found', async () => {
+                (publicClient.getLogs as jest.Mock).mockResolvedValue([]);
+
+                await expect(web3pgp.getKeyRegisteredLog(mockFingerprint, mockBlockNumber))
+                    .rejects.toThrow(`KeyRegistered event log not found for primaryKeyFingerprint ${mockFingerprint} at block ${mockBlockNumber}`);
+            });
+        });
+
+        describe('searchSubkeyAddedLogs', () => {
+            test('should search logs with primary and subkey fingerprints', async () => {
+                const mockLogs = [{
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    args: {
+                        primaryKeyFingerprint: mockFingerprint,
+                        subkeyFingerprint: mockFingerprint2,
+                        openPGPMsg: mockOpenPGPMsg
+                    }
+                }];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.searchSubkeyAddedLogs(mockFingerprint, mockFingerprint2, BigInt(0), BigInt(1000));
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith({
+                    address: contractAddress,
+                    event: expect.objectContaining({ name: 'SubkeyAdded' }),
+                    fromBlock: BigInt(0),
+                    toBlock: BigInt(1000),
+                    args: {
+                        primaryKeyFingerprint: toBytes32(mockFingerprint),
+                        subkeyFingerprint: toBytes32(mockFingerprint2)
+                    }
+                });
+                expect(result).toHaveLength(1);
+                expect(result[0]).toEqual({
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    primaryKeyFingerprint: mockFingerprint,
+                    subkeyFingerprint: mockFingerprint2,
+                    openPGPMsg: mockOpenPGPMsg
+                });
+            });
+
+            test('should search logs with only primary fingerprint', async () => {
+                const mockLogs: any[] = [];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.searchSubkeyAddedLogs(mockFingerprint);
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        args: {
+                            primaryKeyFingerprint: toBytes32(mockFingerprint)
+                        }
+                    })
+                );
+                expect(result).toEqual([]);
+            });
+
+            test('should search logs with only subkey fingerprint', async () => {
+                const mockLogs: any[] = [];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.searchSubkeyAddedLogs(undefined, mockFingerprint2);
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        args: {
+                            subkeyFingerprint: toBytes32(mockFingerprint2)
+                        }
+                    })
+                );
+                expect(result).toEqual([]);
+            });
+
+            test('should search logs with arrays of fingerprints', async () => {
+                const mockLogs: any[] = [];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const primaryFingerprints = [mockFingerprint];
+                const subkeyFingerprints = [mockFingerprint2];
+                const result = await web3pgp.searchSubkeyAddedLogs(primaryFingerprints, subkeyFingerprints);
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        args: {
+                            primaryKeyFingerprint: primaryFingerprints.map(toBytes32),
+                            subkeyFingerprint: subkeyFingerprints.map(toBytes32)
+                        }
+                    })
+                );
+                expect(result).toEqual([]);
+            });
+
+            test('should search all logs when no filter specified', async () => {
+                const mockLogs: any[] = [];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.searchSubkeyAddedLogs();
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith({
+                    address: contractAddress,
+                    event: expect.objectContaining({ name: 'SubkeyAdded' }),
+                    fromBlock: 0n,
+                    toBlock: 1000n
+                });
+                expect(result).toEqual([]);
+            });
+        });
+
+        describe('getSubkeyAddedLog', () => {
+            test('should get specific log by fingerprints and block', async () => {
+                const mockLogs = [{
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    args: {
+                        primaryKeyFingerprint: mockFingerprint,
+                        subkeyFingerprint: mockFingerprint2,
+                        openPGPMsg: mockOpenPGPMsg
+                    }
+                }];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.getSubkeyAddedLog(mockFingerprint, mockFingerprint2, mockBlockNumber);
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        fromBlock: mockBlockNumber,
+                        toBlock: mockBlockNumber,
+                    })
+                );
+                expect(result).toEqual({
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    primaryKeyFingerprint: mockFingerprint,
+                    subkeyFingerprint: mockFingerprint2,
+                    openPGPMsg: mockOpenPGPMsg
+                });
+            });
+
+            test('should throw error when log not found', async () => {
+                (publicClient.getLogs as jest.Mock).mockResolvedValue([]);
+
+                await expect(web3pgp.getSubkeyAddedLog(mockFingerprint, mockFingerprint2, mockBlockNumber))
+                    .rejects.toThrow(`SubkeyAdded event log not found for primaryKeyFingerprint ${mockFingerprint}, subkeyFingerprint ${mockFingerprint2} at block ${mockBlockNumber}`);
+            });
+        });
+
+        describe('searchKeyRevokedLogs', () => {
+            test('should search logs with single fingerprint', async () => {
+                const mockLogs = [{
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    args: {
+                        fingerprint: mockFingerprint,
+                        revocationCertificate: mockRevocationCert
+                    }
+                }];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.searchKeyRevokedLogs(mockFingerprint, BigInt(0), BigInt(1000));
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith({
+                    address: contractAddress,
+                    event: expect.objectContaining({ name: 'KeyRevoked' }),
+                    fromBlock: BigInt(0),
+                    toBlock: BigInt(1000),
+                    args: {
+                        fingerprint: toBytes32(mockFingerprint)
+                    }
+                });
+                expect(result).toHaveLength(1);
+                expect(result[0]).toEqual({
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    fingerprint: mockFingerprint,
+                    revocationCertificate: mockRevocationCert
+                });
+            });
+
+            test('should search logs with multiple fingerprints', async () => {
+                const mockLogs: any[] = [];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const fingerprints = [mockFingerprint, mockFingerprint2];
+                const result = await web3pgp.searchKeyRevokedLogs(fingerprints, BigInt(0), BigInt(1000));
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith({
+                    address: contractAddress,
+                    event: expect.objectContaining({ name: 'KeyRevoked' }),
+                    fromBlock: BigInt(0),
+                    toBlock: BigInt(1000),
+                    args: {
+                        fingerprint: fingerprints.map(toBytes32)
+                    }
+                });
+                expect(result).toEqual([]);
+            });
+
+            test('should search all logs when no fingerprint specified', async () => {
+                const mockLogs: any[] = [];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.searchKeyRevokedLogs();
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith({
+                    address: contractAddress,
+                    event: expect.objectContaining({ name: 'KeyRevoked' }),
+                    fromBlock: 0n,
+                    toBlock: 1000n
+                });
+                expect(result).toEqual([]);
+            });
+        });
+
+        describe('getKeyRevokedLog', () => {
+            test('should get specific log by fingerprint and block', async () => {
+                const mockLogs = [{
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    args: {
+                        fingerprint: mockFingerprint,
+                        revocationCertificate: mockRevocationCert
+                    }
+                }];
+                (publicClient.getLogs as jest.Mock).mockResolvedValue(mockLogs);
+
+                const result = await web3pgp.getKeyRevokedLog(mockFingerprint, mockBlockNumber);
+
+                expect(publicClient.getLogs).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        fromBlock: mockBlockNumber,
+                        toBlock: mockBlockNumber,
+                    })
+                );
+                expect(result).toEqual({
+                    blockNumber: mockBlockNumber,
+                    blockHash: mockBlockHash,
+                    transactionHash: mockTxHash,
+                    fingerprint: mockFingerprint,
+                    revocationCertificate: mockRevocationCert
+                });
+            });
+
+            test('should throw error when log not found', async () => {
+                (publicClient.getLogs as jest.Mock).mockResolvedValue([]);
+
+                await expect(web3pgp.getKeyRevokedLog(mockFingerprint, mockBlockNumber))
+                    .rejects.toThrow(`KeyRevoked event log not found for fingerprint ${mockFingerprint} at block ${mockBlockNumber}`);
+            });
+        });
+    });
+
+    describe('UTILITY FUNCTIONS', () => {
+        describe('getBlockTimestamp', () => {
+            const mockTimestamp = BigInt(1699876543); // Timestamp in seconds
+            const mockBlock = {
+                timestamp: mockTimestamp,
+                number: BigInt(12345),
+                hash: '0x' + '1'.repeat(64) as `0x${string}`
+            };
+
+            test('should get timestamp by block number', async () => {
+                (publicClient.getBlock as jest.Mock).mockResolvedValue(mockBlock);
+
+                const result = await web3pgp.getBlockTimestamp(BigInt(12345));
+
+                expect(publicClient.getBlock).toHaveBeenCalledWith({ blockNumber: BigInt(12345) });
+                expect(result).toBeInstanceOf(Date);
+                expect(result.getTime()).toBe(Number(mockTimestamp) * 1000);
+            });
+
+            test('should get timestamp by block hash', async () => {
+                const blockHash = '0x' + '1'.repeat(64) as `0x${string}`;
+                (publicClient.getBlock as jest.Mock).mockResolvedValue(mockBlock);
+
+                const result = await web3pgp.getBlockTimestamp(blockHash);
+
+                expect(publicClient.getBlock).toHaveBeenCalledWith({ blockHash });
+                expect(result).toBeInstanceOf(Date);
+                expect(result.getTime()).toBe(Number(mockTimestamp) * 1000);
+            });
+
+            test('should correctly convert timestamp to Date', async () => {
+                const specificTimestamp = BigInt(1700000000); // Nov 14, 2023
+                (publicClient.getBlock as jest.Mock).mockResolvedValue({
+                    ...mockBlock,
+                    timestamp: specificTimestamp
+                });
+
+                const result = await web3pgp.getBlockTimestamp(BigInt(100));
+
+                const expectedDate = new Date(Number(specificTimestamp) * 1000);
+                expect(result.getTime()).toBe(expectedDate.getTime());
+            });
+
+            test('should handle genesis block with timestamp 0', async () => {
+                (publicClient.getBlock as jest.Mock).mockResolvedValue({
+                    ...mockBlock,
+                    timestamp: BigInt(0)
+                });
+
+                const result = await web3pgp.getBlockTimestamp(BigInt(0));
+
+                expect(result.getTime()).toBe(0);
+                expect(result.toISOString()).toBe('1970-01-01T00:00:00.000Z');
             });
         });
     });

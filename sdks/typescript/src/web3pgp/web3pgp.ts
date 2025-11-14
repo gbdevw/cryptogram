@@ -408,14 +408,21 @@ export class Web3PGP implements IWeb3PGP {
      * @return An array of KeyRegisteredLog objects matching the search criteria.
      */
     public async searchKeyRegisteredLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRegisteredLog[]> {
+        // Use default values: fromBlock = 0n, toBlock = latest block
+        const from = fromBlock ?? 0n;
+        const to = toBlock ?? await this.client.getBlockNumber();
+
+        // Build args only if primaryKeyFingerprint is provided
+        const args = primaryKeyFingerprint !== undefined ? {
+            primaryKeyFingerprint: Array.isArray(primaryKeyFingerprint) ? primaryKeyFingerprint.map(toBytes32) : toBytes32(primaryKeyFingerprint)
+        } : undefined;
+
         const logs = await this.client.getLogs({
             address: this.address,
             event: Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRegistered')!,
-            fromBlock,
-            toBlock,
-            args: primaryKeyFingerprint ? {
-                primaryKeyFingerprint: Array.isArray(primaryKeyFingerprint) ? primaryKeyFingerprint.map(toBytes32) : toBytes32(primaryKeyFingerprint)
-            } : undefined
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
         });
         
         return logs.map(log => ({
@@ -453,19 +460,28 @@ export class Web3PGP implements IWeb3PGP {
      * @return An array of SubkeyAddedLog objects matching the search criteria.
      */
     public async searchSubkeyAddedLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], subkeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<SubkeyAddedLog[]> {
+        // Use default values: fromBlock = 0n, toBlock = latest block
+        const from = fromBlock ?? 0n;
+        const to = toBlock ?? await this.client.getBlockNumber();
+
+        // Build args object, including only defined properties
+        let args: any = undefined;
+        if (primaryKeyFingerprint !== undefined || subkeyFingerprint !== undefined) {
+            args = {};
+            if (primaryKeyFingerprint !== undefined) {
+                args.primaryKeyFingerprint = Array.isArray(primaryKeyFingerprint) ? primaryKeyFingerprint.map(toBytes32) : toBytes32(primaryKeyFingerprint);
+            }
+            if (subkeyFingerprint !== undefined) {
+                args.subkeyFingerprint = Array.isArray(subkeyFingerprint) ? subkeyFingerprint.map(toBytes32) : toBytes32(subkeyFingerprint);
+            }
+        }
+
         const logs = await this.client.getLogs({
             address: this.address,
             event: Web3PGPABI.find(item => item.type === 'event' && item.name === 'SubkeyAdded')!,
-            fromBlock,
-            toBlock,
-            args: {
-                ...(primaryKeyFingerprint ? {
-                    primaryKeyFingerprint: Array.isArray(primaryKeyFingerprint) ? primaryKeyFingerprint.map(toBytes32) : toBytes32(primaryKeyFingerprint)
-                } : {}),
-                ...(subkeyFingerprint ? {
-                    subkeyFingerprint: Array.isArray(subkeyFingerprint) ? subkeyFingerprint.map(toBytes32) : toBytes32(subkeyFingerprint)
-                } : {})
-            }
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
         });
         
         return logs.map(log => ({
@@ -501,14 +517,21 @@ export class Web3PGP implements IWeb3PGP {
      * @return An array of KeyRevokedLog objects matching the search criteria.
      */
     public async searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRevokedLog[]> {
+        // Use default values: fromBlock = 0n, toBlock = latest block
+        const from = fromBlock ?? 0n;
+        const to = toBlock ?? await this.client.getBlockNumber();
+
+        // Build args only if fingerprint is provided
+        const args = fingerprint !== undefined ? {
+            fingerprint: Array.isArray(fingerprint) ? fingerprint.map(toBytes32) : toBytes32(fingerprint)
+        } : undefined;
+
         const logs = await this.client.getLogs({
             address: this.address,
             event: Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRevoked')!,
-            fromBlock,
-            toBlock,
-            args: fingerprint ? {
-                fingerprint: Array.isArray(fingerprint) ? fingerprint.map(toBytes32) : toBytes32(fingerprint)
-            } : undefined
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
         });
         
         return logs.map(log => ({
