@@ -4,6 +4,7 @@ import { IWeb3PGPService } from './web3pgp.service.interface';
 import { IWeb3PGP } from './web3pgp.interface';
 import { BYTES32_ZERO, to0x, toBytes32 } from '../utils/0xstr';
 import { OpenPGPUtils } from '../utils/openpgp';
+import { KeyRegisteredLog, KeyRevokedLog, SubkeyAddedLog } from './types/types';
 
 /*****************************************************************************************************************/
 /* CUSTOM ERRORS                                                                                                 */
@@ -235,6 +236,186 @@ export class Web3PGPService implements IWeb3PGPService {
     }
 
     /*****************************************************************************************************************/
+    /* LOG VALIDATION AND EXTRACTION FUNCTIONS                                                                       */
+    /*****************************************************************************************************************/
+
+    /**
+     * Validate and extract the public key from the KeyRegisteredLog.
+     * 
+     * @description This method validates the data contained in a KeyRegisteredLog event
+     * and extracts the corresponding OpenPGP public key. It ensures that the log data
+     * is well-formed and that the extracted key matches the declared fingerprint.
+     * 
+     * @param log The KeyRegisteredLog event data from the blockchain 
+     * @returns The validated OpenPGP public key
+     * 
+     * @throws Web3PGPServiceValidationError if the log data is invalid or missing required fields
+     * @throws Web3PGPServiceValidationError if the extracted OpenPGP message is invalid or corrupted
+     * @throws Web3PGPServiceValidationError if the primary key fingerprint does not match the log data
+     * @throws Web3PGPServiceValidationError if any declared subkey is missing from the extracted key
+     */
+    public async extractFromKeyRegisteredLog(log: KeyRegisteredLog): Promise<openpgp.PublicKey> {
+        try {
+            // Validate required data are present
+            if (!log.openPGPMsg || !log.primaryKeyFingerprint) {
+                throw new Web3PGPServiceValidationError(`The KeyRegisteredLog event is missing the data needed to extract and validate the public key.`);
+            }
+            // Read and verify the primary key using the hex-encoded binary openPGP message from the log data
+            const primaryKey = await openpgp.readKey({ binaryKey: toBytes(log.openPGPMsg) });
+            // Validate the key fingerprint matches the declared one
+            if (toBytes32(to0x(primaryKey.getFingerprint())) !== toBytes32(to0x(log.primaryKeyFingerprint))) {
+                throw new Web3PGPServiceValidationError(`The fingerprint of the retrieved primary key does not match the declared fingerprint in the KeyRegisteredLog event.`);
+            }
+            // Verify the key contains the declared subkeys and prune the extra ones
+            // Payload should match the on-chain data but extra subkeys may exist and should be ignored (not a critical error)
+            let subkeys: openpgp.Subkey[] = [];
+            for (const subkeyFingerprint of log.subkeyFingerprints || []) {
+                const normalizedSubkeyFingerprint = toBytes32(to0x(subkeyFingerprint));
+                const subkey = primaryKey.subkeys.find(sk => toBytes32(to0x(sk.getFingerprint())) === normalizedSubkeyFingerprint);
+                if (subkey) {
+                    subkeys.push(subkey);
+                } else {
+                    // A declared subkey is missing from the key data - critical error
+                    throw new Web3PGPServiceValidationError(`The primary key does not contain the declared subkey with fingerprint ${subkeyFingerprint} from the KeyRegisteredLog event.`);
+                }
+            }
+            // Prune extra subkeys
+            primaryKey.subkeys = subkeys;
+            console.debug(`[Web3PGP - Service] Successfully extracted primary key ${log.primaryKeyFingerprint} with ${subkeys.length} subkeys from KeyRegisteredLog event`);
+            return primaryKey.toPublic();
+        } catch (err) {
+            if (err instanceof Web3PGPServiceValidationError) {
+                // Rethrow validation errors
+                throw err;
+            }
+            // Wrap other errors
+            throw new Web3PGPServiceValidationError(`Failed to read the OpenPGP message from the KeyRegisteredLog event: ${err}`);
+        }
+    }
+
+    /**
+     * Validate and extract the subkey from the SubkeyAddedLog.
+     * 
+     * @param log The SubkeyAddedLog event data from the blockchain
+     * @returns The validated OpenPGP public key containing the primary key and the added subkey.
+     * @throws Web3PGPServiceValidationError if the log data is invalid or missing required fields
+     * @throws Web3PGPServiceValidationError if the extracted OpenPGP message is invalid or corrupted
+     * @throws Web3PGPServiceValidationError if the primary key fingerprint does not match the log data
+     * @throws Web3PGPServiceValidationError if the subkey is missing from the extracted key
+     * 
+     * @example
+     * ```typescript
+     * const subkey = await service.extractFromSubkeyAddedLog(log);
+     * pk = await pk.update(subkey);
+     * ```
+     */
+    public async extractFromSubkeyAddedLog(log: SubkeyAddedLog): Promise<openpgp.PublicKey> {
+        try {
+            // Validate required data are present
+            if (!log.openPGPMsg || !log.subkeyFingerprint || !log.primaryKeyFingerprint) {
+                throw new Web3PGPServiceValidationError(`The SubkeyAddedLog event is missing the data needed to extract and validate the subkey.`);
+            }
+            // Read and verify the subkey using the hex-encoded binary openPGP message from the log data
+            let pk: openpgp.Key;
+            try {
+                pk = await openpgp.readKey({ binaryKey: toBytes(log.openPGPMsg) });
+                // Sanitize to only include primary key and the subkey
+                pk = OpenPGPUtils.sanitizeSubkey(pk, log.subkeyFingerprint);
+            } catch (err) {
+                throw new Web3PGPServiceValidationError(`Failed to read and sanitize the OpenPGP message for subkey with fingerprint ${log.subkeyFingerprint} from SubkeyAddedLog event: ${err}`);
+            }
+            // Validate the primary key fingerprint matches the declared one
+            if (toBytes32(to0x(pk.getFingerprint())) !== toBytes32(to0x(log.primaryKeyFingerprint))) {
+                throw new Web3PGPServiceValidationError(`The primary key fingerprint ${pk.getFingerprint()} does not match the declared primary key fingerprint ${log.primaryKeyFingerprint} in SubkeyAddedLog event.`);
+            }
+            console.debug(`[Web3PGP - Service] Successfully extracted subkey ${log.subkeyFingerprint} for primary key ${log.primaryKeyFingerprint} from SubkeyAddedLog event`);
+            return pk.toPublic();
+        } catch (err) {
+            if (err instanceof Web3PGPServiceValidationError) {
+                // Rethrow service errors
+                throw err;
+            }
+            // Wrap other errors
+            throw new Web3PGPServiceValidationError(`Failed to read the OpenPGP message from the SubkeyAddedLog event: ${err}`);
+        }
+    }
+
+    /**
+     * Validate and extract the revoked key or revocation certificate from the KeyRevokedLog. In case of a key certificate, the functioon validates it effectively revokes the key or subkey.
+
+     * @param log The KeyRevokedLog event data from the blockchain 
+     * @returns A tuple containing either the revoked OpenPGP public key (if a key certificate was provided) or undefined, and either the armored revocation certificate (if provided) or undefined.
+     * @throws Web3PGPServiceValidationError if the log data is invalid or missing required fields
+     * @throws Web3PGPServiceValidationError if the extracted OpenPGP message is invalid or corrupted
+     * @throws Web3PGPServiceValidationError if the key certificate does not effectively revoke the target key or subkey
+     * 
+     * @example
+     * ```typescript
+     * const [revokedKey, revocationCert] = await service.extractFromKeyRevokedLog(log);
+     * if (revokedKey) {
+     *   pk = await pk.update(revokedKey);
+     * } else if (revocationCert) {
+     *   pk = await openpgp.revokeKey({ key: pk, revocationCertificate: revocationCert, format: 'object' });
+     * }
+     * ```
+     */
+    public async extractFromKeyRevokedLog(log: KeyRevokedLog): Promise<[openpgp.PublicKey | undefined, string | undefined]> {
+        try {
+            // Validate required data are present
+            if (!log.fingerprint || !log.revocationCertificate) {
+                throw new Web3PGPServiceValidationError(`The KeyRevokedLog event is missing the data needed to extract and validate the revocation.`);
+            }
+            try {
+                // Try to parse the revocation certificate as a key certificate
+                const revokedKey = await openpgp.readKey({ armoredKey: log.revocationCertificate });
+                // Check the fingerprint matches either the primary key or a subkey
+                if (toBytes32(to0x(revokedKey.getFingerprint())) === toBytes32(to0x(log.fingerprint))) {
+                    // Sanitize primary key
+                    const pk = await OpenPGPUtils.sanitizePrimaryKey(revokedKey);
+                    // Check the primary key is revoked
+                    if (!await pk.isRevoked()) {
+                        throw new Web3PGPServiceValidationError(`The primary key with fingerprint ${pk.getFingerprint()} is not revoked as expected in the KeyRevokedLog event.`);
+                    }
+                    // Return the revoked key and no standalone revocation certificate
+                    console.debug(`[Web3PGP - Service] Successfully extracted revoked primary key ${log.fingerprint} from KeyRevokedLog event`);
+                    return [pk.toPublic(), undefined];
+                } else {
+                    // Sanitize to keep only the target subkey - Will throw an error if not found
+                    const pk = await OpenPGPUtils.sanitizeSubkey(revokedKey, log.fingerprint);
+                    // Check subkey is revoked
+                    if (!await OpenPGPUtils.isSubkeyRevoked(pk.subkeys[0]!, pk)) {
+                        throw new Web3PGPServiceValidationError(`The subkey with fingerprint ${log.fingerprint} is not revoked as expected in the KeyRevokedLog event.`);
+                    }
+                    // Return the revoked key and no standalone revocation certificate
+                    console.debug(`[Web3PGP - Service] Successfully extracted revoked subkey ${log.fingerprint} from KeyRevokedLog event`);
+                    return [pk.toPublic(), undefined];
+                }
+            } catch (err) {
+                // Fallback - Try to read as a standalone revocation certificate
+                const cert = await openpgp.readMessage({ 
+                    binaryMessage: toBytes(log.revocationCertificate),
+                    config: {
+                        // Standalone revocation certs do not have public keys needed to verify the revocations signature
+                        // This causes OpenPGP.js to throw an error unless we allow unauthenticated messages
+                        allowMissingKeyFlags: true,
+                        allowUnauthenticatedMessages: true 
+                    }
+                });
+                // Return the armored standalone revocation certificate - We cannot check if the key is actually revoked without the public key
+                console.debug(`[Web3PGP - Service] Successfully extracted revocation certificate for key ${log.fingerprint} from KeyRevokedLog event`);
+                return [undefined, cert.armor()];
+            }
+        } catch (err) {
+            if (err instanceof Web3PGPServiceValidationError) {
+                // Rethrow service errors
+                throw err;
+            }
+            // Wrap other errors
+            throw new Web3PGPServiceValidationError(`Failed to read the OpenPGP message from the KeyRevokedLog event: ${err}`);
+        }
+    }
+
+    /*****************************************************************************************************************/
     /* KEY RETRIEVAL                                                                                                 */
     /*****************************************************************************************************************/
 
@@ -313,31 +494,8 @@ export class Web3PGPService implements IWeb3PGPService {
         console.debug(`[Web3PGP - Service] Fetching KeyRegistered log for ${primaryKeyFingerprint} at block ${blockNumber}`);
         const normalizedPrimaryKeyFingerprint = toBytes32(to0x(primaryKeyFingerprint));
         const registration = await this.web3pgp.getKeyRegisteredLog(normalizedPrimaryKeyFingerprint, blockNumber);
-        // Validate the data
-        if (!registration.openPGPMsg || !registration.primaryKeyFingerprint) {
-            throw new Web3PGPServiceCriticalError(`The KeyRegistered event log at block ${blockNumber} is missing required data.`);
-        }
-        // Read and verify the primary key using the hex-encoded binary openPGP message from the log data
-        const primaryKey = await openpgp.readKey({ binaryKey: toBytes(registration.openPGPMsg) });
-        // Validate the key fingerprint matches the declared one
-        if (toBytes32(to0x(primaryKey.getFingerprint())) !== normalizedPrimaryKeyFingerprint) {
-            throw new Web3PGPServiceCriticalError(`The fingerprint of the retrieved primary key does not match the declared fingerprint in the log.`);
-        }
-        // Validate the key contains the declared subkeys and prune the extra ones
-        let subkeys: openpgp.Subkey[] = [];
-        for (const subkeyFingerprint of registration.subkeyFingerprints || []) {
-            const normalizedSubkeyFingerprint = toBytes32(to0x(subkeyFingerprint));
-            const subkey = primaryKey.subkeys.find(sk => toBytes32(to0x(sk.getFingerprint())) === normalizedSubkeyFingerprint);
-            if (subkey) {
-                subkeys.push(subkey);
-            } else {
-                // A declared subkey is missing from the key data - critical error
-                throw new Web3PGPServiceCriticalError(`The primary key does not contain the declared subkey with fingerprint ${subkeyFingerprint}.`);
-            }
-        }
-        // Prune extra subkeys
-        primaryKey.subkeys = subkeys;
-        console.debug(`[Web3PGP - Service] Successfully retrieved primary key ${normalizedPrimaryKeyFingerprint} with ${subkeys.length} subkeys`);
+        // Extract the key data from the log
+        const primaryKey = await this.extractFromKeyRegisteredLog(registration);
         return primaryKey.toPublic();
     }
 
@@ -347,23 +505,19 @@ export class Web3PGPService implements IWeb3PGPService {
      * @returns A copy of the primary key with imported subkeys
      */
     private async importAddedSubkeys(primaryKey: openpgp.PublicKey): Promise<openpgp.PublicKey> {
-        // List subkeys related to the primary key using the blockchain records
+        // List subkeys related to the primary key
         const normalizedFingerprint = toBytes32(to0x(primaryKey.getFingerprint()));
-        console.debug(`[Web3PGP - Service] Listing subkeys for primary key ${normalizedFingerprint}`);
-        
         let copyPk = primaryKey.toPublic();
         const declaredSubkeys = await this.fetchAllPaginated(
             (start, limit) => this.web3pgp.listSubkeys(normalizedFingerprint, start, limit)
         );
         
-        console.debug(`[Web3PGP - Service] Found ${declaredSubkeys.length} declared subkeys for ${normalizedFingerprint}`);
-        
         // Remove subkeys from declaredSubkeys that are already in primaryKey
         const existingSubkeyFingerprints = new Set(primaryKey.subkeys.map(sk => toBytes32(to0x(sk.getFingerprint()))));
         const subkeysToImport = declaredSubkeys.filter(skFp => !existingSubkeyFingerprints.has(skFp));
         
-        console.debug(`[Web3PGP - Service] Need to import ${subkeysToImport.length} additional subkeys`);
         // Get the list of block numbers where the remaining subkeys were added
+        console.debug(`[Web3PGP - Service] Listing block numbers with subkeys added to primary key ${normalizedFingerprint}`);
         const subkeyBlockNumbers = await this.web3pgp.getKeyPublicationBlockBatch(subkeysToImport);
         // Merge both arrays to create tuples of (subkeyFingerprint, blockNumber)
         const subkeysWithBlocks: Array<{ subkeyFingerprint: `0x${string}`, blockNumber: bigint }> = subkeysToImport.map((skFp, index) => ({
@@ -371,27 +525,14 @@ export class Web3PGPService implements IWeb3PGPService {
             blockNumber: subkeyBlockNumbers[index]!
         }));
         // Import and verify each subkey
+        console.debug(`[Web3PGP - Service] Importing ${subkeysToImport.length} subkeys for primary key ${normalizedFingerprint}`);
         const importedSubkeys = await Promise.allSettled(subkeysWithBlocks.map(async ({ subkeyFingerprint, blockNumber }) => {
             // Retrieve the subkey data from the blockchain
+            console.debug(`[Web3PGP - Service] Fetching SubkeyAdded log for subkey ${subkeyFingerprint} at block ${blockNumber}`);
             const subkeyData = await this.web3pgp.getSubkeyAddedLog(normalizedFingerprint, subkeyFingerprint, blockNumber);
-            // Validate required data are present
-            if (!subkeyData.openPGPMsg || !subkeyData.subkeyFingerprint || !subkeyData.primaryKeyFingerprint) {
-                throw new Web3PGPServiceValidationError(`The SubkeyAdded event log at block ${blockNumber} is missing required data.`);
-            }
-            // Read and verify the subkey using the hex-encoded binary openPGP message from the log data
-            let pk: openpgp.Key;
-            try {
-                pk = await openpgp.readKey({ binaryKey: toBytes(subkeyData.openPGPMsg) });
-                // Sanitize to only include primary key and the subkey
-                pk = OpenPGPUtils.sanitizeSubkey(pk, subkeyFingerprint);
-            } catch (err) {
-                throw new Web3PGPServiceValidationError(`Failed to read and sanitize the OpenPGP message for subkey with fingerprint ${subkeyFingerprint} at block ${blockNumber}: ${err}`);
-            }
-            // Validate the primary key fingerprint matches the declared one
-            if (toBytes32(to0x(pk.getFingerprint())) !== normalizedFingerprint) {
-                throw new Web3PGPServiceValidationError(`The fingerprint of the retrieved subkey's primary key does not match the declared fingerprint in the log.`);
-            }
-            return pk.toPublic();
+            // Extract and validate the subkey
+            const subkey = await this.extractFromSubkeyAddedLog(subkeyData);
+            return subkey.toPublic();
         }));
         // Update the primary key with the imported subkeys
         for (const result of importedSubkeys) {
@@ -402,8 +543,8 @@ export class Web3PGPService implements IWeb3PGPService {
                     // Non-critical validation error - log a warning but continue
                     console.warn(`[Web3PGP - Service] Failed to import subkey in key ${copyPk.getFingerprint()}: ${result.reason}`);
                 } else {
-                    // Critical failure that prevented the subkey import (network failure, others) - rethrow
-                    throw result.reason;
+                    // Critical failure that prevented the subkey import (network failure, others) - wrap and throw
+                    throw new Web3PGPServiceCriticalError(`Critical error occured while importing subkey for key ${copyPk.getFingerprint()}: ${result.reason}`);
                 }
             }
         }
@@ -420,13 +561,9 @@ export class Web3PGPService implements IWeb3PGPService {
     private async importAndApplyRevocations(primaryKey: openpgp.PublicKey) {
         // List the block numbers where revocations were published for this key and its subkeys
         const normalizedFingerprint = toBytes32(to0x(primaryKey.getFingerprint()));
-        console.debug(`[Web3PGP - Service] Importing revocations for primary key ${normalizedFingerprint} and its subkeys`);
-        
         let copyPk = primaryKey.toPublic();
         const allFingerprints = OpenPGPUtils.listAllFingerprints(copyPk).map(fp => toBytes32(to0x(fp)));
-        
-        console.debug(`[Web3PGP - Service] Checking revocations for ${allFingerprints.length} fingerprints`);
-        
+        console.debug(`[Web3PGP - Service] Checking revocations for key ${normalizedFingerprint} and its ${allFingerprints.length - 1} subkeys`);
         const revocationBlocksPromises = Promise.allSettled(allFingerprints.map(async (fp) => {
             return this.fetchAllPaginated(
                 (start, limit) => this.web3pgp.listRevocations(fp, start, limit)
@@ -445,34 +582,28 @@ export class Web3PGPService implements IWeb3PGPService {
         }
         const uniqueRevocationBlocks = Array.from(new Set(allRevocationBlocks));
         
-        console.debug(`[Web3PGP - Service] Found ${uniqueRevocationBlocks.length} revocation blocks to process`);
-        
         // Get the revocation logs for each block
         const revocationLogsPromises = await Promise.allSettled(uniqueRevocationBlocks.map(async (blockNumber) => {
             // Search for revocation logs in this block for all fingerprints
+            console.debug(`[Web3PGP - Service] Fetching KeyRevoked logs for fingerprints at block ${blockNumber}`);
             const revocationLog = await this.web3pgp.searchKeyRevokedLogs(allFingerprints, blockNumber, blockNumber);
-            // Verify and sanitize each revoked key
+            // Extract the key/certificate from each log
             let validRevokedKeys: openpgp.PublicKey[] = [];
             for (const log of revocationLog) {
                 try {
-                    // Verify required data are present
-                    if (!log.revocationCertificate || !log.fingerprint) {
-                        // Malformed log - non-critical, just skip it
-                        console.warn(`[Web3PGP - Service] Revocation log at block ${blockNumber} for fingerprint ${log.fingerprint} is missing required data. Skipping.`);
-                        continue;
-                    }
-                    // Parse the revoked key
-                    let revokedKey = await openpgp.readKey({ binaryKey: toBytes(log.revocationCertificate) });
-                    // Sanitize the revoked key to only include the primary key or the specific subkey
-                    if (toBytes32(to0x(revokedKey.getFingerprint())) === normalizedFingerprint) {
-                        // Primary key
-                        revokedKey = await OpenPGPUtils.sanitizePrimaryKey(revokedKey);
+                    console.debug(`[Web3PGP - Service] Processing revocation log for fingerprint ${log.fingerprint} at block ${blockNumber}`);
+                    const [revokedKey, cert] = await this.extractFromKeyRevokedLog(log); 
+                    if (revokedKey) {
+                        validRevokedKeys.push(revokedKey);
                     } else {
-                        // Subkey
-                        revokedKey = await OpenPGPUtils.sanitizeSubkey(revokedKey, log.fingerprint);
+                        // Standalone revocation certificate - apply it to a copy of the primary key and then push the revoked key to results
+                        let r = await openpgp.revokeKey({
+                            key: copyPk,
+                            revocationCertificate: cert!,
+                            format: 'object'
+                        });
+                        validRevokedKeys.push(r.publicKey);
                     }
-                    // Add to valid revoked keys
-                    validRevokedKeys.push(revokedKey);
                 } catch (err) {
                     // Log and skip invalid revoked keys
                     console.warn(`[Web3PGP - Service] Skipping. Failed to read or sanitize revoked key ${log.fingerprint} from log at block ${blockNumber}: ${err}`);
@@ -525,3 +656,5 @@ export class Web3PGPService implements IWeb3PGPService {
         return results;
     }
 }
+
+

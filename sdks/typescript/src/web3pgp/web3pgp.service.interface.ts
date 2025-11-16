@@ -1,5 +1,6 @@
 import { TransactionReceipt } from 'viem';
 import * as openpgp from 'openpgp';
+import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog } from './types/types';
 
 /**
  * Interface for the Web3PGP service that provides high-level operations for managing OpenPGP keys on the blockchain.
@@ -160,4 +161,113 @@ export interface IWeb3PGPService {
      * ```
      */
     getPublicKey(fingerprint: `0x${string}`): Promise<openpgp.PublicKey>;
+
+    /*****************************************************************************************************************/
+    /* LOG VALIDATION AND EXTRACTION                                                                                 */
+    /*****************************************************************************************************************/
+
+    /**
+     * Validate and extract the public key from a KeyRegisteredLog event.
+     * 
+     * This method:
+     * 1. Validates the log data contains required fields
+     * 2. Extracts and parses the OpenPGP message from the log
+     * 3. Verifies the primary key fingerprint matches the declared one
+     * 4. Validates all declared subkeys are present in the key
+     * 5. Prunes any extra subkeys not declared in the log
+     * 
+     * @param log The KeyRegisteredLog event data from the blockchain
+     * @returns The validated OpenPGP public key extracted from the log
+     * 
+     * @throws Web3PGPServiceValidationError if the log data is invalid or missing required fields
+     * @throws Web3PGPServiceValidationError if the extracted OpenPGP message is invalid or corrupted
+     * @throws Web3PGPServiceValidationError if the primary key fingerprint does not match the log data
+     * @throws Web3PGPServiceValidationError if any declared subkey is missing from the extracted key
+     * 
+     * @example
+     * ```typescript
+     * const logs = await web3pgp.searchKeyRegisteredLogs();
+     * for (const log of logs) {
+     *   try {
+     *     const publicKey = await service.extractFromKeyRegisteredLog(log);
+     *     console.log(`Valid key: ${publicKey.getFingerprint()}`);
+     *   } catch (err) {
+     *     console.warn(`Invalid log data: ${err.message}`);
+     *   }
+     * }
+     * ```
+     */
+    extractFromKeyRegisteredLog(log: KeyRegisteredLog): Promise<openpgp.PublicKey>;
+
+    /**
+     * Validate and extract the subkey from a SubkeyAddedLog event.
+     * 
+     * This method:
+     * 1. Validates the log data contains required fields
+     * 2. Extracts and parses the OpenPGP message from the log
+     * 3. Sanitizes the key to only include the primary key and the specific subkey
+     * 4. Verifies the primary key fingerprint matches the declared one
+     * 
+     * @param log The SubkeyAddedLog event data from the blockchain
+     * @returns The validated OpenPGP public key containing the primary key and the added subkey
+     * 
+     * @throws Web3PGPServiceValidationError if the log data is invalid or missing required fields
+     * @throws Web3PGPServiceValidationError if the extracted OpenPGP message is invalid or corrupted
+     * @throws Web3PGPServiceValidationError if the primary key fingerprint does not match the log data
+     * @throws Web3PGPServiceValidationError if the subkey is missing from the extracted key
+     * 
+     * @example
+     * ```typescript
+     * const logs = await web3pgp.searchSubkeyAddedLogs(primaryFingerprint);
+     * let primaryKey = await service.getPublicKey(primaryFingerprint);
+     * for (const log of logs) {
+     *   const subkey = await service.extractFromSubkeyAddedLog(log);
+     *   primaryKey = await primaryKey.update(subkey);
+     * }
+     * ```
+     */
+    extractFromSubkeyAddedLog(log: SubkeyAddedLog): Promise<openpgp.PublicKey>;
+
+    /**
+     * Validate and extract the revoked key or revocation certificate from a KeyRevokedLog event.
+     * 
+     * This method handles two types of revocation data:
+     * 1. Key certificates: Full OpenPGP keys with revocation signatures
+     * 2. Standalone revocation certificates: Signature packets only
+     * 
+     * The method:
+     * 1. Validates the log data contains required fields
+     * 2. Attempts to parse as a key certificate first
+     * 3. If that fails, attempts to parse as a standalone revocation certificate
+     * 4. For key certificates, validates the revocation is effective
+     * 5. Returns either the revoked key or the armored revocation certificate
+     * 
+     * @param log The KeyRevokedLog event data from the blockchain
+     * @returns A tuple containing either:
+     *   - [revokedKey, undefined] if a valid key certificate was found
+     *   - [undefined, armoredCert] if a standalone revocation certificate was found
+     * 
+     * @throws Web3PGPServiceValidationError if the log data is invalid or missing required fields
+     * @throws Web3PGPServiceValidationError if the extracted OpenPGP message is invalid or corrupted
+     * @throws Web3PGPServiceValidationError if a key certificate does not effectively revoke the target key
+     * 
+     * @example
+     * ```typescript
+     * const logs = await web3pgp.searchKeyRevokedLogs(fingerprint);
+     * let publicKey = await service.getPublicKey(fingerprint);
+     * for (const log of logs) {
+     *   const [revokedKey, revocationCert] = await service.extractFromKeyRevokedLog(log);
+     *   if (revokedKey) {
+     *     publicKey = await publicKey.update(revokedKey);
+     *   } else if (revocationCert) {
+     *     const result = await openpgp.revokeKey({ 
+     *       key: publicKey, 
+     *       revocationCertificate: revocationCert 
+     *     });
+     *     publicKey = result.publicKey;
+     *   }
+     * }
+     * ```
+     */
+    extractFromKeyRevokedLog(log: KeyRevokedLog): Promise<[openpgp.PublicKey | undefined, string | undefined]>;
 }
