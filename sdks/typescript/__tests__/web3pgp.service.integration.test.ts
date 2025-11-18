@@ -1,11 +1,11 @@
 import { Web3PGP } from '../src/web3pgp/web3pgp';
-import { Web3PGPService } from '../src/web3pgp/web3pgp.service';
+import { Web3PGPService, Web3PGPServiceValidationError } from '../src/web3pgp/web3pgp.service';
 import { AnvilHelper } from './helpers/anvil.helper';
 import { Address, toHex } from 'viem';
 import * as openpgp from 'openpgp';
 import { OpenPGPUtils } from '../src/utils/openpgp';
-import { to0x, toBytes32 } from '../src/utils/0xstr';
-import { KeyRegisteredLog } from '../src/web3pgp/types/types';
+import { BYTES32_ZERO, to0x, toBytes32 } from '../src/utils/0xstr';
+import { KeyRegisteredLog, SubkeyAddedLog } from '../src/web3pgp/types/types';
 
 /**
  * Integration tests for Web3PGPService using real OpenPGP keys and blockchain (Anvil)
@@ -59,7 +59,7 @@ describe('Web3PGPService Integration Tests', () => {
             // 1. Generate OpenPGP key pair
             const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Sanitize the public key (remove private key material)
-            const pk = OpenPGPUtils.sanitizePrimaryKey(publicKey);
+            const pk = await OpenPGPUtils.sanitizePrimaryKey(publicKey);
             // 3. Register the key on-chain
             const receipt = await service.register(pk);
             throw new Error('Not Implemented');
@@ -226,18 +226,21 @@ describe('Web3PGPService Integration Tests', () => {
         describe('extractFromKeyRegisteredLog', () => {
             test('should extract valid public key from KeyRegisteredLog', async () => {
                 // 1. Generate OpenPGP key pair
-                const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
                 // 2. Forge the KeyRegisteredLog with minimal required fields
-                const log: KeyRegisteredLog = {
+                //
+                // Include the key with all its subkeys and declare alll of them
+                let log: KeyRegisteredLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     subkeyFingerprints: publicKey.subkeys.map(subkey => toBytes32(to0x(subkey.getFingerprint()))),
                     openPGPMsg: toHex(publicKey.write())
                 };
                 // 3. Extract and validate using the service
-                const extractedKey = await service.extractFromKeyRegisteredLog(log);
+                let extractedKey = await service.extractFromKeyRegisteredLog(log);
                 // 4. Verify extracted key matches original
                 expect(extractedKey.getFingerprint()).toBe(publicKey.getFingerprint());
                 expect(extractedKey.subkeys.length).toBe(publicKey.subkeys.length);
@@ -246,76 +249,272 @@ describe('Web3PGPService Integration Tests', () => {
                 }
             });
 
-            test('should validate primary key fingerprint matches log data', async () => {
-                throw new Error('Not Implemented');
+            test('should remove extra subkeys', async () => {
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Forge the KeyRegisteredLog with minimal required fields
+                //
+                // Include the key with all its subkeys but declare only one of them
+                let log: KeyRegisteredLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
+                    subkeyFingerprints: [toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint()))],
+                    openPGPMsg: toHex(publicKey.write())
+                };
+                // 3. Extract and validate using the service
+                let extractedKey = await service.extractFromKeyRegisteredLog(log);
+                // 4. Verify extracted key matches original and has the extra subkeey pruned
+                expect(extractedKey.getFingerprint()).toBe(publicKey.getFingerprint());
+                expect(extractedKey.subkeys.length).toBe(publicKey.subkeys.length-1);
+                expect(extractedKey.subkeys[0]!.getFingerprint()).toBe(publicKey.subkeys[0]!.getFingerprint());
             });
 
-            test('should validate all declared subkeys are present', async () => {
-                throw new Error('Not Implemented');
+            test('should throw if the declared fingerprint does not match the fingerprint computed from the public key', async () => {
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Forge the KeyRegisteredLog with minimal required fields
+                //
+                // Include the key with all its subkeys but declare only one of them
+                let log: KeyRegisteredLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: BYTES32_ZERO, // Invalid fingerprint
+                    subkeyFingerprints: [toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint()))],
+                    openPGPMsg: toHex(publicKey.write())
+                };
+                // 3. Extract and validate using the service - EXPECT ERROR
+                await expect(service.extractFromKeyRegisteredLog(log)).rejects.toThrow(Web3PGPServiceValidationError);
             });
 
-            test('should prune extra subkeys not declared in log', async () => {
-                throw new Error('Not Implemented');
+            test('should throw if the openPGP message is corrupted', async () => {
+                // Forge log with corrupted OpenPGP message
+                let log: KeyRegisteredLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: BYTES32_ZERO,
+                    subkeyFingerprints: [],
+                    openPGPMsg: '0xDEADBEEF' // Corrupted data
+                };
+                await expect(service.extractFromKeyRegisteredLog(log)).rejects.toThrow(Web3PGPServiceValidationError);
             });
 
-            test('should throw ValidationError for missing openPGPMsg', async () => {
-                throw new Error('Not Implemented');
+            test('should throw if one of the declared subkey is missing in the key data', async () => {
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Forge the KeyRegisteredLog with minimal required fields
+                //
+                // Include the key with only one subkey but declare two subkeys
+                let log: KeyRegisteredLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
+                    subkeyFingerprints: [
+                        toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())),
+                        BYTES32_ZERO // Non-existent subkey
+                    ],
+                    openPGPMsg: toHex(publicKey.write())
+                };
+                await expect(service.extractFromKeyRegisteredLog(log)).rejects.toThrow(Web3PGPServiceValidationError);
             });
 
-            test('should throw ValidationError for missing primaryKeyFingerprint', async () => {
-                throw new Error('Not Implemented');
+            test('should return a public key even though a private key was registered', async () => {
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Forge the KeyRegisteredLog with minimal required fields
+                let log: KeyRegisteredLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: toBytes32(to0x(privateKey.getFingerprint())),
+                    subkeyFingerprints: privateKey.subkeys.map(subkey => toBytes32(to0x(subkey.getFingerprint()))),
+                    openPGPMsg: toHex(privateKey.write())
+                };
+                // 3. Extract and validate using the service
+                let extractedKey = await service.extractFromKeyRegisteredLog(log);
+                // 4. Verify extracted key matches original public key
+                expect(extractedKey.getFingerprint()).toBe(publicKey.getFingerprint());
+                expect(extractedKey.subkeys.length).toBe(publicKey.subkeys.length);
+                for (let i = 0; i < publicKey.subkeys.length; i++) {
+                    expect(extractedKey.subkeys[i]!.getFingerprint()).toBe(publicKey.subkeys[i]!.getFingerprint());
+                }
+                expect(extractedKey.isPrivate()).toBe(false);
             });
 
-            test('should throw ValidationError for fingerprint mismatch', async () => {
-                throw new Error('Not Implemented');
+            test('should throw if a declared subkey fails verification in case verifications are enabled', async () => {
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Remove binding signatures from the published subkey
+                publicKey.subkeys[0]!.bindingSignatures = [];
+
+                // 3. Forge the KeyRegisteredLog with minimal required fields
+                let log: KeyRegisteredLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
+                    subkeyFingerprints: [toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint()))],
+                    openPGPMsg: toHex(publicKey.write())
+                };
+                // 4. Extract and validate using the service - EXPECT ERROR
+                await expect(service.extractFromKeyRegisteredLog(log)).rejects.toThrow(Web3PGPServiceValidationError);
+                // 5. Now extract with verifications disabled
+                await expect(service.extractFromKeyRegisteredLog(log, true)).resolves.not.toThrow();
             });
 
-            test('should throw ValidationError for missing declared subkey', async () => {
-                throw new Error('Not Implemented');
-            });
+            test('should throw if the primary key is revoked and verifications are enabled', async () => {
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Revoke the primary key
+                let pk = await openpgp.revokeKey({
+                    key: privateKey,
+                    format: 'object',
+                });
+                expect(await pk.publicKey.isRevoked()).toBe(true);
 
-            test('should throw ValidationError for corrupted OpenPGP message', async () => {
-                throw new Error('Not Implemented');
+                // 3. Forge the KeyRegisteredLog with minimal required fields
+                let log: KeyRegisteredLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
+                    subkeyFingerprints: [toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint()))],
+                    openPGPMsg: toHex(pk.publicKey.write())
+                };
+                // 4. Extract and validate using the service - EXPECT ERROR
+                await expect(service.extractFromKeyRegisteredLog(log)).rejects.toThrow(Web3PGPServiceValidationError);
+                // 5. Now extract with verifications disabled
+                await expect(service.extractFromKeyRegisteredLog(log, true)).resolves.not.toThrow();
             });
         });
 
         describe('extractFromSubkeyAddedLog', () => {
-            test('should extract valid subkey from SubkeyAddedLog', async () => {
-                throw new Error('Not Implemented');
+            test('should extract valid subkey from SubkeyAddedLog and prune the extra ones', async () => {
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Forge the SubkeyAddedLog with minimal required fields
+                let log: SubkeyAddedLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
+                    subkeyFingerprint: toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())),
+                    openPGPMsg: toHex(publicKey.write())
+                };
+                // 3. Extract and validate using the service
+                let extractedSubkey = await service.extractFromSubkeyAddedLog(log);
+                // 4. Verify extracted subkey matches original
+                expect(extractedSubkey.getFingerprint()).toBe(publicKey.getFingerprint());
+                expect(extractedSubkey.subkeys.length).toBe(1);
+                expect(extractedSubkey.subkeys[0]!.getFingerprint()).toBe(publicKey.subkeys[0]!.getFingerprint());
             });
 
-            test('should sanitize to include only primary key and specific subkey', async () => {
-                throw new Error('Not Implemented');
+            test('should throw if the primary key fingerprint does not matches the one declared in the log', async () => {
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Forge the SubkeyAddedLog with minimal required fields
+                let log: SubkeyAddedLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: BYTES32_ZERO, // Invalid fingerprint
+                    subkeyFingerprint: toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())),
+                    openPGPMsg: toHex(publicKey.write())
+                };
+                // 3. Extract and validate using the service - EXPECT ERROR
+                await expect(service.extractFromSubkeyAddedLog(log)).rejects.toThrow(Web3PGPServiceValidationError);
             });
 
-            test('should validate primary key fingerprint matches log', async () => {
-                throw new Error('Not Implemented');
+            test('should throw if the subkey is missing from the key data', async () => {
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Prune the subkeys to simulate missing subkey
+                publicKey.subkeys = [];
+                // 3. Forge the SubkeyAddedLog with minimal required fields
+                let log: SubkeyAddedLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
+                    subkeyFingerprint: BYTES32_ZERO, // Non-existent subkey
+                    openPGPMsg: toHex(publicKey.write())
+                };
+                // 4. Extract and validate using the service - EXPECT ERROR
+                await expect(service.extractFromSubkeyAddedLog(log)).rejects.toThrow(Web3PGPServiceValidationError);
             });
 
-            test('should throw ValidationError for missing openPGPMsg', async () => {
-                throw new Error('Not Implemented');
+            test('should throw if the subkey does not match the declared subkey fingerprint', async () => {
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Forge the SubkeyAddedLog with minimal required fields
+                let log: SubkeyAddedLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
+                    subkeyFingerprint: BYTES32_ZERO, // Invalid fingerprint
+                    openPGPMsg: toHex(publicKey.write())
+                };
+                // 3. Extract and validate using the service - EXPECT ERROR
+                await expect(service.extractFromSubkeyAddedLog(log)).rejects.toThrow(Web3PGPServiceValidationError);
             });
 
-            test('should throw ValidationError for missing subkeyFingerprint', async () => {
-                throw new Error('Not Implemented');
+            test('should throw if the openPGP message is not valid', async () => {
+                // 1. Forge log with corrupted OpenPGP message
+                let log: SubkeyAddedLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: BYTES32_ZERO,
+                    subkeyFingerprint: BYTES32_ZERO,
+                    openPGPMsg: '0xDEADBEEF' // Corrupted data
+                };
+                // 2. Extract and validate using the service - EXPECT ERROR
+                await expect(service.extractFromSubkeyAddedLog(log)).rejects.toThrow(Web3PGPServiceValidationError);
             });
 
-            test('should throw ValidationError for missing primaryKeyFingerprint', async () => {
-                throw new Error('Not Implemented');
-            });
+            test('should throw an error if the subkey does not have a valid binding signature', async () => {
+                
+                // 1. Generate OpenPGP key pair
+                let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+                // 2. Remove binding signatures from the published subkey
+                publicKey.subkeys[0]!.bindingSignatures = [];
 
-            test('should throw ValidationError for primary fingerprint mismatch', async () => {
-                throw new Error('Not Implemented');
-            });
-
-            test('should throw ValidationError for corrupted OpenPGP message', async () => {
-                throw new Error('Not Implemented');
-            });
-
-            test('should throw ValidationError if subkey not found in message', async () => {
-                throw new Error('Not Implemented');
+                // 3. Forge the SubkeyAddedLog with minimal required fields
+                let log: SubkeyAddedLog = {
+                    blockNumber: 0n,
+                    blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    blockDate: new Date(),
+                    transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+                    primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
+                    subkeyFingerprint: toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())),
+                    openPGPMsg: toHex(publicKey.write())
+                };
+                // 4. Extract and validate using the service - EXPECT ERROR
+                await expect(service.extractFromSubkeyAddedLog(log)).rejects.toThrow(Web3PGPServiceValidationError);
+                // 5. Now extract with verifications disabled
+                await expect(service.extractFromSubkeyAddedLog(log, true)).resolves.not.toThrow();
             });
         });
+
+        // RESUME HERE - ADD p-limit to limit service overshootting requests
+        // Add tests for revocation and the rest of the service methods
 
         describe('extractFromKeyRevokedLog', () => {
             test('should extract revoked key certificate from KeyRevokedLog', async () => {
