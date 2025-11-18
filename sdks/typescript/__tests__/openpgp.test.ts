@@ -30,7 +30,7 @@ describe('OpenPGPUtils', () => {
   describe('sanitizePrimaryKey', () => {
     test('successfully sanitizes primary key', async () => {
       const [privateKey] = await generateTestKeyPair();
-      const result = OpenPGPUtils.sanitizePrimaryKey(privateKey);
+      const result = await OpenPGPUtils.sanitizePrimaryKey(privateKey);
       // Check that the original key remains unchanged and is still private
       expect(privateKey.isPrivate()).toBe(true);
       expect(privateKey.getSubkeys().length).toBeGreaterThan(0);
@@ -58,9 +58,9 @@ describe('OpenPGPUtils', () => {
     test('throws error for non-existent subkey', async () => {
       const fingerprint = '0x1234567890abcdef' as `0x${string}`;
       const [privateKey] = await generateTestKeyPair();
-      expect(() => {
-        OpenPGPUtils.sanitizeSubkey(privateKey, fingerprint);
-      }).toThrow(/.*0x1234567890abcdef.*found.*/);
+      await expect(async () => {
+        await OpenPGPUtils.sanitizeSubkey(privateKey, fingerprint);
+      }).rejects.toThrow(/.*0x1234567890abcdef.*found.*/);
     });
   });
 
