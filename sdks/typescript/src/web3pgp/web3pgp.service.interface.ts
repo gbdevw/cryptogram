@@ -169,14 +169,26 @@ export interface IWeb3PGPService {
     /**
      * Validate and extract the public key from a KeyRegisteredLog event.
      * 
+     * @description
+     * 
      * This method:
-     * 1. Validates the log data contains required fields
-     * 2. Extracts and parses the OpenPGP message from the log
-     * 3. Verifies the primary key fingerprint matches the declared one
-     * 4. Validates all declared subkeys are present in the key
-     * 5. Prunes any extra subkeys not declared in the log
+     * 1.   Validates the log data contains required fields
+     * 2.   Extracts and parses the OpenPGP message from the log
+     * 3.   Verifies the primary key fingerprint matches the declared one
+     * 4.   (if verifications are enabled) Verifies the primary key has a valid signature, is not expired and is not 
+     *      revoked at the time of registration (uses the block timestamp)..
+     * 5.   Validates all declared subkeys are present in the key
+     * 6.   (if verifications are enabled) Verifies each subkey has a valid signature, is not expired and is not 
+     *      revoked at the time of registration (uses the block timestamp).
+     * 7.   Prunes any extra subkeys not declared in the log
+     * 
+     * Cryptographic verifications of the keys (steps 4 and 6) can be skipped by setting the `skipCryptographicVerifications`
+     * parameter to true. This is useful when users want to extract and parse the OpenPGP key material in order to perform
+     * custom validations or inspections in case the verification fails, is expected to fail or is performed by an external
+     * OpenPGP toolkit.
      * 
      * @param log The KeyRegisteredLog event data from the blockchain
+     * @param skipCryptographicVerifications If true, skips cryptographic verifications of key and subkeys. Defaults to false.
      * @returns The validated OpenPGP public key extracted from the log
      * 
      * @throws Web3PGPServiceValidationError if the log data is invalid or missing required fields
@@ -197,18 +209,30 @@ export interface IWeb3PGPService {
      * }
      * ```
      */
-    extractFromKeyRegisteredLog(log: KeyRegisteredLog): Promise<openpgp.PublicKey>;
+    extractFromKeyRegisteredLog(log: KeyRegisteredLog, skipCryptographicVerifications?: boolean): Promise<openpgp.PublicKey>;
 
     /**
      * Validate and extract the subkey from a SubkeyAddedLog event.
      * 
+     * @description
      * This method:
      * 1. Validates the log data contains required fields
      * 2. Extracts and parses the OpenPGP message from the log
-     * 3. Sanitizes the key to only include the primary key and the specific subkey
-     * 4. Verifies the primary key fingerprint matches the declared one
+     * 3. Verifies the primary key fingerprint matches the declared one
+     * 4. Verifies the subkey fingerprint matches the declared one
+     * 5. Prunes any extra subkeys and user ID packets, returning only the primary key and the added subkey
+     * 6. (if verifications are enabled) Verifies the primary key has a valid signature, is not expired and is not 
+     *    revoked at the time of subkey addition (uses the block timestamp).
+     * 7. (if verifications are enabled) Verifies the subkey has a valid signature, is not expired and is not 
+     *    revoked at the time of addition (uses the block timestamp).
+     * 
+     * Cryptographic verifications of the keys (steps 6 and 7) can be skipped by setting the `skipCryptographicVerifications`
+     * parameter to true. This is useful when users want to extract and parse the OpenPGP key material in order to perform
+     * custom validations or inspections in case the verification fails, is expected to fail or is performed by an external
+     * OpenPGP toolkit.
      * 
      * @param log The SubkeyAddedLog event data from the blockchain
+     * @param skipCryptographicVerifications If true, skips cryptographic verifications of key and subkey. Defaults to false.
      * @returns The validated OpenPGP public key containing the primary key and the added subkey
      * 
      * @throws Web3PGPServiceValidationError if the log data is invalid or missing required fields
@@ -226,23 +250,28 @@ export interface IWeb3PGPService {
      * }
      * ```
      */
-    extractFromSubkeyAddedLog(log: SubkeyAddedLog): Promise<openpgp.PublicKey>;
+    extractFromSubkeyAddedLog(log: SubkeyAddedLog, skipCryptographicVerifications?: boolean): Promise<openpgp.PublicKey>;
 
     /**
      * Validate and extract the revoked key or revocation certificate from a KeyRevokedLog event.
      * 
+     * @description
      * This method handles two types of revocation data:
      * 1. Key certificates: Full OpenPGP keys with revocation signatures
-     * 2. Standalone revocation certificates: Signature packets only
+     * 2. Standalone revocation certificates: Revocation signature packets only
      * 
      * The method:
-     * 1. Validates the log data contains required fields
-     * 2. Attempts to parse as a key certificate first
-     * 3. If that fails, attempts to parse as a standalone revocation certificate
-     * 4. For key certificates, validates the revocation is effective
-     * 5. Returns either the revoked key or the armored revocation certificate
+     * 1.   Validates the log data contains required fields
+     * 2.   Attempts to parse as a key certificate first
+     * 3.   If that fails, attempts to parse as a standalone revocation certificate and returns the armored certificate.
+     *      It is the user's responsibility to verify and apply the revocation certificate to the target key.
+     * 4. For key certificates, validates the fingerprint matches the target key
+     * 5. (if verifications are enabled) Verifies the primary key has a valid signature, is not expired and is revoked
+     *    at the time of revocation (uses the block timestamp).
+     * 6. Returns either the revoked key or the armored revocation certificate
      * 
      * @param log The KeyRevokedLog event data from the blockchain
+     * @param skipCryptographicVerifications If true, skips cryptographic verifications of the revoked key. Defaults to false.
      * @returns A tuple containing either:
      *   - [revokedKey, undefined] if a valid key certificate was found
      *   - [undefined, armoredCert] if a standalone revocation certificate was found
@@ -269,5 +298,5 @@ export interface IWeb3PGPService {
      * }
      * ```
      */
-    extractFromKeyRevokedLog(log: KeyRevokedLog): Promise<[openpgp.PublicKey | undefined, string | undefined]>;
+    extractFromKeyRevokedLog(log: KeyRevokedLog, skipCryptographicVerifications?: boolean): Promise<[openpgp.PublicKey | undefined, string | undefined]>;
 }
