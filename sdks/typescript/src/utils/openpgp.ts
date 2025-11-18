@@ -7,17 +7,37 @@ import { to0x, toBytes32 } from './0xstr';
 export class OpenPGPUtils {
 
     /**
+     * Verify the validity of an OpenPGP public key, including its primary key and all subkeys.
+     *
+     * This checks that the keys are properly signed, not expired and not revoked as of the given date.
+     *
+     * @param key The OpenPGP public key to verify
+     * @param date The date to verify against (defaults to now)
+     * @param config Optional OpenPGP configuration
+     * 
+     * @throws - Error if the primary key or any subkey is invalid
+     */
+    static async verifyKey(key: openpgp.PublicKey, date?: Date, config?: openpgp.Config): Promise<void> {
+        // Verify the primary key
+        await key.verifyPrimaryKey(date, undefined, config);
+        // Verify each subkey
+        for (const subkey of key.getSubkeys()) {
+            await subkey.verify(date, config);
+        }
+    }
+
+    /**
      * Prepare a primary key for blockchain publication by creating a copy of its without
      * private key material and subkeys. The resulting certificate contains only the primary
      * key with its user IDs for identity verification.
      *
      * Can also be used to sanitize certificates retrieved from blockchain: The smart contract
-     * only validates fingerprint uniqueness but not OpenPGP certificate validity and content. 
+     * only validates fingerprint uniqueness but not OpenPGP certificate validity and content.
      *
      * @param key The key to prepare (can be private or public)
      * @returns A sanitized primary key certificate ready for blockchain storage
      */
-    static sanitizePrimaryKey(key: openpgp.Key): openpgp.Key {
+    static async sanitizePrimaryKey(key: openpgp.Key): Promise<openpgp.Key> {
         // Create a copy of the public key and remove subkeys
         const publicKey = key.toPublic();
         publicKey.subkeys = [];
@@ -27,10 +47,11 @@ export class OpenPGPUtils {
     /**
      * Prepare a specific subkey for blockchain publication by isolating it and removing
      * user IDs to prevent identity collisions.
+     * 
+     * @description
      *
      * The resulting certificate contains the primary key (for signature verification
-     * interoperability) plus exactly one subkey. User IDs are removed to avoid
-     * conflicts with the primary key certificate stored separately.
+     * interoperability) plus exactly one subkey.
      *
      * This creates a "subkey certificate" that can be combined with the primary
      * key certificate using key.update() for full key reconstruction.
@@ -39,13 +60,15 @@ export class OpenPGPUtils {
      * as the smart contract only validates fingerprint uniqueness but not OpenPGP
      * certificate validity. While cryptographic verification of subkeys provides
      * inherent security, this sanitization ensures clean certificate reconstruction.
+     * 
+     * The function does not verify the subkey's validity (signatures, expiration, revocation).
      *
      * @param key The key containing the target subkey
      * @param fingerprint The subkey fingerprint that will be padded (bytes32 format, with or without 0x prefix)
      * @returns A sanitized subkey certificate ready for blockchain storage
      * @throws - Error if the specified subkey fingerprint is not found
      */
-    static sanitizeSubkey(key: openpgp.Key, fingerprint: `0x${string}`): openpgp.Key {
+    static async sanitizeSubkey(key: openpgp.Key, fingerprint: `0x${string}`): Promise<openpgp.Key> {
         // Convert and validate fingerprint format
         const targetFingerprint = toBytes32(to0x(fingerprint));
 
@@ -63,7 +86,6 @@ export class OpenPGPUtils {
 
         // Keep only the target subkey and remove user IDs to prevent identity collision
         publicKey.subkeys = [targetSubkey];
-        publicKey.users = [];
         return publicKey;
     }
 
