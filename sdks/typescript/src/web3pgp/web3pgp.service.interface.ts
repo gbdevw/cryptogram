@@ -26,8 +26,9 @@ export interface IWeb3PGPService {
     /**
      * Register a new OpenPGP public key (primary key with optional subkeys) on the blockchain.
      * 
+     * @description
      * This method:
-     * 1. Validates the provided public key
+     * 1. Verifies the provided public key and subkeys have a valid signature, are not expired and not revoked.
      * 2. Extracts the primary key fingerprint and subkey fingerprints
      * 3. Serializes the key to binary OpenPGP message format
      * 4. Registers the key on-chain via the Web3PGP contract
@@ -35,8 +36,8 @@ export interface IWeb3PGPService {
      * @param key The OpenPGP public key to register (must include primary key, may include subkeys)
      * @returns Transaction receipt after successful registration
      * 
-     * @throws Error if the key is invalid or missing required components
-     * @throws Error if the key is already registered on-chain
+     * @throws Error if the key or one of its subkeys are invalid
+     * @throws Error if the key or one of its subkeys are already registered on-chain
      * @throws Error if wallet client is not configured
      * @throws Error if transaction fails
      * 
@@ -58,8 +59,10 @@ export interface IWeb3PGPService {
      * 2. Verifies the primary key is already registered on-chain
      * 3. Verifies the subkey is not already registered
      * 4. Extracts the primary key fingerprint
-     * 5. Serializes the key material (primary + subkey) to binary format
-     * 6. Adds the subkey on-chain via the Web3PGP contract
+     * 5. Verifies the provided key and subkey have valid signatures, are not expired and not revoked.
+     * 6. Removes extra subkeys and user ID packets.
+     * 7. Serializes the key material (primary + subkey) to binary format
+     * 8. Adds the subkey on-chain via the Web3PGP contract
      * 
      * @param key The OpenPGP public key containing both the primary key and the new subkey
      * @param subkeyFingerprint The fingerprint of the specific subkey to add (must exist in the key)
@@ -86,22 +89,25 @@ export interface IWeb3PGPService {
     /*****************************************************************************************************************/
 
     /**
-     * Revoke a key by publishing a revoked public key (containing revocation signature) on the blockchain.
+     * Publish a key revocation certificate on the blockchain.
      * 
-     * This method handles the case where the user has revoked their key using standard OpenPGP tools
-     * and now wants to publish the revoked key (which includes the revocation signature) on-chain.
+     * @description
+     * This method allows users who have revoked their key using standard OpenPGP tools to publish the key revocation
+     * certificate on-chain and inform others that the key is no longer valid.
      * 
-     * The method:
-     * 1. Validates the provided key contains a valid revocation signature
-     * 2. Verifies the target key is registered on-chain
-     * 3. Serializes the revoked key to binary format
-     * 4. Publishes the revocation on-chain via the Web3PGP contract
+     * The method accepts either a key object with the revocation signature or a standalone revocation certificate 
+     * in armored format. In the later case, the method will download and verify the public key from the blockchain 
+     * using the provided fingerprint as ID, apply the revocation certificate, verify the key is revoked at present time
+     * and publish the revoked key on-chain.
+     * 
+     * When a revoked key is provided, the method will verify the target key or subkey, identified by the provided 
+     * fingerprint, is indeed revoked in the key object at the present time and will publish the revoked key on-chain. 
      * 
      * @param keyOrCertificate The revoked OpenPGP public key or a revocation certificate
      * @param fingerprint The fingerprint of the key being revoked (primary key or subkey)
      * @returns Transaction receipt after successful revocation publication
      * 
-     * @throws Error if the key doesn't contain a valid revocation signature
+     * @throws Error if the key doesn't contain a valid revocation signature at the present time
      * @throws Error if the fingerprint doesn't match any key in the provided key object
      * @throws Error if the target key is not registered on-chain
      * @throws Error if wallet client is not configured
