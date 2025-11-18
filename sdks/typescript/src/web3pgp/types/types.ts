@@ -10,6 +10,8 @@ export type KeyRegisteredLog = {
     blockNumber: bigint;
     // Hash of the block that contains the event
     blockHash: `0x${string}`;
+    // Date and time when the block containing the event was mined
+    blockDate: Date;
     // Transaction hash of the transaction that triggered the event
     transactionHash: `0x${string}`;
     // The declared fingerprint of the registered key as bytes32 hex string
@@ -32,6 +34,8 @@ export type SubkeyAddedLog = {
     blockNumber: bigint;
     // Hash of the block that contains the event
     blockHash: `0x${string}`;
+    // Date and time when the block containing the event was mined
+    blockDate: Date;
     // Transaction hash of the transaction that triggered the event
     transactionHash: `0x${string}`;
     // The declared fingerprint of the primary key to which the subkey was added as bytes32 hex string
@@ -54,6 +58,8 @@ export type KeyRevokedLog = {
     blockNumber: bigint;
     // Hash of the block that contains the event
     blockHash: `0x${string}`;
+    // Date and time when the block containing the event was mined
+    blockDate: Date;
     // Transaction hash of the transaction that triggered the event
     transactionHash: `0x${string}`;
     // The declared fingerprint of the revoked key as bytes32 hex string
