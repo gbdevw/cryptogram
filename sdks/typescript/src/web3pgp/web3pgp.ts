@@ -425,14 +425,15 @@ export class Web3PGP implements IWeb3PGP {
             ...(args !== undefined && { args })
         });
         
-        return logs.map(log => ({
+        return Promise.all(logs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
+            blockDate: await this.getBlockTimestamp(log.blockNumber),
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprints: log.args.subkeyFingerprints,
             openPGPMsg: log.args.openPGPMsg
-        }));
+        })));
     }
 
     /**
@@ -484,14 +485,15 @@ export class Web3PGP implements IWeb3PGP {
             ...(args !== undefined && { args })
         });
         
-        return logs.map(log => ({
+        return Promise.all(logs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
+            blockDate: await this.getBlockTimestamp(log.blockNumber),
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprint: log.args.subkeyFingerprint,
             openPGPMsg: log.args.openPGPMsg
-        }));
+        })));
     }
 
     /**
@@ -534,13 +536,14 @@ export class Web3PGP implements IWeb3PGP {
             ...(args !== undefined && { args })
         });
         
-        return logs.map(log => ({
+        return Promise.all(logs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
+            blockDate: await this.getBlockTimestamp(log.blockNumber),
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             revocationCertificate: log.args.revocationCertificate
-        }));
+        })));
     }
 
     /*****************************************************************************************************************/
