@@ -126,7 +126,7 @@ export class OpenPGPUtils {
                 await revocationSig.verify(
                     primaryPublicKey.keyPacket,        // verification key
                     openpgp.enums.signature.subkeyRevocation,  // signature type
-                    sub.keyPacket,           // signed data (the subkey)
+                    { key: primaryPublicKey.keyPacket, bind: sub.keyPacket }, // subkey revocation context
                     date                     // verification date
                 );
 
