@@ -493,7 +493,7 @@ export class Web3PGPService implements IWeb3PGPService {
             let revokedKey: openpgp.Key;
             try {
                 // Try to parse the revocation certificate as a key certificate
-                revokedKey = await openpgp.readKey({ armoredKey: log.revocationCertificate });
+                revokedKey = await openpgp.readKey({ binaryKey: toBytes(log.revocationCertificate) });
             } catch (err) {
                 // Fallback - Try to read as a standalone revocation certificate
                 const cert = await openpgp.readMessage({ 
@@ -525,6 +525,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 // Sanitize to keep only the target subkey - Will throw an error if not found
                 const pk = await OpenPGPUtils.sanitizeSubkey(revokedKey, log.fingerprint);
                 // Check subkey is revoked
+                console.log(pk.subkeys[0]);
                 if (skipCryptographicVerifications !== true && !await OpenPGPUtils.isSubkeyRevoked(pk.subkeys[0]!, pk, log.blockDate)) {
                     throw new Web3PGPServiceValidationError(`The subkey with fingerprint ${log.fingerprint} is not revoked as expected in the KeyRevokedLog event.`);
                 }
