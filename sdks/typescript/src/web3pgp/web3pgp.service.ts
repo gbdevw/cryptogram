@@ -215,7 +215,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 // Publish the revoked primary key
                 return this.web3pgp.revoke(normalizedFingerprint, toHex(revoked.toPublic().write()));
             } else {
-                throw new Error('The provided key does not contain a valid revocation signature.');
+                throw new Web3PGPServiceValidationError('The provided key does not contain a valid revocation signature.');
             }
         }
         else {
@@ -229,7 +229,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 // Publish the revoked subkey
                 return this.web3pgp.revoke(normalizedFingerprint, toHex(pk.toPublic().write()));
             } else {
-                throw new Error('The specified subkey does not contain a valid revocation signature.');
+                throw new Web3PGPServiceValidationError('The specified subkey does not contain a valid revocation signature.');
             }
         }
     }
@@ -254,7 +254,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 // Publish the revoked primary key
                 return this.web3pgp.revoke(normalizedFingerprint, toHex(pk.toPublic().write()));
             } else {
-                throw new Error('The provided key does not contain a valid revocation signature.');
+                throw new Web3PGPServiceValidationError('The provided key does not contain a valid revocation signature.');
             }
         } else {
             // Must be a subkey
@@ -264,7 +264,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 // Publish the subkey
                 return this.web3pgp.revoke(normalizedFingerprint, toHex(pk.write()));
             } else {
-                throw new Error('The specified subkey does not contain a valid revocation signature.');
+                throw new Web3PGPServiceValidationError('The specified subkey does not contain a valid revocation signature.');
             }
         }
     }
