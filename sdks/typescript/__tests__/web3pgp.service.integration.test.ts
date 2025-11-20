@@ -36,7 +36,7 @@ describe('Web3PGPService Integration Tests', () => {
         await anvil.start();
 
         console.log('Deploying Web3PGP contract...');
-        const deployment = await anvil.deployWeb3PGP();
+        let deployment = await anvil.deployWeb3PGP();
         contractAddress = deployment.web3pgp;
 
         console.log('Creating Web3PGP and Web3PGPService instances...');
@@ -58,28 +58,28 @@ describe('Web3PGPService Integration Tests', () => {
     describe('Key Registration', () => {
         test('should register a primary key without subkeys', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Sanitize the public key (remove private key material)
-            const pk = await OpenPGPUtils.sanitizePrimaryKey(publicKey);
+            let pk = await OpenPGPUtils.sanitizePrimaryKey(publicKey);
             // 3. Register the key on-chain
-            const receipt = await service.register(pk);
+            let receipt = await service.register(pk);
             // 4. Use the low level bindings and information fom the receipt to extract the KeyRegisteredLog from the blockchain
-            const log = await service.contract.getKeyRegisteredLog(toBytes32(to0x(publicKey.getFingerprint())), receipt.blockNumber);
+            let log = await service.contract.getKeyRegisteredLog(toBytes32(to0x(publicKey.getFingerprint())), receipt.blockNumber);
             // 5. Extract the key from the log and verify it matches the original
-            const extractedKey = await service.extractFromKeyRegisteredLog(log);
+            let extractedKey = await service.extractFromKeyRegisteredLog(log);
             expect(extractedKey.getFingerprint()).toBe(publicKey.getFingerprint());
             expect(extractedKey.subkeys.length).toBe(0);
         });
 
         test('should register a primary key with subkeys', async () => {
             // 1. Generate OpenPGP key pair with subkeys
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Register the key with its subkeys on-chain
-            const receipt = await service.register(publicKey);
+            let receipt = await service.register(publicKey);
             // 3. Use the low level bindings and information fom the receipt to extract the KeyRegisteredLog from the blockchain
-            const log = await service.contract.getKeyRegisteredLog(toBytes32(to0x(publicKey.getFingerprint())), receipt.blockNumber);
+            let log = await service.contract.getKeyRegisteredLog(toBytes32(to0x(publicKey.getFingerprint())), receipt.blockNumber);
             // 4. Extract the key from the log and verify it matches the original
-            const extractedKey = await service.extractFromKeyRegisteredLog(log);
+            let extractedKey = await service.extractFromKeyRegisteredLog(log);
             expect(extractedKey.getFingerprint()).toBe(publicKey.getFingerprint());
             expect(extractedKey.subkeys.length).toBe(publicKey.subkeys.length);
             for (let i = 0; i < publicKey.subkeys.length; i++) {
@@ -89,7 +89,7 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should fail to register an already registered key', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Register the key on-chain
             await service.register(publicKey);
             // 3. Attempt to register the same key again - EXPECT ERROR
@@ -98,9 +98,9 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should fail to register a revoked key', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Revoke the key locally
-            const revoked = await openpgp.revokeKey({ key: privateKey, format: 'object' });
+            let revoked = await openpgp.revokeKey({ key: privateKey, format: 'object' });
             expect(await revoked.publicKey.isRevoked()).toBe(true);
             // 3. Attempt to register the revoked key - EXPECT ERROR
             await expect(service.register((revoked.publicKey))).rejects.toThrow(Web3PGPServiceError);
@@ -108,7 +108,7 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should fail to register a key with a revoked subkey', async () => {
             // 1. Generate OpenPGP key pair with subkeys
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Revoke one of the subkeys locally
             publicKey.subkeys[0] = await publicKey.subkeys[0]!.revoke(privateKey.keyPacket as openpgp.SecretKeyPacket);
             expect(await OpenPGPUtils.isSubkeyRevoked(publicKey.subkeys[0]!, publicKey)).toBe(true);
@@ -118,7 +118,7 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should fail to register a malformed key', async () => {
             // 1. Create a malformed public key by removing binding signatures from one subkey
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             publicKey.subkeys[0]!.bindingSignatures = [];
             // 2. Attempt to register the malformed key - EXPECT ERROR
             await expect(service.register(publicKey)).rejects.toThrow(Web3PGPServiceError);   
@@ -128,24 +128,24 @@ describe('Web3PGPService Integration Tests', () => {
     describe('Subkey Management', () => {
         test('should add a subkey to an existing primary key', async () => {
             // 1. Generate OpenPGP key pair for primary key
-            const [primaryPrivateKey, primaryPublicKey, primaryRevocationCert] = await createAliceOpenPGPKeys();
+            let [primaryPrivateKey, primaryPublicKey, primaryRevocationCert] = await createAliceOpenPGPKeys();
             // 2. Create a copy of the subkeys
-            const subkeys = primaryPublicKey.subkeys
+            let subkeys = primaryPublicKey.subkeys
             // Remove all subkeys from the primary key
             primaryPublicKey.subkeys = [];
             // 3. Register the primary key without subkeys
             await service.register(primaryPublicKey);
             // 4. Add a subkey to the registered primary key
             primaryPublicKey.subkeys = subkeys;
-            const receipt = await service.addSubkey(primaryPublicKey, to0x(primaryPublicKey.subkeys[0]!.getFingerprint()));
+            let receipt = await service.addSubkey(primaryPublicKey, to0x(primaryPublicKey.subkeys[0]!.getFingerprint()));
             // 5. Use the low level bindings and information fom the receipt to extract the SubkeyAddedLog from the blockchain
-            const log = await service.contract.getSubkeyAddedLog(
+            let log = await service.contract.getSubkeyAddedLog(
                 to0x(primaryPublicKey.getFingerprint()), 
                 to0x(primaryPublicKey.subkeys[0]!.getFingerprint()), 
                 receipt.blockNumber
             );
             // 6. Extract the key from the log and verify it matches the original subkey
-            const extractedKey = await service.extractFromSubkeyAddedLog(log);
+            let extractedKey = await service.extractFromSubkeyAddedLog(log);
             expect(extractedKey.getFingerprint()).toBe(primaryPublicKey.getFingerprint());
             expect(extractedKey.subkeys.length).toBe(1);
             expect(extractedKey.subkeys[0]!.getFingerprint()).toBe(primaryPublicKey.subkeys[0]!.getFingerprint());
@@ -153,31 +153,31 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should fail to add a subkey to unregistered primary key', async () => {
             // 1. Generate OpenPGP key pair for primary key
-            const [primaryPrivateKey, primaryPublicKey, primaryRevocationCert] = await createAliceOpenPGPKeys();
+            let [primaryPrivateKey, primaryPublicKey, primaryRevocationCert] = await createAliceOpenPGPKeys();
             // 2. Attempt to add a subkey to the unregistered primary key - EXPECT ERROR
             await expect(service.addSubkey(primaryPublicKey, to0x(primaryPublicKey.subkeys[0]!.getFingerprint()))).rejects.toThrow(ContractFunctionExecutionError);
         });
 
         test('should fail to add an already registered subkey', async () => {
             // 1. Generate OpenPGP key pair for primary key
-            const [primaryPrivateKey, primaryPublicKey, primaryRevocationCert] = await createAliceOpenPGPKeys();
+            let [primaryPrivateKey, primaryPublicKey, primaryRevocationCert] = await createAliceOpenPGPKeys();
             // 2. Create a copy of the subkeys
-            const subkeys = primaryPublicKey.subkeys
+            let subkeys = primaryPublicKey.subkeys
             // Remove all subkeys from the primary key
             primaryPublicKey.subkeys = [];
             // 3. Register the primary key without subkeys
             await service.register(primaryPublicKey);
             // 4. Add a subkey to the registered primary key
             primaryPublicKey.subkeys = subkeys;
-            const receipt = await service.addSubkey(primaryPublicKey, to0x(primaryPublicKey.subkeys[0]!.getFingerprint()));
+            let receipt = await service.addSubkey(primaryPublicKey, to0x(primaryPublicKey.subkeys[0]!.getFingerprint()));
             // 5. Attempt to add the same subkey again - EXPECT ERROR
             await expect(service.addSubkey(primaryPublicKey, to0x(primaryPublicKey.subkeys[0]!.getFingerprint()))).rejects.toThrow(ContractFunctionExecutionError);
         });
 
         test('should fail if a subkey without a valid binding signature is added', async () => {
             // 1. Create Alice's keys and store subkeys aside
-            const [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();
-            const aliceSubkeys = alicePublicKey.subkeys;
+            let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();
+            let aliceSubkeys = alicePublicKey.subkeys;
             alicePublicKey.subkeys = [];
             // 2. Register Alice's primary key
             await service.register(alicePublicKey);
@@ -192,18 +192,18 @@ describe('Web3PGPService Integration Tests', () => {
     describe('Key Revocation', () => {
         test('should publish a key revocation certificate for the primary key', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Register the key on-chain
             await service.register(publicKey);
             // 3. Revoke the key locally
-            const revoked = await openpgp.revokeKey({ key: privateKey, format: 'object' });
+            let revoked = await openpgp.revokeKey({ key: privateKey, format: 'object' });
             expect(await revoked.publicKey.isRevoked()).toBe(true);
             // 3. Publish the revocation certificate
-            const receipt = await service.revoke(revoked.publicKey, to0x(revoked.publicKey.getFingerprint()));
+            let receipt = await service.revoke(revoked.publicKey, to0x(revoked.publicKey.getFingerprint()));
             // 4. Use the low level bindings and information fom the receipt to extract the KeyRevokedLog from the blockchain
-            const log = await service.contract.getKeyRevokedLog(toBytes32(to0x(publicKey.getFingerprint())), receipt.blockNumber);
+            let log = await service.contract.getKeyRevokedLog(toBytes32(to0x(publicKey.getFingerprint())), receipt.blockNumber);
             // 5. Extract the revocation certificate from the log and verify it matches the original
-            const [revokedKey, cert] = await service.extractFromKeyRevokedLog(log);
+            let [revokedKey, cert] = await service.extractFromKeyRevokedLog(log);
             expect(cert).toBeUndefined; // Full key revocation does not have a standalone certificate
             expect(revokedKey).toBeDefined();
             expect(revokedKey!.getFingerprint()).toBe(publicKey.getFingerprint());
@@ -213,16 +213,16 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should publish a standalone armored revocation certificate', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Register the key on-chain
             await service.register(publicKey);
             // 3. Publish the standalone revocation certificate
-            const receipt = await service.revoke(revocationCert, to0x(publicKey.getFingerprint()));
+            let receipt = await service.revoke(revocationCert, to0x(publicKey.getFingerprint()));
             // 4. Use the low level bindings and information fom the receipt to extract the KeyRevokedLog from the blockchain
-            const log = await service.contract.getKeyRevokedLog(toBytes32(to0x(publicKey.getFingerprint())), receipt.blockNumber);
+            let log = await service.contract.getKeyRevokedLog(toBytes32(to0x(publicKey.getFingerprint())), receipt.blockNumber);
             // 5. Extract the key revocation certificate from the log and verify it matches the original
             // NOTE: revoke, when used with a standalone subkey revocation, publishes the full primary key with the revoked subkey
-            const [revokedKey, cert] = await service.extractFromKeyRevokedLog(log);
+            let [revokedKey, cert] = await service.extractFromKeyRevokedLog(log);
             expect(cert).toBeUndefined(); 
             expect(revokedKey).toBeDefined();
             expect(await revokedKey!.isRevoked()).toBe(true);
@@ -230,18 +230,18 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should publish a key revocation certificate with a revoked subkey', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Register the key on-chain
             await service.register(publicKey);
             // 3. Revoke one of the subkeys locally
             publicKey.subkeys[0] = await publicKey.subkeys[0]!.revoke(privateKey.keyPacket as openpgp.SecretKeyPacket);
             expect(await OpenPGPUtils.isSubkeyRevoked(publicKey.subkeys[0]!, publicKey)).toBe(true);
             // 4. Publish the revocation certificate for the subkey
-            const receipt = await service.revoke(publicKey, to0x(publicKey.subkeys[0]!.getFingerprint()));
+            let receipt = await service.revoke(publicKey, to0x(publicKey.subkeys[0]!.getFingerprint()));
             // 5. Use the low level bindings and information fom the receipt to extract the KeyRevokedLog from the blockchain
-            const log = await service.contract.getKeyRevokedLog(toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())), receipt.blockNumber);
+            let log = await service.contract.getKeyRevokedLog(toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())), receipt.blockNumber);
             // 6. Extract the key certificate from the log and verify it matches the original
-            const [revokedKey, cert] = await service.extractFromKeyRevokedLog(log);
+            let [revokedKey, cert] = await service.extractFromKeyRevokedLog(log);
             expect(cert).toBeUndefined(); // Full key revocation does not have a standalone certificate
             expect(revokedKey).toBeDefined();
             expect(revokedKey!.getFingerprint()).toBe(publicKey.getFingerprint());
@@ -252,7 +252,7 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should fail if the target key is not revoked', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Register the key on-chain
             await service.register(publicKey);
             // 3. Attempt to publish a revocation for a non-revoked key - EXPECT ERROR
@@ -261,7 +261,7 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should fail if the target subkey is not revoked', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Register the key on-chain
             await service.register(publicKey);
             // 3. Attempt to publish a revocation for a non-revoked subkey - EXPECT ERROR
@@ -270,7 +270,7 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should apply multiple revocations correctly', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Register the key on-chain
             await service.register(publicKey);
             // 3. Revoke the primary key locally
@@ -284,9 +284,9 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should fail if the target key is not registered', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Locally revoke the key
-            const revoked = await openpgp.revokeKey({ key: privateKey, format: 'object' });
+            let revoked = await openpgp.revokeKey({ key: privateKey, format: 'object' });
             expect(await revoked.publicKey.isRevoked()).toBe(true);
             // 3. Attempt to publish the revocation for the unregistered key - EXPECT ERROR
             await expect(service.revoke(revoked.publicKey, to0x(revoked.publicKey.getFingerprint()))).rejects.toThrow(ContractFunctionExecutionError);
@@ -294,35 +294,177 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should fail if the revocation certificate is malformed', async () => {
             // 1. Generate OpenPGP key pair
-            const [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             // 2. Register the key on-chain
             await service.register(publicKey);
             // 3. Create a malformed revocation certificate
-            const malformedCert = revocationCert.slice(0, revocationCert.length - 10) + 'AAAAAAAAAA';
+            let malformedCert = revocationCert.slice(0, revocationCert.length - 10) + 'AAAAAAAAAA';
             // 4. Attempt to publish the malformed revocation certificate - EXPECT ERROR
             await expect(service.revoke(malformedCert, to0x(publicKey.getFingerprint()))).rejects.toThrow();
         });
     });
 
     describe('Key Retrieval', () => {
-        test('should retrieve a registered primary key', async () => {
-            throw new Error('Not Implemented');
+        test('should retrieve a registered primary key without subkeys', async () => {
+            // 1. Generate OpenPGP key pair
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            // 2. Remove the subkeys to register only the primary key
+            let pk = await OpenPGPUtils.sanitizePrimaryKey(publicKey);
+            // 3. Register the key on-chain
+            await service.register(pk);
+            // 4. Retrieve the key using the service
+            let retrievedKey = await service.getPublicKey(to0x(publicKey.getFingerprint()));
+            // 5. Verify the retrieved key matches the original
+            expect(retrievedKey.getFingerprint()).toBe(publicKey.getFingerprint());
+            expect(retrievedKey.subkeys.length).toBe(0);
         });
 
-        test('should retrieve a primary key with its subkeys', async () => {
-            throw new Error('Not Implemented');
+        test('should retrieve a primary key registered with its subkeys', async () => {
+            // 1. Generate OpenPGP key pair
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            // 2. Register the key with its subkeys on-chain
+            await service.register(publicKey);
+            // 3. Retrieve the key using the service
+            let retrievedKey = await service.getPublicKey(to0x(publicKey.getFingerprint()));
+            // 4. Verify the retrieved key matches the original
+            expect(retrievedKey.getFingerprint()).toBe(publicKey.getFingerprint());
+            expect(retrievedKey.subkeys.length).toBe(publicKey.subkeys.length);
+            for (let i = 0; i < publicKey.subkeys.length; i++) {
+                expect(retrievedKey.subkeys[i]!.getFingerprint()).toBe(publicKey.subkeys[i]!.getFingerprint());
+            }
         });
 
-        test('should retrieve a subkey by its fingerprint', async () => {
-            throw new Error('Not Implemented');
+        test('should retrieve a revoked public key with its subkeys - key revocation certificate', async () => {
+            // 1. Generate OpenPGP key pair
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            // 2. Register the key with its subkeys on-chain
+            await service.register(publicKey);
+            // 3. Revoke the key locally
+            let revoked = await openpgp.revokeKey({ key: privateKey, format: 'object' });
+            expect(await revoked.publicKey.isRevoked()).toBe(true);
+            // 4. Publish the revocation certificate
+            await service.revoke(revoked.publicKey, to0x(revoked.publicKey.getFingerprint()));
+            // 5. Retrieve the key using the service
+            let retrievedKey = await service.getPublicKey(to0x(publicKey.getFingerprint()));
+            // 6. Verify the retrieved key matches the original and is marked as revoked
+            expect(retrievedKey.getFingerprint()).toBe(publicKey.getFingerprint());
+            expect(retrievedKey.subkeys.length).toBe(publicKey.subkeys.length);
+            expect(await retrievedKey.isRevoked()).toBe(true);
+            for (let i = 0; i < publicKey.subkeys.length; i++) {
+                expect(retrievedKey.subkeys[i]!.getFingerprint()).toBe(publicKey.subkeys[i]!.getFingerprint());
+                // Subkeys are considered as revoked because the primary key is revoked
+                expect(await OpenPGPUtils.isSubkeyRevoked(retrievedKey.subkeys[i]!, retrievedKey)).toBe(true);
+            }
         });
 
-        test('should reconstruct key with added subkeys', async () => {
-            throw new Error('Not Implemented');
+        test('should retrieve a revoked public key with its subkeys - standalone revocation certificate', async () => {
+            // 1. Generate OpenPGP key pair
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            // 2. Register the key with its subkeys on-chain
+            await service.register(publicKey);
+            // 3. Publish the standalone revocation certificate
+            await service.revoke(revocationCert, to0x(publicKey.getFingerprint()));
+            // 5. Retrieve the key using the service
+            let retrievedKey = await service.getPublicKey(to0x(publicKey.getFingerprint()));
+            // 6. Verify the retrieved key matches the original and is marked as revoked
+            expect(retrievedKey.getFingerprint()).toBe(publicKey.getFingerprint());
+            expect(retrievedKey.subkeys.length).toBe(publicKey.subkeys.length);
+            expect(await retrievedKey.isRevoked()).toBe(true);
+            for (let i = 0; i < publicKey.subkeys.length; i++) {
+                expect(retrievedKey.subkeys[i]!.getFingerprint()).toBe(publicKey.subkeys[i]!.getFingerprint());
+                // Subkeys are considered as revoked because the primary key is revoked
+                expect(await OpenPGPUtils.isSubkeyRevoked(retrievedKey.subkeys[i]!, retrievedKey)).toBe(true);
+            }
         });
 
-        test('should retrieve key with revocations applied', async () => {
-            throw new Error('Not Implemented');
+        test('should retrieve a public key with one of its subkeys revoked', async () => {
+            // 1. Generate OpenPGP key pair
+            let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
+            // 2. Register the key with its subkeys on-chain
+            await service.register(publicKey);
+            // 3. Revoke one of the subkeys locally
+            let targetSubkeyFingerprint = publicKey.subkeys[0]!.getFingerprint();
+            publicKey.subkeys[0] = await publicKey.subkeys[0]!.revoke(privateKey.keyPacket as openpgp.SecretKeyPacket);
+            expect(await OpenPGPUtils.isSubkeyRevoked(publicKey.subkeys[0]!, publicKey)).toBe(true);
+            // 4. Publish the revocation certificate for the subkey
+            await service.revoke(publicKey, to0x(publicKey.subkeys[0]!.getFingerprint()));
+            // 5. Retrieve the key using the service
+            let retrievedKey = await service.getPublicKey(to0x(publicKey.getFingerprint()));
+            // 6. Verify the retrieved key matches the original and the subkey is marked as revoked
+            expect(retrievedKey.getFingerprint()).toBe(publicKey.getFingerprint());
+            expect(retrievedKey.subkeys.length).toBe(2);
+            for (let i = 0; i < 2; i++) {
+                if (i === 0) {
+                    expect(to0x(retrievedKey.subkeys[i]!.getFingerprint())).toBe(to0x(targetSubkeyFingerprint));
+                    expect(await OpenPGPUtils.isSubkeyRevoked(retrievedKey.subkeys[i]!, retrievedKey)).toBe(true);
+                } else {
+                    expect(await OpenPGPUtils.isSubkeyRevoked(retrievedKey.subkeys[i]!, retrievedKey)).toBe(false);
+                }
+            }
+        });
+
+        test('should reconstruct key with added subkeys from a subkey fingerprint', async () => {
+            // 1. Generate OpenPGP key pair for primary key
+            let [primaryPrivateKey, primaryPublicKey, primaryRevocationCert] = await createAliceOpenPGPKeys();
+            // 2. Register the primary key with subkeys
+            await service.register(primaryPublicKey);
+            // 3. Add a new subkey to the primary key
+            primaryPrivateKey = await primaryPrivateKey.addSubkey({
+                type: 'rsa',
+                rsaBits: 4096,
+                sign: true,
+            });
+            primaryPublicKey = primaryPrivateKey.toPublic();
+            expect(primaryPublicKey.subkeys.length).toBe(3);
+            expect(primaryPublicKey.subkeys[2]).toBeDefined();
+            let targetFingerprint = toBytes32(to0x(primaryPublicKey.subkeys[2]!.getFingerprint()));
+            // 4. Add a subkey to the registered primary key
+            await service.addSubkey(primaryPublicKey, targetFingerprint);
+            // 5. Retrieve the key using the service and the fingerprint of the newly added subkey
+            let retrievedKey = await service.getPublicKey(targetFingerprint);
+            // 6. Verify the retrieved key matches the original with the added subkey
+            expect(retrievedKey.getFingerprint()).toBe(primaryPublicKey.getFingerprint());
+            expect(retrievedKey.subkeys.length).toBe(primaryPrivateKey.subkeys.length);
+            expect(retrievedKey.subkeys[2]).toBeDefined();
+            expect(toBytes32(to0x(retrievedKey.subkeys[2]!.getFingerprint()))).toBe(targetFingerprint);
+        });
+
+        test('register multiple keys, subkeys and revocation certificates and reconstruct them', async () => {
+            // 1. Generate Alice's and Bob's OpenPGP key pairs
+            let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();    
+            let [bobPrivateKey, bobPublicKey, bobRevocationCert] = await createBobOpenPGPKeys();
+            // 2. Register both keys on-chain
+            await service.register(alicePublicKey);
+            await service.register(bobPublicKey);
+            // 3. Add a subkey to Alice's key and publish it
+            alicePrivateKey = await alicePrivateKey.addSubkey({
+                type: 'rsa',
+                rsaBits: 4096,
+                sign: true,
+            });
+            alicePublicKey = alicePrivateKey.toPublic();
+            await service.addSubkey(alicePublicKey, to0x(alicePublicKey.subkeys[2]!.getFingerprint()));
+            // 4. Revoke Alice's added subkey locally and publish the revocation
+            alicePublicKey = alicePrivateKey.toPublic();
+            alicePublicKey.subkeys[0] = await alicePublicKey.subkeys[0]!.revoke(alicePrivateKey.keyPacket as openpgp.SecretKeyPacket);
+            expect(await OpenPGPUtils.isSubkeyRevoked(alicePublicKey.subkeys[0]!, alicePublicKey)).toBe(true);
+            await service.revoke(alicePublicKey, to0x(alicePublicKey.subkeys[0]!.getFingerprint()));
+            // 4. Revoke Bob's primary key by publishing the standalone revocation certificate
+            await service.revoke(bobRevocationCert, to0x(bobPublicKey.getFingerprint()));
+            // 5. Retrieve and verify Alice's key
+            let retrievedAlice = await service.getPublicKey(to0x(alicePublicKey.getFingerprint()));
+            expect(retrievedAlice.getFingerprint()).toBe(alicePublicKey.getFingerprint());
+            expect(retrievedAlice.subkeys.length).toBe(3);
+            expect(await OpenPGPUtils.isSubkeyRevoked(retrievedAlice.subkeys[0]!, retrievedAlice)).toBe(true);
+            // 6. Retrieve and verify Bob's key
+            let retrievedBob = await service.getPublicKey(to0x(bobPublicKey.getFingerprint()));
+            expect(retrievedBob.getFingerprint()).toBe(bobPublicKey.getFingerprint());
+            expect(retrievedBob.subkeys.length).toBe(bobPublicKey.subkeys.length);
+            expect(await retrievedBob.isRevoked()).toBe(true);
+            for (let i = 0; i < bobPublicKey.subkeys.length; i++) {
+                expect(retrievedBob.subkeys[i]!.getFingerprint()).toBe(bobPublicKey.subkeys[i]!.getFingerprint());
+                expect(await OpenPGPUtils.isSubkeyRevoked(retrievedBob.subkeys[i]!, retrievedBob)).toBe(true);
+            }
         });
 
         test('should fail to retrieve an unregistered key', async () => {
@@ -711,7 +853,7 @@ describe('Web3PGPService Integration Tests', () => {
                 // 1. Generate OpenPGP key pair
                 let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
                 // 2. Revoke a subkey to get the revoked key object
-                const date = new Date();
+                let date = new Date();
                 publicKey.subkeys[0] = await publicKey.subkeys[0]!.revoke(privateKey.keyPacket as openpgp.SecretKeyPacket, undefined, date);
                 expect(await OpenPGPUtils.isSubkeyRevoked(publicKey.subkeys[0]!, publicKey, date)).toBe(true);
                 // 3. Forge the KeyRevokedLog with minimal required fields
@@ -830,7 +972,7 @@ describe('Web3PGPService Integration Tests', () => {
  *          - Alice's Revocation Certificate (armored string)
  */
 async function createAliceOpenPGPKeys(): Promise<[openpgp.PrivateKey, openpgp.PublicKey, string]> {
-    const keys = await openpgp.generateKey({
+    let keys = await openpgp.generateKey({
         format: 'object',
         type: 'rsa',
         rsaBits: 4096,
@@ -861,7 +1003,7 @@ async function createAliceOpenPGPKeys(): Promise<[openpgp.PrivateKey, openpgp.Pu
  *          - Bob's Revocation Certificate (armored string)
  */
 async function createBobOpenPGPKeys(): Promise<[openpgp.PrivateKey, openpgp.PublicKey, string]> {
-    const keys = await openpgp.generateKey({
+    let keys = await openpgp.generateKey({
         format: 'object',
         type: 'ecc',
         curve: 'nistP256',
