@@ -581,7 +581,7 @@ export class Web3PGPService implements IWeb3PGPService {
 
         if (publicationBlockNumber === BigInt(0)) {
             console.debug(`[Web3PGP - Service] Key ${normalizedFingerprint} is not registered on-chain`);
-            throw new Error(`The key with fingerprint ${fingerprint} is not registered on-chain.`);
+            throw new Web3PGPServiceError(`The key with fingerprint ${fingerprint} is not registered on-chain.`);
         }
 
         console.debug(`[Web3PGP - Service] Key ${normalizedFingerprint} published at block ${publicationBlockNumber}, parent: ${parentFingerprint}`);
