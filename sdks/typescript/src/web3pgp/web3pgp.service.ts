@@ -5,7 +5,7 @@ import { IWeb3PGP } from './web3pgp.interface';
 import { BYTES32_ZERO, to0x, toBytes32 } from '../utils/0xstr';
 import { OpenPGPUtils } from '../utils/openpgp';
 import { KeyRegisteredLog, KeyRevokedLog, SubkeyAddedLog } from './types/types';
-import { config } from 'process';
+import pLimit = require('p-limit');
 
 /*****************************************************************************************************************/
 /* CUSTOM ERRORS                                                                                                 */
@@ -47,6 +47,26 @@ export class Web3PGPServiceValidationError extends Web3PGPServiceError {
     }
 }
 
+/*****************************************************************************************************************/
+/* SERVICE IMPLEMENTATION                                                                                        */
+/*****************************************************************************************************************/
+
+/**
+ * Configuration options for Web3PGPService.
+ */
+export interface Web3PGPServiceOptions {
+    /**
+     * Maximum number of concurrent operations performed when retrieving, reconstructing and verifying keys from 
+     * the blockchain.
+     * 
+     * This limit helps prevent resource exhaustion and rate-limiting issues when interacting with RPC endpoints or
+     * when processing large numbers of keys.
+     * 
+     * @default 10
+     */
+    concurrencyLimit?: number;
+}
+
 /**
  * High-level service for managing OpenPGP keys on the blockchain.
  * 
@@ -62,6 +82,14 @@ export class Web3PGPService implements IWeb3PGPService {
 
     // Low-level Web3PGP contract instance
     private readonly web3pgp: IWeb3PGP;
+
+    /**
+     * Limiter to control concurrent operations.
+     * 
+     * Prevents overwhelming the RPC provider with too many simultaneous requests. Also prevents
+     * excessive CPU and memory usage when processing large numbers of keys.
+     */
+    private readonly concurrencyLimit: ReturnType<typeof pLimit>;
 
     /**
      * Create a new Web3PGPService instance.
@@ -80,8 +108,9 @@ export class Web3PGPService implements IWeb3PGPService {
      * const receipt = await service.register(publicKey);
      * ```
      */
-    constructor(web3pgp: IWeb3PGP) {
+    constructor(web3pgp: IWeb3PGP, options?: Web3PGPServiceOptions) {
         this.web3pgp = web3pgp;
+        this.concurrencyLimit = pLimit(options?.concurrencyLimit ?? 10);
     }
 
     /**
@@ -525,7 +554,6 @@ export class Web3PGPService implements IWeb3PGPService {
                 // Sanitize to keep only the target subkey - Will throw an error if not found
                 const pk = await OpenPGPUtils.sanitizeSubkey(revokedKey, log.fingerprint);
                 // Check subkey is revoked
-                console.log(pk.subkeys[0]);
                 if (skipCryptographicVerifications !== true && !await OpenPGPUtils.isSubkeyRevoked(pk.subkeys[0]!, pk, log.blockDate)) {
                     throw new Web3PGPServiceValidationError(`The subkey with fingerprint ${log.fingerprint} is not revoked as expected in the KeyRevokedLog event.`);
                 }
@@ -654,14 +682,18 @@ export class Web3PGPService implements IWeb3PGPService {
         }));
         // Import and verify each subkey
         console.debug(`[Web3PGP - Service] Importing ${subkeysToImport.length} subkeys for primary key ${normalizedFingerprint}`);
-        const importedSubkeys = await Promise.allSettled(subkeysWithBlocks.map(async ({ subkeyFingerprint, blockNumber }) => {
-            // Retrieve the subkey data from the blockchain
-            console.debug(`[Web3PGP - Service] Fetching SubkeyAdded log for subkey ${subkeyFingerprint} at block ${blockNumber}`);
-            const subkeyData = await this.web3pgp.getSubkeyAddedLog(normalizedFingerprint, subkeyFingerprint, blockNumber);
-            // Extract and validate the subkey
-            const subkey = await this.extractFromSubkeyAddedLog(subkeyData);
-            return subkey.toPublic();
-        }));
+        const importedSubkeys = await Promise.allSettled(
+            subkeysWithBlocks.map(({ subkeyFingerprint, blockNumber }) => {
+                return this.concurrencyLimit(async () => {
+                    // Retrieve the subkey data from the blockchain
+                    console.debug(`[Web3PGP - Service] Fetching SubkeyAdded log for subkey ${subkeyFingerprint} at block ${blockNumber}`);
+                    const subkeyData = await this.web3pgp.getSubkeyAddedLog(normalizedFingerprint, subkeyFingerprint, blockNumber);
+                    // Extract and validate the subkey
+                    const subkey = await this.extractFromSubkeyAddedLog(subkeyData);
+                    return subkey.toPublic();
+                })
+            })
+        );
         // Update the primary key with the imported subkeys
         for (const result of importedSubkeys) {
             if (result.status === 'fulfilled') {
@@ -692,11 +724,15 @@ export class Web3PGPService implements IWeb3PGPService {
         let copyPk = primaryKey.toPublic();
         const allFingerprints = OpenPGPUtils.listAllFingerprints(copyPk).map(fp => toBytes32(to0x(fp)));
         console.debug(`[Web3PGP - Service] Checking revocations for key ${normalizedFingerprint} and its ${allFingerprints.length - 1} subkeys`);
-        const revocationBlocksPromises = Promise.allSettled(allFingerprints.map(async (fp) => {
-            return this.fetchAllPaginated(
-                (start, limit) => this.web3pgp.listRevocations(fp, start, limit)
-            );
-        }));
+        const revocationBlocksPromises = Promise.allSettled(
+            allFingerprints.map((fp) => {
+                return this.concurrencyLimit(async () => {
+                    return this.fetchAllPaginated(
+                        (start, limit) => this.web3pgp.listRevocations(fp, start, limit)
+                    );
+                })
+            })
+        );
         // Flatten the results and keep unique values. Throw an error if any promise was rejected.
         const revocationBlocksResults = await revocationBlocksPromises;
         let allRevocationBlocks: bigint[] = [];
@@ -711,35 +747,39 @@ export class Web3PGPService implements IWeb3PGPService {
         const uniqueRevocationBlocks = Array.from(new Set(allRevocationBlocks));
         
         // Get the revocation logs for each block
-        const revocationLogsPromises = await Promise.allSettled(uniqueRevocationBlocks.map(async (blockNumber) => {
-            // Search for revocation logs in this block for all fingerprints
-            console.debug(`[Web3PGP - Service] Fetching KeyRevoked logs for fingerprints at block ${blockNumber}`);
-            const revocationLog = await this.web3pgp.searchKeyRevokedLogs(allFingerprints, blockNumber, blockNumber);
-            // Extract the key/certificate from each log
-            let validRevokedKeys: openpgp.PublicKey[] = [];
-            for (const log of revocationLog) {
-                try {
-                    console.debug(`[Web3PGP - Service] Processing revocation log for fingerprint ${log.fingerprint} at block ${blockNumber}`);
-                    const [revokedKey, cert] = await this.extractFromKeyRevokedLog(log); 
-                    if (revokedKey) {
-                        validRevokedKeys.push(revokedKey);
-                    } else {
-                        // Standalone revocation certificate - apply it to a copy of the primary key and then push the revoked key to results
-                        let r = await openpgp.revokeKey({
-                            key: copyPk,
-                            revocationCertificate: cert!,
-                            format: 'object'
-                        });
-                        validRevokedKeys.push(r.publicKey);
+        const revocationLogsPromises = await Promise.allSettled(
+            uniqueRevocationBlocks.map((blockNumber) => {
+                return this.concurrencyLimit(async () => {
+                    // Search for revocation logs in this block for all fingerprints
+                    console.debug(`[Web3PGP - Service] Fetching KeyRevoked logs for fingerprints at block ${blockNumber}`);
+                    const revocationLog = await this.web3pgp.searchKeyRevokedLogs(allFingerprints, blockNumber, blockNumber);
+                    // Extract the key/certificate from each log
+                    let validRevokedKeys: openpgp.PublicKey[] = [];
+                    for (const log of revocationLog) {
+                        try {
+                            console.debug(`[Web3PGP - Service] Processing revocation log for fingerprint ${log.fingerprint} at block ${blockNumber}`);
+                            const [revokedKey, cert] = await this.extractFromKeyRevokedLog(log); 
+                            if (revokedKey) {
+                                validRevokedKeys.push(revokedKey);
+                            } else {
+                                // Standalone revocation certificate - apply it to a copy of the primary key and then push the revoked key to results
+                                let r = await openpgp.revokeKey({
+                                    key: copyPk,
+                                    revocationCertificate: cert!,
+                                    format: 'object'
+                                });
+                                validRevokedKeys.push(r.publicKey);
+                            }
+                        } catch (err) {
+                            // Log and skip invalid revoked keys
+                            console.warn(`[Web3PGP - Service] Skipping. Failed to read or sanitize revoked key ${log.fingerprint} from log at block ${blockNumber}: ${err}`);
+                            continue;
+                        }
                     }
-                } catch (err) {
-                    // Log and skip invalid revoked keys
-                    console.warn(`[Web3PGP - Service] Skipping. Failed to read or sanitize revoked key ${log.fingerprint} from log at block ${blockNumber}: ${err}`);
-                    continue;
-                }
-            }
-            return validRevokedKeys;
-        }));
+                    return validRevokedKeys;
+                })
+            })
+        );
         // Apply revocations to the primary key
         for (const result of revocationLogsPromises) {
             if (result.status === 'fulfilled') {
