@@ -581,20 +581,6 @@ describe('Web3PGPService Integration Tests', () => {
         });
     });
 
-    describe('Performance and Pagination', () => {
-        test('should handle key with many subkeys efficiently', async () => {
-            throw new Error('Not Implemented');
-        });
-
-        test('should paginate through large revocation lists', async () => {
-            throw new Error('Not Implemented');
-        });
-
-        test('should handle concurrent key operations', async () => {
-            throw new Error('Not Implemented');
-        });
-    });
-
     describe('Log Extraction and Validation', () => {
         describe('extractFromKeyRegisteredLog', () => {
             test('should extract valid public key from KeyRegisteredLog', async () => {
