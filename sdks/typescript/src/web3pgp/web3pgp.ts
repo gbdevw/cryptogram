@@ -3,7 +3,6 @@ import { toBytes32 } from '../utils/0xstr';
 import { Address, PublicClient, TransactionReceipt, WalletClient } from 'viem';
 import { IWeb3PGP } from './web3pgp.interface';
 import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog } from './types/types';
-import { Web3PGPServiceError } from './web3pgp.service';
 
 export class Web3PGP implements IWeb3PGP {
 
@@ -44,7 +43,7 @@ export class Web3PGP implements IWeb3PGP {
      */
     private ensureWalletClient(): void {
         if (!this._walletClient) {
-            throw new Web3PGPServiceError('WalletClient is required for write operations. Please set walletClient before calling this method.');
+            throw new Error('WalletClient is required for write operations. Please set walletClient before calling this method.');
         }
     }
 
