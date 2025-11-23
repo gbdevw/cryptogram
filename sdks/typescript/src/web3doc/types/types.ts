@@ -2,11 +2,11 @@
  * This struct is used to describe the recipient of a document and indicate if the recipient is requested to
  * sign the document.
  * 
- * @property address The Ethereum address of the recipient.
+ * @property fingerprint The fingerprint of the recipient's key.
  * @property signatureRequested Indicates whether a signature from this recipient has been requested.
  */
 export type Recipient = {
-    address: `0x${string}`;
+    fingerprint: `0x${string}`;
     signatureRequested: boolean;
 }
 
