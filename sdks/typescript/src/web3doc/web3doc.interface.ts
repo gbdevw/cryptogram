@@ -3,7 +3,8 @@ import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, Notificati
 
 /**
  * TypeScript interface for the Web3Doc smart contract.
- * Enables secure document exchange and management on Ethereum using OpenPGP.
+ * 
+ * This interface provides low-level bindings to interact with the Web3Doc contract deployed on the blockchain.
  */
 export interface IWeb3Doc {
 
