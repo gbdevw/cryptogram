@@ -2,6 +2,8 @@ import { Address, TransactionReceipt, PublicClient, WalletClient } from 'viem';
 import { IWeb3Doc } from './web3doc.interface';
 import { IWeb3PGP } from '../web3pgp/web3pgp.interface';
 import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, NotificationLog } from './types/types';
+import { Web3Doc as Web3DocABI }  from '../abis/Web3Doc';
+import { to0x, toBytes32 } from '../utils/0xstr';
 
 /**
  * Implementation of the Web3Doc contract interface.
@@ -111,7 +113,29 @@ export class Web3Doc implements IWeb3Doc {
         document: `0x${string}`,
         mimeType: string
     ): Promise<TransactionReceipt> {
-        throw new Error('Not implemented');
+        this.ensureWalletClient();
+        // Simulate client call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3DocABI,
+            functionName: 'sendOnChain',
+            args: [
+                toBytes32(to0x(emitter)), 
+                recipients.map(recipient => ({
+                    fingerprint: toBytes32(to0x(recipient.fingerprint)),
+                    signatureRequested: recipient.signatureRequested,
+                })),
+                dochash, 
+                signature, 
+                document, 
+                mimeType
+            ],
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
     }
 
     /**
@@ -132,7 +156,29 @@ export class Web3Doc implements IWeb3Doc {
         uri: string,
         mimeType: string
     ): Promise<TransactionReceipt> {
-        throw new Error('Not implemented');
+        this.ensureWalletClient();
+        // Simulate client call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3DocABI,
+            functionName: 'sendOffChain',
+            args: [
+                toBytes32(to0x(emitter)), 
+                recipients.map(recipient => ({
+                    fingerprint: toBytes32(to0x(recipient.fingerprint)),
+                    signatureRequested: recipient.signatureRequested,
+                })),
+                dochash, 
+                signature, 
+                uri, 
+                mimeType
+            ],
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
     }
 
     /**
@@ -149,7 +195,27 @@ export class Web3Doc implements IWeb3Doc {
         recipients: Recipient[],
         document: `0x${string}`
     ): Promise<TransactionReceipt> {
-        throw new Error('Not implemented');
+        this.ensureWalletClient();
+        // Simulate client call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3DocABI,
+            functionName: 'copyOnChain',
+            args: [
+                original,
+                toBytes32(to0x(emitter)), 
+                recipients.map(recipient => ({
+                    fingerprint: toBytes32(to0x(recipient.fingerprint)),
+                    signatureRequested: recipient.signatureRequested,
+                })),
+                document
+            ],
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
     }
 
     /**
@@ -166,7 +232,27 @@ export class Web3Doc implements IWeb3Doc {
         recipients: Recipient[],
         uri: string
     ): Promise<TransactionReceipt> {
-        throw new Error('Not implemented');
+        this.ensureWalletClient();
+        // Simulate client call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3DocABI,
+            functionName: 'copyOffChain',
+            args: [
+                original,
+                toBytes32(to0x(emitter)), 
+                recipients.map(recipient => ({
+                    fingerprint: toBytes32(to0x(recipient.fingerprint)),
+                    signatureRequested: recipient.signatureRequested,
+                })),
+                uri
+            ],
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
     }
 
     /**
@@ -177,7 +263,23 @@ export class Web3Doc implements IWeb3Doc {
      * @param signature The detached binary OpenPGP signature made over the document.
      */
     async sign(id: bigint, emitter: `0x${string}`, signature: `0x${string}`): Promise<TransactionReceipt> {
-        throw new Error('Not implemented');
+        this.ensureWalletClient();
+        // Simulate client call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3DocABI,
+            functionName: 'sign',
+            args: [
+                id,
+                toBytes32(to0x(emitter)),
+                signature
+            ],
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
     }
 
     /**
@@ -188,7 +290,23 @@ export class Web3Doc implements IWeb3Doc {
      * @param signature A detached binary OpenPGP signature made over the raw bytes of the keccak256 hash of the document.
      */
     async timestamp(emitter: `0x${string}`, dochash: `0x${string}`, signature: `0x${string}`): Promise<TransactionReceipt> {
-        throw new Error('Not implemented');
+        this.ensureWalletClient();
+        // Simulate client call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3DocABI,
+            functionName: 'timestamp',
+            args: [
+                toBytes32(to0x(emitter)),
+                dochash,
+                signature
+            ],
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
     }
 
     /*****************************************************************************************************************/
@@ -201,7 +319,11 @@ export class Web3Doc implements IWeb3Doc {
      * @return The address of the Web3PGP contract used by this contract.
      */
     async getWeb3PGPAddress(): Promise<Address> {
-        throw new Error('Not implemented');
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'getWeb3PGPAddress',
+        });
     }
 
     /**
@@ -211,7 +333,12 @@ export class Web3Doc implements IWeb3Doc {
      * @return The ID of the original document if the given document is a copy, or 0 if it is not a copy.
      */
     async isCopyOf(id: bigint): Promise<bigint> {
-        throw new Error('Not implemented');
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'isCopyOf',
+            args: [id],
+        });
     }
 
     /**
@@ -221,7 +348,12 @@ export class Web3Doc implements IWeb3Doc {
      * @return The block number in which the document was published. 0 if the document does not exist.
      */
     async getDocumentBlockNumberByID(id: bigint): Promise<bigint> {
-        throw new Error('Not implemented');
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'getDocumentBlockNumberByID',
+            args: [id],
+        });
     }
 
     /**
@@ -231,7 +363,12 @@ export class Web3Doc implements IWeb3Doc {
      * @return The block numbers in which the documents were published.
      */
     async getDocumentBlockNumberByIDBatch(ids: bigint[]): Promise<bigint[]> {
-        throw new Error('Not implemented');
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'getDocumentBlockNumberByIDBatch',
+            args: [ids],
+        }) as Promise<bigint[]>;
     }
 
     /**
@@ -243,7 +380,12 @@ export class Web3Doc implements IWeb3Doc {
      * @return An array of signature IDs associated with the document.
      */
     async listSignatures(id: bigint, start: bigint, limit: bigint): Promise<bigint[]> {
-        throw new Error('Not implemented');
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'listSignatures',
+            args: [id, start, limit],
+        }) as Promise<bigint[]>;
     }
 
     /*****************************************************************************************************************/
@@ -268,7 +410,46 @@ export class Web3Doc implements IWeb3Doc {
         fromBlock?: bigint, 
         toBlock?: bigint
     ): Promise<DocumentLog[]> {
-        throw new Error('Not implemented');
+        // Use default values: fromBlock = 0n, toBlock = latest block
+        const from = fromBlock ?? 0n;
+        const to = toBlock ?? await this.client.getBlockNumber();
+
+        // Build args only if a filter is provided
+        let args: any = undefined;
+        if (ids !== undefined || emitters !== undefined || dochashes !== undefined) {
+            args = {};
+            if (ids !== undefined) {
+                args.id = ids;
+            }
+            if (emitters !== undefined) {
+                args.emitter = emitters.map(toBytes32);
+            }
+            if (dochashes !== undefined) {
+                args.dochash = dochashes;
+            }
+        }
+
+        const logs = await this.client.getLogs({
+            address: this.address,
+            event: Web3DocABI.find(item => item.type === 'event' && item.name === 'Document')!,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+        
+        return Promise.all(logs.map(async log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: await this.getBlockTimestamp(log.blockNumber),
+            transactionHash: log.transactionHash,
+            id: log.args.id,
+            emitter: log.args.emitter,
+            dochash: log.args.dochash,
+            signature: log.args.signature,
+            document: log.args.document,
+            uri: log.args.uri,
+            mimeType: log.args.mimeType,
+        })));
     }
 
     /**
@@ -276,7 +457,7 @@ export class Web3Doc implements IWeb3Doc {
      * 
      * @param id The unique ID of the document.
      * @param blockNumber The block number where to search for the document.
-     * @returns The DocumentLog if found, otherwise null.
+     * @returns The DocumentLog if found, otherwise undefined.
      * @example
      * ```typescript
      * const targetID = 1n;
@@ -284,8 +465,10 @@ export class Web3Doc implements IWeb3Doc {
      * const documentLog = await web3Doc.getDocumentLogByID(targetID, blockNumber);
      * ```
      */
-    async getDocumentLogByID(id: bigint, blockNumber: bigint): Promise<DocumentLog | null> {
-        throw new Error('Not implemented');
+    async getDocumentLogByID(id: bigint, blockNumber: bigint): Promise<DocumentLog | undefined> {
+        let logs = await this.searchDocumentLogs([id], undefined, undefined, blockNumber, blockNumber);
+        return logs.length > 0 ? logs[0] : undefined;
+        
     }
 
     /**
@@ -314,7 +497,7 @@ export class Web3Doc implements IWeb3Doc {
      * 
      * @param copy The unique ID of the copy.
      * @param blockNumber The block number where to search for the copy.
-     * @returns The CopyLog if found, otherwise null.
+     * @returns The CopyLog if found, otherwise undefined.
      * @exampletypescript
      * ```typescript
      * const targetCopyID = 1n;
@@ -322,7 +505,7 @@ export class Web3Doc implements IWeb3Doc {
      * const copyLog = await web3Doc.getCopyLogByID(targetCopyID, blockNumber);
      * ```
      */
-    async getCopyLogByID(copy: bigint, blockNumber: bigint): Promise<CopyLog | null> {
+    async getCopyLogByID(copy: bigint, blockNumber: bigint): Promise<CopyLog | undefined> {
         throw new Error('Not implemented');
     }
 
@@ -392,7 +575,7 @@ export class Web3Doc implements IWeb3Doc {
      * 
      * @param id The unique ID of the timestamp.
      * @param blockNumber The block number where to search for the timestamp.
-     * @returns The TimestampLog if found, otherwise null.
+     * @returns The TimestampLog if found, otherwise undefined.
      * @example
      * ```typescript
      * const targetID = 1n;
@@ -400,7 +583,11 @@ export class Web3Doc implements IWeb3Doc {
      * const timestampLog = await web3Doc.getTimestampLogById(targetID, blockNumber);
      * ```
      */
-    async getTimestampLogById(id: bigint, blockNumber: bigint): Promise<TimestampLog | null> {
+    async getTimestampLogById(id: bigint, blockNumber: bigint): Promise<TimestampLog | undefined> {
         throw new Error('Not implemented');
+    }
+
+    getBlockTimestamp(blockNumber: bigint): any {
+        throw new Error('Method not implemented.');
     }
 }

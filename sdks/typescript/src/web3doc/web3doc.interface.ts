@@ -170,7 +170,7 @@ export interface IWeb3Doc {
      * 
      * @param id The unique ID of the document.
      * @param blockNumber The block number where to search for the document.
-     * @returns The DocumentLog if found, otherwise null.
+     * @returns The DocumentLog if found, otherwise undefined.
      * @example
      * ```typescript
      * const targetID = 1n;
@@ -178,7 +178,7 @@ export interface IWeb3Doc {
      * const documentLog = await web3Doc.getDocumentLogByID(targetID, blockNumber);
      * ```
      */
-    getDocumentLogByID(id: bigint, blockNumber: bigint): Promise<DocumentLog | null>;
+    getDocumentLogByID(id: bigint, blockNumber: bigint): Promise<DocumentLog | undefined>;
 
     /**
      * Searches for Copy events emitted by the smart contract, filtered by the provided criteria.
@@ -203,7 +203,7 @@ export interface IWeb3Doc {
      * 
      * @param copy The unique ID of the copy.
      * @param blockNumber The block number where to search for the copy.
-     * @returns The CopyLog if found, otherwise null.
+     * @returns The CopyLog if found, otherwise undefined.
      * @exampletypescript
      * ```typescript
      * const targetCopyID = 1n;
@@ -211,7 +211,7 @@ export interface IWeb3Doc {
      * const copyLog = await web3Doc.getCopyLogByID(targetCopyID, blockNumber);
      * ```
      */
-    getCopyLogByID(copy: bigint, blockNumber: bigint): Promise<CopyLog | null>;
+    getCopyLogByID(copy: bigint, blockNumber: bigint): Promise<CopyLog | undefined>;
 
     /**
      * Searches for Notification events emitted by the smart contract, filtered by the provided criteria.
@@ -271,7 +271,7 @@ export interface IWeb3Doc {
      * 
      * @param id The unique ID of the timestamp.
      * @param blockNumber The block number where to search for the timestamp.
-     * @returns The TimestampLog if found, otherwise null.
+     * @returns The TimestampLog if found, otherwise undefined.
      * @example
      * ```typescript
      * const targetID = 1n;
@@ -279,5 +279,5 @@ export interface IWeb3Doc {
      * const timestampLog = await web3Doc.getTimestampLogById(targetID, blockNumber);
      * ```
      */
-    getTimestampLogById(id: bigint, blockNumber: bigint): Promise<TimestampLog | null>;
+    getTimestampLogById(id: bigint, blockNumber: bigint): Promise<TimestampLog | undefined>;
 }

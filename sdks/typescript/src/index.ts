@@ -8,5 +8,9 @@ export * from './web3pgp/web3pgp.service.interface';
 export * from './web3pgp/web3pgp';
 export * from './web3pgp/web3pgp.service';
 
-// TODO: Export web3doc functions when implemented
-// export * from './web3doc';
+// Export web3doc functions
+export * from './web3doc/types/types';
+export * from './web3doc/web3doc.interface';
+export * from './web3doc/web3doc.service.interface';
+export * from './web3doc/web3doc';
+export * from './web3doc/web3doc.service';
