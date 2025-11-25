@@ -1,24 +1,40 @@
 import { Web3PGP as Web3PGPABI }  from '../abis/Web3PGP';
 import { toBytes32 } from '../utils/0xstr';
-import { Address, PublicClient, TransactionReceipt, WalletClient } from 'viem';
+import { Address, PublicClient, TransactionReceipt, WalletClient, parseEventLogs } from 'viem';
 import { IWeb3PGP } from './web3pgp.interface';
 import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog } from './types/types';
+import { RequestedFeeUpdatedLog, FeesWithdrawnLog } from '../flatfee/types/types';
+import { FlatFee } from '../flatfee/flatefee';
+import { getBlockTimestamp } from '../utils/viemutils';
 
 export class Web3PGP implements IWeb3PGP {
 
     static readonly abi = Web3PGPABI;
 
     // Address of the Web3PGP contract
-    public readonly address: `0x${string}`;
+    private _address: `0x${string}`;
     // Viem public client instance used to read from the blockchain
     private _client: PublicClient;
     // Viem wallet client instance used to sign transaction
     private _walletClient: WalletClient | undefined;
+    // Flatfee implementation
+    private _flatFee: FlatFee;
     
     constructor(address: `0x${string}`, client: PublicClient, walletClient?: WalletClient) {
-        this.address = address;
+        this._address = address;
         this._client = client;
         this._walletClient = walletClient;
+        this._flatFee = new FlatFee(address, client, walletClient);
+    }
+
+    public get address(): `0x${string}` {
+        return this._address;
+    }
+
+    public set address(value: `0x${string}`) {
+        this._address = value;
+        // Reflect the change in the flat fee instance
+        this._flatFee.address = value;
     }
 
     public get client(): PublicClient {
@@ -27,6 +43,8 @@ export class Web3PGP implements IWeb3PGP {
 
     public set client(value: PublicClient) {
         this._client = value;
+        // Reflect the change in the flat fee instance
+        this._flatFee.client = value;
     }
 
     public get walletClient(): WalletClient | undefined {
@@ -35,6 +53,8 @@ export class Web3PGP implements IWeb3PGP {
 
     public set walletClient(value: WalletClient | undefined) {
         this._walletClient = value;
+        // Reflect the change in the flat fee instance
+        this._flatFee.walletClient = value;
     }
 
     /**
@@ -158,11 +178,8 @@ export class Web3PGP implements IWeb3PGP {
      * @return The requested fee in wei.
      */
     public requestedFee(): Promise<bigint> {
-        return this.client.readContract({
-            address: this.address,
-            abi: Web3PGPABI,
-            functionName: 'requestedFee',
-        });
+        // Delegate to the FlatFee instance
+        return this._flatFee.requestedFee();
     }
 
     /*****************************************************************************************************************/
@@ -266,7 +283,7 @@ export class Web3PGP implements IWeb3PGP {
     }
 
     /*****************************************************************************************************************/
-    /* WRITE FUNCTIONS (RESTRICTED - ACCESS CONTROLLED)                                                             */
+    /* WRITE FUNCTIONS (FLATFEE)                                                                                     */
     /*****************************************************************************************************************/
 
     /**
@@ -275,19 +292,8 @@ export class Web3PGP implements IWeb3PGP {
      * @return Transaction receipt after updating the fee.
      */
     public async updateRequestedFee(newFee: bigint): Promise<TransactionReceipt> {
-        this.ensureWalletClient();
-        // Simulate the contract call
-        const { request } = await this.client.simulateContract({
-            address: this.address,
-            account: this.walletClient!.account,
-            abi: Web3PGPABI,
-            functionName: 'updateRequestedFee',
-            args: [newFee],
-        });
-        // Use the wallet client to send the actual transaction
-        const txhash = await this.walletClient!.writeContract(request);
-        // Wait for transaction to be mined and return the receipt
-        return this.client.waitForTransactionReceipt({ hash: txhash });
+        // Delegate to the FlatFee instance
+        return this._flatFee.updateRequestedFee(newFee);
     }
 
     /**
@@ -296,19 +302,8 @@ export class Web3PGP implements IWeb3PGP {
      * @return Transaction receipt after withdrawing fees.
      */
     public async withdrawFees(to: Address): Promise<TransactionReceipt> {
-        this.ensureWalletClient();
-        // Simulate the contract call
-        const { request } = await this.client.simulateContract({
-            address: this.address,
-            account: this.walletClient!.account,
-            abi: Web3PGPABI,
-            functionName: 'withdrawFees',
-            args: [to],
-        });
-        // Use the wallet client to send the actual transaction
-        const txhash = await this.walletClient!.writeContract(request);
-        // Wait for transaction to be mined and return the receipt
-        return this.client.waitForTransactionReceipt({ hash: txhash });
+        // Delegate to the FlatFee instance
+        return this._flatFee.withdrawFees(to);
     }
 
     /*****************************************************************************************************************/
@@ -428,7 +423,7 @@ export class Web3PGP implements IWeb3PGP {
         return Promise.all(logs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockDate: await this.getBlockTimestamp(log.blockNumber),
+            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprints: log.args.subkeyFingerprints,
@@ -488,7 +483,7 @@ export class Web3PGP implements IWeb3PGP {
         return Promise.all(logs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockDate: await this.getBlockTimestamp(log.blockNumber),
+            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprint: log.args.subkeyFingerprint,
@@ -539,29 +534,121 @@ export class Web3PGP implements IWeb3PGP {
         return Promise.all(logs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockDate: await this.getBlockTimestamp(log.blockNumber),
+            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             revocationCertificate: log.args.revocationCertificate
         })));
     }
 
-    /*****************************************************************************************************************/
-    /* UTILITY FUNCTIONS                                                                                             */
-    /*****************************************************************************************************************/
+    /**
+     * Extract KeyRegistered event logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of KeyRegisteredLog objects extracted from the receipt.
+     */
+    extractKeyRegisteredLog(receipt: TransactionReceipt): Promise<KeyRegisteredLog[]> {
+        let parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            eventName: 'KeyRegistered',
+            logs: receipt.logs
+        });
+
+        return Promise.all(parsedLogs.map(async log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
+            transactionHash: log.transactionHash,
+            primaryKeyFingerprint: log.args.primaryKeyFingerprint,
+            subkeyFingerprints: log.args.subkeyFingerprints,
+            openPGPMsg: log.args.openPGPMsg
+        })));
+    }
 
     /**
-     * Get the timestamp of a specific block.
-     * @param block The block to get the timestamp for (block number or block hash).
-     * @return The Date object representing the block timestamp.
+     * Extract SubkeyAdded event logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of SubkeyAddedLog objects extracted from the receipt.
      */
-    public async getBlockTimestamp(block: bigint | `0x${string}`): Promise<Date> {
-        if (typeof block === 'bigint') {
-            const b = await this.client.getBlock({ blockNumber: block });
-            return new Date(Number(b.timestamp) * 1000);
-        } else {
-            const b = await this.client.getBlock({ blockHash: block });
-            return new Date(Number(b.timestamp) * 1000);
-        }
+    extractSubkeyAddedLog(receipt: TransactionReceipt): Promise<SubkeyAddedLog[]> {
+        let parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            eventName: 'SubkeyAdded',
+            logs: receipt.logs
+        });
+
+        return Promise.all(parsedLogs.map(async log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
+            transactionHash: log.transactionHash,
+            primaryKeyFingerprint: log.args.primaryKeyFingerprint,
+            subkeyFingerprint: log.args.subkeyFingerprint,
+            openPGPMsg: log.args.openPGPMsg
+        })));
+    }
+
+    /**
+     * Extract KeyRevoked event logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of KeyRevokedLog objects extracted from the receipt.
+     */
+    extractKeyRevokedLog(receipt: TransactionReceipt): Promise<KeyRevokedLog[]> {
+        let parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            eventName: 'KeyRevoked',
+            logs: receipt.logs
+        });
+
+        return Promise.all(parsedLogs.map(async log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            revocationCertificate: log.args.revocationCertificate
+        })));
+    }
+
+    /**
+     * Search for RequestedFeeUpdated event logs.
+     * @param fromBlock The starting block number of the search range.
+     * @param toBlock The ending block number of the search range.
+     * @returns An array of RequestedFeeUpdatedLog objects found within the specified block range.
+     */
+    searchRequestedFeeUpdatedLogs(fromBlock?: bigint, toBlock?: bigint): Promise<RequestedFeeUpdatedLog[]> {
+        // Delegate to the FlatFee instance
+        return this._flatFee.searchRequestedFeeUpdatedLogs(fromBlock, toBlock);
+    }
+
+    /**
+     * Search for FeesWithdrawn event logs.
+     * @param recipients Optional array of recipient addresses to filter the logs.
+     * @param fromBlock The starting block number of the search range.
+     * @param toBlock The ending block number of the search range.
+     * @returns An array of FeesWithdrawnLog objects found within the specified block range.
+     */
+    searchFeesWithdrawnLogs(recipients?: Address[], fromBlock?: bigint, toBlock?: bigint): Promise<FeesWithdrawnLog[]> {
+        // Delegate to the FlatFee instance
+        return this._flatFee.searchFeesWithdrawnLogs(recipients, fromBlock, toBlock);
+    }
+
+    /**
+     * Extract FeesWithdrawn event logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of FeesWithdrawnLog objects extracted from the receipt.
+     */
+    extractFeesWithdrawnLog(receipt: TransactionReceipt): Promise<FeesWithdrawnLog[]> {
+        // Delegate to the FlatFee instance
+        return this._flatFee.extractFeesWithdrawnLog(receipt);
+    }
+
+    /**
+     * Extract RequestedFeeUpdated event logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of RequestedFeeUpdatedLog objects extracted from the receipt.
+     */
+    extractRequestedFeeUpdatedLog(receipt: TransactionReceipt): Promise<RequestedFeeUpdatedLog[]> {
+        // Delegate to the FlatFee instance
+        return this._flatFee.extractRequestedFeeUpdatedLog(receipt);
     }
 }

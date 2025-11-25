@@ -1,3 +1,4 @@
+import { getBlockTimestamp } from '../src/utils/viemutils';
 import { Web3PGP } from '../src/web3pgp/web3pgp';
 import { AnvilHelper } from './helpers/anvil.helper';
 import { Address } from 'viem';
@@ -330,19 +331,191 @@ describe('Web3PGP Integration Tests', () => {
             const publicClient = anvil.getPublicClient();
             const blockNumber = await publicClient.getBlockNumber();
 
-            const timestamp = await web3pgp.getBlockTimestamp(blockNumber);
+            const timestamp = await getBlockTimestamp(publicClient, blockNumber);
 
             expect(timestamp).toBeInstanceOf(Date);
             expect(timestamp.getTime()).toBeGreaterThan(0);
         });
+    });
 
-        test('should get block timestamp by hash', async () => {
+    describe('Fee Management (Restricted Functions)', () => {
+        test('should read current requested fee', async () => {
+            const fee = await web3pgp.requestedFee();
+            expect(fee).toBe(0n); // Deployed with 0 fee
+        });
+
+        test('should update requested fee (admin only)', async () => {
+            const newFee = BigInt(1000000); // 0.000001 ETH in wei
+
+            // Update the fee (account 0 is admin in deployment)
+            const receipt = await web3pgp.updateRequestedFee(newFee);
+            expect(receipt.status).toBe('success');
+
+            // Verify fee was updated
+            const updatedFee = await web3pgp.requestedFee();
+            expect(updatedFee).toBe(newFee);
+
+            // Reset fee back to 0 for other tests
+            await web3pgp.updateRequestedFee(0n);
+        });
+
+        test('should register key with fee when fee is set', async () => {
+            const testFee = BigInt(100000); // Small fee
+            const testKey = generateUniqueFingerprint();
+
+            // Set a fee
+            await web3pgp.updateRequestedFee(testFee);
+
+            // Register key with fee
+            const receipt = await web3pgp.register(testKey, [], mockOpenPGPMsg);
+            expect(receipt.status).toBe('success');
+
+            // Verify key was registered
+            const exists = await web3pgp.exists(testKey);
+            expect(exists).toBe(true);
+
+            // Reset fee
+            await web3pgp.updateRequestedFee(0n);
+        });
+
+        test('should withdraw accumulated fees (admin only)', async () => {
             const publicClient = anvil.getPublicClient();
-            const block = await publicClient.getBlock({ blockNumber: 1n });
+            const recipientAddress = anvil.accounts[1]!.address;
 
-            const timestamp = await web3pgp.getBlockTimestamp(block.hash);
+            // Set a fee
+            const fee = BigInt(100000);
+            await web3pgp.updateRequestedFee(fee);
 
-            expect(timestamp).toBeInstanceOf(Date);
+            // Register some keys to accumulate fees
+            const key1 = generateUniqueFingerprint();
+            const key2 = generateUniqueFingerprint();
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            await web3pgp.register(key2, [], mockOpenPGPMsg);
+
+            // Get recipient balance before withdrawal
+            const balanceBefore = await publicClient.getBalance({ address: recipientAddress });
+
+            // Withdraw fees
+            const receipt = await web3pgp.withdrawFees(recipientAddress);
+            expect(receipt.status).toBe('success');
+
+            // Get recipient balance after withdrawal
+            const balanceAfter = await publicClient.getBalance({ address: recipientAddress });
+
+            // Balance should have increased (at least by the fees collected)
+            expect(balanceAfter).toBeGreaterThan(balanceBefore);
+            const increase = balanceAfter - balanceBefore;
+            expect(increase).toBeGreaterThanOrEqual(fee * 2n); // At least 2 registrations worth of fees
+
+            // Reset fee
+            await web3pgp.updateRequestedFee(0n);
+        });
+
+        test('should search RequestedFeeUpdated event logs', async () => {
+            const oldFee = await web3pgp.requestedFee();
+            const newFee = BigInt(500000);
+
+            // Update fee
+            const receipt = await web3pgp.updateRequestedFee(newFee);
+
+            // Search for fee update logs
+            const logs = await web3pgp.searchRequestedFeeUpdatedLogs(receipt.blockNumber, receipt.blockNumber);
+
+            expect(logs.length).toBeGreaterThan(0);
+            const log = logs.find(l => l.blockNumber === receipt.blockNumber);
+            expect(log).toBeDefined();
+            expect(log!.oldFee).toBe(oldFee);
+            expect(log!.newFee).toBe(newFee);
+            expect(log!.blockTimestamp).toBeInstanceOf(Date);
+
+            // Reset fee
+            await web3pgp.updateRequestedFee(0n);
+        });
+
+        test('should extract RequestedFeeUpdated log from receipt', async () => {
+            const newFee = BigInt(750000);
+
+            // Update fee
+            const receipt = await web3pgp.updateRequestedFee(newFee);
+
+            // Extract log from receipt
+            const logs = await web3pgp.extractRequestedFeeUpdatedLog(receipt);
+
+            expect(logs).toHaveLength(1);
+            expect(logs[0]!.newFee).toBe(newFee);
+            expect(logs[0]!.transactionHash).toBe(receipt.transactionHash);
+
+            // Reset fee
+            await web3pgp.updateRequestedFee(0n);
+        });
+
+        test('should search FeesWithdrawn event logs', async () => {
+            const recipientAddress = anvil.accounts[2]!.address;
+
+            // Set fee and register keys to accumulate fees
+            await web3pgp.updateRequestedFee(BigInt(100000));
+            await web3pgp.register(generateUniqueFingerprint(), [], mockOpenPGPMsg);
+            await web3pgp.register(generateUniqueFingerprint(), [], mockOpenPGPMsg);
+
+            // Withdraw fees
+            const receipt = await web3pgp.withdrawFees(recipientAddress);
+
+            // Search for withdrawal logs
+            const logs = await web3pgp.searchFeesWithdrawnLogs([recipientAddress], receipt.blockNumber, receipt.blockNumber);
+
+            expect(logs.length).toBeGreaterThan(0);
+            const log = logs.find(l => l.blockNumber === receipt.blockNumber);
+            expect(log).toBeDefined();
+            expect(log!.to).toBe(recipientAddress);
+            expect(log!.amount).toBeGreaterThan(0n);
+            expect(log!.blockTimestamp).toBeInstanceOf(Date);
+
+            // Reset fee
+            await web3pgp.updateRequestedFee(0n);
+        });
+
+        test('should extract FeesWithdrawn log from receipt', async () => {
+            const recipientAddress = anvil.accounts[3]!.address;
+
+            // Set fee and register keys
+            await web3pgp.updateRequestedFee(BigInt(100000));
+            await web3pgp.register(generateUniqueFingerprint(), [], mockOpenPGPMsg);
+
+            // Withdraw fees
+            const receipt = await web3pgp.withdrawFees(recipientAddress);
+
+            // Extract log from receipt
+            const logs = await web3pgp.extractFeesWithdrawnLog(receipt);
+
+            expect(logs).toHaveLength(1);
+            expect(logs[0]!.to).toBe(recipientAddress);
+            expect(logs[0]!.amount).toBeGreaterThan(0n);
+            expect(logs[0]!.transactionHash).toBe(receipt.transactionHash);
+
+            // Reset fee
+            await web3pgp.updateRequestedFee(0n);
+        });
+
+        test('should handle fee updates across multiple operations', async () => {
+            const fee1 = BigInt(100000);
+            const fee2 = BigInt(200000);
+            const fee3 = BigInt(150000);
+
+            // Multiple fee updates
+            await web3pgp.updateRequestedFee(fee1);
+            let currentFee = await web3pgp.requestedFee();
+            expect(currentFee).toBe(fee1);
+
+            await web3pgp.updateRequestedFee(fee2);
+            currentFee = await web3pgp.requestedFee();
+            expect(currentFee).toBe(fee2);
+
+            await web3pgp.updateRequestedFee(fee3);
+            currentFee = await web3pgp.requestedFee();
+            expect(currentFee).toBe(fee3);
+
+            // Reset
+            await web3pgp.updateRequestedFee(0n);
         });
     });
 

@@ -1,11 +1,12 @@
 import { Address, TransactionReceipt } from 'viem';
 import { KeyRegisteredLog, KeyRevokedLog, SubkeyAddedLog } from './types/types';
+import { IFlatFee } from '../flatfee/flatefee.interface';
 
 /**
  * Interface for the Web3PGP contract methods.
  * This defines the low-level contract interactions following the IWeb3PGP Solidity interface.
  */
-export interface IWeb3PGP {
+export interface IWeb3PGP extends IFlatFee {
 
     /*****************************************************************************************************************/
     /* READ FUNCTIONS                                                                                                */
@@ -64,12 +65,6 @@ export interface IWeb3PGP {
      */
     listSubkeys(parentKeyFingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<`0x${string}`[]>;
 
-    /**
-     * Get the requested fee for payable operations.
-     * @return The requested fee in wei.
-     */
-    requestedFee(): Promise<bigint>;
-
     /*****************************************************************************************************************/
     /* WRITE FUNCTIONS (PAYABLE)                                                                                     */
     /*****************************************************************************************************************/
@@ -107,24 +102,6 @@ export interface IWeb3PGP {
      * @return Transaction receipt after publishing the revocation.
      */
     revoke(fingerprint: `0x${string}`, revocationCertificate: `0x${string}`): Promise<TransactionReceipt>;
-
-    /*****************************************************************************************************************/
-    /* WRITE FUNCTIONS (RESTRICTED - ACCESS CONTROLLED)                                                             */
-    /*****************************************************************************************************************/
-
-    /**
-     * Update the requested service fee.
-     * @param newFee The new requested fee to be set in wei.
-     * @return Transaction receipt after updating the fee.
-     */
-    updateRequestedFee(newFee: bigint): Promise<TransactionReceipt>;
-
-    /**
-     * Withdraw the full contract balance to the specified address.
-     * @param to The address to which the fees are withdrawn.
-     * @return Transaction receipt after withdrawing fees.
-     */
-    withdrawFees(to: Address): Promise<TransactionReceipt>;
 
     /*****************************************************************************************************************/
     /* INITIALIZATION & UPGRADE FUNCTIONS                                                                            */
@@ -214,14 +191,24 @@ export interface IWeb3PGP {
      */
     searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRevokedLog[]>;
 
-    /*****************************************************************************************************************/
-    /* UTILITY FUNCTIONS                                                                                             */
-    /*****************************************************************************************************************/
+    /**
+     * Extracts KeyRegisteredLog entries from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @return The list of KeyRegisteredLog extracted from the receipt.
+     */
+    extractKeyRegisteredLog(receipt: TransactionReceipt): Promise<KeyRegisteredLog[]>;
 
     /**
-     * Get the timestamp of a specific block.
-     * @param block The block to get the timestamp for (block number or block hash).
-     * @return The Date object representing the block timestamp.
+     * Extracts SubkeyAddedLog entries from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @return The list of SubkeyAddedLog extracted from the receipt.
      */
-    getBlockTimestamp(block: bigint | `0x${string}`): Promise<Date>;
+    extractSubkeyAddedLog(receipt: TransactionReceipt): Promise<SubkeyAddedLog[]>;
+
+    /**
+     * Extracts KeyRevokedLog entries from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @return The list of KeyRevokedLog extracted from the receipt.
+     */
+    extractKeyRevokedLog(receipt: TransactionReceipt): Promise<KeyRevokedLog[]>;
 }
