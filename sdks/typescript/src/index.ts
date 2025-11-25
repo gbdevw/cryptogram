@@ -14,3 +14,8 @@ export * from './web3doc/web3doc.interface';
 export * from './web3doc/web3doc.service.interface';
 export * from './web3doc/web3doc';
 export * from './web3doc/web3doc.service';
+
+// Export flatfee functions
+export * from './flatfee/types/types';
+export * from './flatfee/flatefee.interface';
+export * from './flatfee/flatefee';

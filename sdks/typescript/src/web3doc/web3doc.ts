@@ -9,6 +9,9 @@ import { to0x, toBytes32 } from '../utils/0xstr';
  * Implementation of the Web3Doc contract interface.
  * 
  * This class provides low-level bindings to interact with the Web3Doc contract deployed on the blockchain.
+ * 
+ * @todo Add fee management and initialization methods to the interface + utility getBlockTimestamp.
+ * @todo Implement log search methods + tests.
  */
 export class Web3Doc implements IWeb3Doc {
     // Address of the Web3Doc contract

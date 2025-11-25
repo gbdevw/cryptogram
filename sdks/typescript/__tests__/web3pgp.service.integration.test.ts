@@ -592,7 +592,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRegisteredLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     subkeyFingerprints: publicKey.subkeys.map(subkey => toBytes32(to0x(subkey.getFingerprint()))),
@@ -617,7 +617,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRegisteredLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     subkeyFingerprints: [toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint()))],
@@ -640,7 +640,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRegisteredLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: BYTES32_ZERO, // Invalid fingerprint
                     subkeyFingerprints: [toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint()))],
@@ -655,7 +655,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRegisteredLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: BYTES32_ZERO,
                     subkeyFingerprints: [],
@@ -673,7 +673,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRegisteredLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     subkeyFingerprints: [
@@ -692,7 +692,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRegisteredLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(privateKey.getFingerprint())),
                     subkeyFingerprints: privateKey.subkeys.map(subkey => toBytes32(to0x(subkey.getFingerprint()))),
@@ -719,7 +719,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRegisteredLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     subkeyFingerprints: [toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint()))],
@@ -745,7 +745,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRegisteredLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     subkeyFingerprints: [toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint()))],
@@ -766,7 +766,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: SubkeyAddedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     subkeyFingerprint: toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())),
@@ -787,7 +787,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: SubkeyAddedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: BYTES32_ZERO, // Invalid fingerprint
                     subkeyFingerprint: toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())),
@@ -806,7 +806,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: SubkeyAddedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     subkeyFingerprint: BYTES32_ZERO, // Non-existent subkey
@@ -823,7 +823,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: SubkeyAddedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     subkeyFingerprint: BYTES32_ZERO, // Invalid fingerprint
@@ -838,7 +838,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: SubkeyAddedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: BYTES32_ZERO,
                     subkeyFingerprint: BYTES32_ZERO,
@@ -859,7 +859,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: SubkeyAddedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     primaryKeyFingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     subkeyFingerprint: toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())),
@@ -886,7 +886,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRevokedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     fingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     revocationCertificate: toHex(revokedKey.publicKey.write())
@@ -911,7 +911,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRevokedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     fingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     revocationCertificate: toHex(revocationCertObj.data)
@@ -947,7 +947,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRevokedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: date,
+                    blockTimestamp: date,
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     fingerprint: toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())),
                     revocationCertificate: toHex(publicKey.write())
@@ -970,7 +970,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRevokedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     fingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     revocationCertificate: toHex(publicKey.write()) // Does not revoke the key
@@ -988,7 +988,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRevokedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     fingerprint: toBytes32(to0x(publicKey.subkeys[0]!.getFingerprint())),
                     revocationCertificate: toHex(publicKey.write()) // Does not have revoked subkeys
@@ -1004,7 +1004,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRevokedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     fingerprint: BYTES32_ZERO,
                     revocationCertificate: '0x' // Missing data
@@ -1027,7 +1027,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let log: KeyRevokedLog = {
                     blockNumber: 0n,
                     blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                    blockDate: new Date(),
+                    blockTimestamp: new Date(),
                     transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
                     fingerprint: toBytes32(to0x(publicKey.getFingerprint())),
                     revocationCertificate: toHex(unarmoredRevocation.data)

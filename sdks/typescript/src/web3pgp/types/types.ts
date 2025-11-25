@@ -1,3 +1,5 @@
+import { BaseLog } from "../../common/types/types";
+
 /**
  * Type representing a KeyRegistered event log emitted by the Web3PGP smart contract.
  * 
@@ -5,15 +7,7 @@
  * The log data are not validated by the smart contract and must be verified by the client application using a
  * OpenPGP implementation.
  */
-export type KeyRegisteredLog = {
-    // Blockchain block number where the event was emitted
-    blockNumber: bigint;
-    // Hash of the block that contains the event
-    blockHash: `0x${string}`;
-    // Date and time when the block containing the event was mined
-    blockDate: Date;
-    // Transaction hash of the transaction that triggered the event
-    transactionHash: `0x${string}`;
+export type KeyRegisteredLog =  BaseLog & {
     // The declared fingerprint of the registered key as bytes32 hex string
     primaryKeyFingerprint: `0x${string}` | undefined;
     // The declared fingerprints of any subkeys associated with the registered key as bytes32 hex strings
@@ -29,15 +23,7 @@ export type KeyRegisteredLog = {
  * The log data are not validated by the smart contract and must be verified by the client application using a
  * OpenPGP implementation.
  */
-export type SubkeyAddedLog = {
-    // Blockchain block number where the event was emitted
-    blockNumber: bigint;
-    // Hash of the block that contains the event
-    blockHash: `0x${string}`;
-    // Date and time when the block containing the event was mined
-    blockDate: Date;
-    // Transaction hash of the transaction that triggered the event
-    transactionHash: `0x${string}`;
+export type SubkeyAddedLog = BaseLog & {
     // The declared fingerprint of the primary key to which the subkey was added as bytes32 hex string
     primaryKeyFingerprint: `0x${string}` | undefined;
     // The declared fingerprint of the added subkey as bytes32 hex string
@@ -53,15 +39,7 @@ export type SubkeyAddedLog = {
  * The log data are not validated by the smart contract and must be verified by the client application using a
  * OpenPGP implementation.
  */
-export type KeyRevokedLog = {
-    // Blockchain block number where the event was emitted
-    blockNumber: bigint;
-    // Hash of the block that contains the event
-    blockHash: `0x${string}`;
-    // Date and time when the block containing the event was mined
-    blockDate: Date;
-    // Transaction hash of the transaction that triggered the event
-    transactionHash: `0x${string}`;
+export type KeyRevokedLog =  BaseLog & {
     // The declared fingerprint of the revoked key as bytes32 hex string
     fingerprint?: `0x${string}` | undefined;
     // Hex-encoded OpenPGP binary message published on-chain which should contain the revocation certificate

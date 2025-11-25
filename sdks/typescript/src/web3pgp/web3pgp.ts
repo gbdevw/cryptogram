@@ -423,7 +423,7 @@ export class Web3PGP implements IWeb3PGP {
         return Promise.all(logs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprints: log.args.subkeyFingerprints,
@@ -483,7 +483,7 @@ export class Web3PGP implements IWeb3PGP {
         return Promise.all(logs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprint: log.args.subkeyFingerprint,
@@ -534,7 +534,7 @@ export class Web3PGP implements IWeb3PGP {
         return Promise.all(logs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             revocationCertificate: log.args.revocationCertificate
@@ -556,7 +556,7 @@ export class Web3PGP implements IWeb3PGP {
         return Promise.all(parsedLogs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprints: log.args.subkeyFingerprints,
@@ -579,7 +579,7 @@ export class Web3PGP implements IWeb3PGP {
         return Promise.all(parsedLogs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprint: log.args.subkeyFingerprint,
@@ -602,7 +602,7 @@ export class Web3PGP implements IWeb3PGP {
         return Promise.all(parsedLogs.map(async log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockDate: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             revocationCertificate: log.args.revocationCertificate

@@ -355,7 +355,7 @@ export class Web3PGPService implements IWeb3PGPService {
             const primaryKey = await openpgp.readKey({ binaryKey: toBytes(log.openPGPMsg) });
             // Verify the primary key has a valid signature and was not expired/revoked at the time of the block in which it was registered
             if (skipCryptographicVerifications !== true) {
-                await primaryKey.verifyPrimaryKey(log.blockDate);
+                await primaryKey.verifyPrimaryKey(log.blockTimestamp);
             }
             // Validate the key fingerprint matches the declared one
             if (toBytes32(to0x(primaryKey.getFingerprint())) !== toBytes32(to0x(log.primaryKeyFingerprint))) {
@@ -370,7 +370,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 if (subkey) {
                     // Verify the subkey has a valid signature and was not expired/revoked at the time of the block in which it was registered
                     if (skipCryptographicVerifications !== true) {
-                        await subkey.verify(log.blockDate);
+                        await subkey.verify(log.blockTimestamp);
                     }
                     subkeys.push(subkey);
                 } else {
@@ -445,7 +445,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 pk = await OpenPGPUtils.sanitizeSubkey(pk, log.subkeyFingerprint);
                 // Verify the sanitized key
                 if (skipCryptographicVerifications !== true) {
-                    await OpenPGPUtils.verifyKey(pk, new Date(log.blockDate));
+                    await OpenPGPUtils.verifyKey(pk, new Date(log.blockTimestamp));
                 }
             } catch (err) {
                 throw new Web3PGPServiceValidationError(`Failed to read and sanitize the OpenPGP message for subkey with fingerprint ${log.subkeyFingerprint} from SubkeyAddedLog event: ${err}`);
@@ -544,7 +544,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 // Sanitize primary key
                 const pk = await OpenPGPUtils.sanitizePrimaryKey(revokedKey);
                 // Check the primary key is revoked
-                if (skipCryptographicVerifications !== true && !await pk.isRevoked(undefined, undefined, log.blockDate)) {
+                if (skipCryptographicVerifications !== true && !await pk.isRevoked(undefined, undefined, log.blockTimestamp)) {
                     throw new Web3PGPServiceValidationError(`The primary key with fingerprint ${pk.getFingerprint()} is not revoked as expected in the KeyRevokedLog event.`);
                 }
                 // Return the revoked key and no standalone revocation certificate
@@ -554,7 +554,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 // Sanitize to keep only the target subkey - Will throw an error if not found
                 const pk = await OpenPGPUtils.sanitizeSubkey(revokedKey, log.fingerprint);
                 // Check subkey is revoked
-                if (skipCryptographicVerifications !== true && !await OpenPGPUtils.isSubkeyRevoked(pk.subkeys[0]!, pk, log.blockDate)) {
+                if (skipCryptographicVerifications !== true && !await OpenPGPUtils.isSubkeyRevoked(pk.subkeys[0]!, pk, log.blockTimestamp)) {
                     throw new Web3PGPServiceValidationError(`The subkey with fingerprint ${log.fingerprint} is not revoked as expected in the KeyRevokedLog event.`);
                 }
                 // Return the revoked key and no standalone revocation certificate
