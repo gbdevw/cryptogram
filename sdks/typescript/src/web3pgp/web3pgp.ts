@@ -11,6 +11,11 @@ export class Web3PGP implements IWeb3PGP {
 
     static readonly abi = Web3PGPABI;
 
+    // Pre-computed event definitions for efficient log queries
+    private static readonly KEY_REGISTERED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRegistered')!;
+    private static readonly SUBKEY_ADDED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'SubkeyAdded')!;
+    private static readonly KEY_REVOKED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRevoked')!;
+
     // Address of the Web3PGP contract
     private _address: `0x${string}`;
     // Viem public client instance used to read from the blockchain
@@ -388,10 +393,9 @@ export class Web3PGP implements IWeb3PGP {
      */
     public async getKeyRegisteredLog(primaryKeyFingerprint: `0x${string}`, blockNumber: bigint): Promise<KeyRegisteredLog> {
         const logs = await this.searchKeyRegisteredLogs(primaryKeyFingerprint, blockNumber, blockNumber);
-        if (logs.length === 0 || !logs[0]) {
-            throw new Error(`KeyRegistered event log not found for primaryKeyFingerprint ${primaryKeyFingerprint} at block ${blockNumber}`);
-        }
-        return logs[0];
+        if (logs.length === 1) return logs[0]!;
+        if (logs.length === 0) throw new Error(`KeyRegistered event log not found for primaryKeyFingerprint ${primaryKeyFingerprint} at block ${blockNumber}`);
+        throw new Error(`Multiple KeyRegistered logs found for primaryKeyFingerprint ${primaryKeyFingerprint} at block ${blockNumber}`);
     }
 
     /**
@@ -414,21 +418,29 @@ export class Web3PGP implements IWeb3PGP {
 
         const logs = await this.client.getLogs({
             address: this.address,
-            event: Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRegistered')!,
+            event: Web3PGP.KEY_REGISTERED_EVENT,
             fromBlock: from,
             toBlock: to,
             ...(args !== undefined && { args })
         });
         
-        return Promise.all(logs.map(async log => ({
+        // Batch fetch timestamps for unique block numbers
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprints: log.args.subkeyFingerprints,
             openPGPMsg: log.args.openPGPMsg
-        })));
+        }));
     }
 
     /**
@@ -441,10 +453,9 @@ export class Web3PGP implements IWeb3PGP {
      */
     public async getSubkeyAddedLog(primaryKeyFingerprint: `0x${string}`, subkeyFingerprint: `0x${string}`, blockNumber: bigint): Promise<SubkeyAddedLog> {
         const logs = await this.searchSubkeyAddedLogs(primaryKeyFingerprint, subkeyFingerprint, blockNumber, blockNumber);
-        if (logs.length === 0 || !logs[0]) {
-            throw new Error(`SubkeyAdded event log not found for primaryKeyFingerprint ${primaryKeyFingerprint}, subkeyFingerprint ${subkeyFingerprint} at block ${blockNumber}`);
-        }
-        return logs[0];
+        if (logs.length === 1) return logs[0]!;
+        if (logs.length === 0) throw new Error(`SubkeyAdded event log not found for primaryKeyFingerprint ${primaryKeyFingerprint}, subkeyFingerprint ${subkeyFingerprint} at block ${blockNumber}`);
+        throw new Error(`Multiple SubkeyAdded logs found for primaryKeyFingerprint ${primaryKeyFingerprint}, subkeyFingerprint ${subkeyFingerprint} at block ${blockNumber}`);
     }
 
     /**
@@ -474,21 +485,29 @@ export class Web3PGP implements IWeb3PGP {
 
         const logs = await this.client.getLogs({
             address: this.address,
-            event: Web3PGPABI.find(item => item.type === 'event' && item.name === 'SubkeyAdded')!,
+            event: Web3PGP.SUBKEY_ADDED_EVENT,
             fromBlock: from,
             toBlock: to,
             ...(args !== undefined && { args })
         });
         
-        return Promise.all(logs.map(async log => ({
+        // Batch fetch timestamps for unique block numbers
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprint: log.args.subkeyFingerprint,
             openPGPMsg: log.args.openPGPMsg
-        })));
+        }));
     }
 
     /**
@@ -500,10 +519,9 @@ export class Web3PGP implements IWeb3PGP {
      */
     public async getKeyRevokedLog(fingerprint: `0x${string}`, blockNumber: bigint): Promise<KeyRevokedLog> {
         const logs = await this.searchKeyRevokedLogs(fingerprint, blockNumber, blockNumber);
-        if (logs.length === 0 || !logs[0]) {
-            throw new Error(`KeyRevoked event log not found for fingerprint ${fingerprint} at block ${blockNumber}`);
-        }
-        return logs[0];
+        if (logs.length === 1) return logs[0]!;
+        if (logs.length === 0) throw new Error(`KeyRevoked event log not found for fingerprint ${fingerprint} at block ${blockNumber}`);
+        throw new Error(`Multiple KeyRevoked logs found for fingerprint ${fingerprint} at block ${blockNumber}`);
     }
 
     /**
@@ -525,20 +543,28 @@ export class Web3PGP implements IWeb3PGP {
 
         const logs = await this.client.getLogs({
             address: this.address,
-            event: Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRevoked')!,
+            event: Web3PGP.KEY_REVOKED_EVENT,
             fromBlock: from,
             toBlock: to,
             ...(args !== undefined && { args })
         });
         
-        return Promise.all(logs.map(async log => ({
+        // Batch fetch timestamps for unique block numbers
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             revocationCertificate: log.args.revocationCertificate
-        })));
+        }));
     }
 
     /**
