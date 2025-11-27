@@ -1,27 +1,40 @@
-import { Address, TransactionReceipt, PublicClient, WalletClient } from 'viem';
+import { Address, TransactionReceipt, PublicClient, WalletClient, parseEventLogs } from 'viem';
 import { IWeb3Doc } from './web3doc.interface';
 import { IWeb3PGP } from '../web3pgp/web3pgp.interface';
 import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, NotificationLog } from './types/types';
 import { Web3Doc as Web3DocABI }  from '../abis/Web3Doc';
 import { to0x, toBytes32 } from '../utils/0xstr';
+import { RequestedFeeUpdatedLog, FeesWithdrawnLog } from '../flatfee/types/types';
+import { FlatFee } from '../flatfee/flatefee';
+import { getBlockTimestamp } from '../utils/viemutils';
+import { Web3DocCriticalError, Web3DocError } from './types/errors';
 
 /**
  * Implementation of the Web3Doc contract interface.
  * 
  * This class provides low-level bindings to interact with the Web3Doc contract deployed on the blockchain.
- * 
- * @todo Add fee management and initialization methods to the interface + utility getBlockTimestamp.
- * @todo Implement log search methods + tests.
  */
 export class Web3Doc implements IWeb3Doc {
+
+    public static readonly abi = Web3DocABI;
+    
+    // Pre-computed event definitions for efficient log queries
+    private static readonly DOCUMENT_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Document')!;
+    private static readonly COPY_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Copy')!;
+    private static readonly NOTIFICATION_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Notification')!;
+    private static readonly SIGNATURE_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Signature')!;
+    private static readonly TIMESTAMP_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Timestamp')!;
+    
     // Address of the Web3Doc contract
-    public readonly address: Address;
+    private _address: Address;
     // IWeb3PGP instance for public key operations
     private _web3pgp: IWeb3PGP;
     // Viem public client instance used to read from the blockchain
     private _client: PublicClient;
     // Viem wallet client instance used to sign transactions
     private _walletClient: WalletClient | undefined;
+    // FlatFee client instance
+    private _flatfee: FlatFee
 
     /**
      * Creates a new Web3Doc instance.
@@ -31,11 +44,12 @@ export class Web3Doc implements IWeb3Doc {
      * @param client A Viem public client for interacting with the blockchain.
      * @param walletClient Optional Viem wallet client for signing transactions.
      */
-    constructor(address: Address, web3pgp: IWeb3PGP, client: PublicClient, walletClient?: WalletClient) {
-        this.address = address;
+    public constructor(address: Address, web3pgp: IWeb3PGP, client: PublicClient, walletClient?: WalletClient) {
+        this._address = address;
         this._web3pgp = web3pgp;
         this._client = client;
         this._walletClient = walletClient;
+        this._flatfee = new FlatFee(address, client, walletClient);
     }
 
     /*****************************************************************************************************************/
@@ -45,43 +59,63 @@ export class Web3Doc implements IWeb3Doc {
     /**
      * Gets the Web3PGP instance.
      */
-    get web3pgp(): IWeb3PGP {
+    public get web3pgp(): IWeb3PGP {
         return this._web3pgp;
     }
 
     /**
      * Sets the Web3PGP instance.
      */
-    set web3pgp(web3pgp: IWeb3PGP) {
+    public set web3pgp(web3pgp: IWeb3PGP) {
         this._web3pgp = web3pgp;
     }
 
     /**
      * Gets the Viem public client.
      */
-    get client(): PublicClient {
+    public get client(): PublicClient {
         return this._client;
     }
 
     /**
      * Sets the Viem public client.
      */
-    set client(client: PublicClient) {
+    public set client(client: PublicClient) {
         this._client = client;
+        // Reflect downstream
+        this._flatfee.client = client;
     }
 
     /**
      * Gets the Viem wallet client.
      */
-    get walletClient(): WalletClient | undefined {
+    public get walletClient(): WalletClient | undefined {
         return this._walletClient;
     }
 
     /**
      * Sets the Viem wallet client.
      */
-    set walletClient(value: WalletClient | undefined) {
+    public set walletClient(value: WalletClient | undefined) {
         this._walletClient = value;
+        // Reflect downstream
+        this._flatfee.walletClient = value;
+    }
+
+    /**
+     * Gets the Web3Doc contract address.
+     */
+    public get address(): Address {
+        return this._address;
+    }
+
+    /**
+     * Sets the Web3Doc contract address.
+     */
+    public set address(address: Address) {
+        this._address = address;
+        // Reflect downstream
+        this._flatfee.address = address;
     }
 
     /**
@@ -90,8 +124,41 @@ export class Web3Doc implements IWeb3Doc {
      */
     private ensureWalletClient(): void {
         if (!this._walletClient) {
-            throw new Error('WalletClient is required for write operations. Please set walletClient before calling this method.');
+            throw new Web3DocError('WalletClient is required for write operations. Please set walletClient before calling this method.');
         }
+    }
+
+    /*****************************************************************************************************************/
+    /* FEES MANAGEMENT FUNCTIONS                                                                                     */
+    /*****************************************************************************************************************/
+
+    /**
+     * Updates the requested fee for document operations.
+     * @param newFee The new fee amount in wei.
+     * @returns A promise that resolves to the transaction receipt.
+     */
+    public updateRequestedFee(newFee: bigint): Promise<TransactionReceipt> {
+        // Delegate to downstream
+        return this._flatfee.updateRequestedFee(newFee);
+    }
+
+    /**
+     * Withdraws accumulated fees to the specified address.
+     * @param to The address to which the fees will be withdrawn.
+     * @returns A promise that resolves to the transaction receipt.
+     */
+    public withdrawFees(to: Address): Promise<TransactionReceipt> {
+        // Delegate to downstream
+        return this._flatfee.withdrawFees(to);
+    }
+
+    /**
+     * Gets the currently requested fee for document operations.
+     * @returns A promise that resolves to the requested fee amount in wei.
+     */
+    public requestedFee(): Promise<bigint> {
+        // Delegate to downstream
+        return this._flatfee.requestedFee();
     }
 
     /*****************************************************************************************************************/
@@ -108,7 +175,7 @@ export class Web3Doc implements IWeb3Doc {
      * @param document The binary OpenPGP message which contains the document.
      * @param mimeType Optional, The MIME type of the document and additional attributes (RFC6838)
      */
-    async sendOnChain(
+    public async sendOnChain(
         emitter: `0x${string}`,
         recipients: Recipient[],
         dochash: `0x${string}`,
@@ -117,6 +184,8 @@ export class Web3Doc implements IWeb3Doc {
         mimeType: string
     ): Promise<TransactionReceipt> {
         this.ensureWalletClient();
+        // Get the requested fee
+        const fee = await this.requestedFee();
         // Simulate client call
         const { request } = await this.client.simulateContract({
             address: this.address,
@@ -134,6 +203,7 @@ export class Web3Doc implements IWeb3Doc {
                 document, 
                 mimeType
             ],
+            value: fee, // Include fee in the transaction value
         });
         // Use the wallet client to send the actual transaction
         const txhash = await this.walletClient!.writeContract(request);
@@ -151,7 +221,7 @@ export class Web3Doc implements IWeb3Doc {
      * @param uri A URI which can be used to download the OpenPGP message (compressed and encrypted) which contains the document.
      * @param mimeType Optional, The MIME type of the document and additional attributes (RFC6838)
      */
-    async sendOffChain(
+    public async sendOffChain(
         emitter: `0x${string}`,
         recipients: Recipient[],
         dochash: `0x${string}`,
@@ -160,6 +230,8 @@ export class Web3Doc implements IWeb3Doc {
         mimeType: string
     ): Promise<TransactionReceipt> {
         this.ensureWalletClient();
+        // Get the requested fee
+        const fee = await this.requestedFee();
         // Simulate client call
         const { request } = await this.client.simulateContract({
             address: this.address,
@@ -177,6 +249,7 @@ export class Web3Doc implements IWeb3Doc {
                 uri, 
                 mimeType
             ],
+            value: fee, // Include fee in the transaction value
         });
         // Use the wallet client to send the actual transaction
         const txhash = await this.walletClient!.writeContract(request);
@@ -192,13 +265,15 @@ export class Web3Doc implements IWeb3Doc {
      * @param recipients The list of recipient key fingerprints to be notified and, optionally, be prompted for a signature.
      * @param document The binary OpenPGP message containing the copy of the original document.
      */
-    async copyOnChain(
+    public async copyOnChain(
         original: bigint,
         emitter: `0x${string}`,
         recipients: Recipient[],
         document: `0x${string}`
     ): Promise<TransactionReceipt> {
         this.ensureWalletClient();
+        // Get the requested fee
+        const fee = await this.requestedFee();
         // Simulate client call
         const { request } = await this.client.simulateContract({
             address: this.address,
@@ -214,6 +289,7 @@ export class Web3Doc implements IWeb3Doc {
                 })),
                 document
             ],
+            value: fee, // Include fee in the transaction value
         });
         // Use the wallet client to send the actual transaction
         const txhash = await this.walletClient!.writeContract(request);
@@ -229,13 +305,15 @@ export class Web3Doc implements IWeb3Doc {
      * @param recipients The list of recipient key fingerprints to be notified and, optionally, be prompted for a signature.
      * @param uri A URI which can be used to download the OpenPGP message containing the (compressed, encrypted and signed) document itself.
      */
-    async copyOffChain(
+    public async copyOffChain(
         original: bigint,
         emitter: `0x${string}`,
         recipients: Recipient[],
         uri: string
     ): Promise<TransactionReceipt> {
         this.ensureWalletClient();
+        // Get the requested fee
+        const fee = await this.requestedFee();
         // Simulate client call
         const { request } = await this.client.simulateContract({
             address: this.address,
@@ -251,6 +329,7 @@ export class Web3Doc implements IWeb3Doc {
                 })),
                 uri
             ],
+            value: fee, // Include fee in the transaction value
         });
         // Use the wallet client to send the actual transaction
         const txhash = await this.walletClient!.writeContract(request);
@@ -265,8 +344,10 @@ export class Web3Doc implements IWeb3Doc {
      * @param emitter The fingerprint of the key used to produce the signature.
      * @param signature The detached binary OpenPGP signature made over the document.
      */
-    async sign(id: bigint, emitter: `0x${string}`, signature: `0x${string}`): Promise<TransactionReceipt> {
+    public async sign(id: bigint, emitter: `0x${string}`, signature: `0x${string}`): Promise<TransactionReceipt> {
         this.ensureWalletClient();
+        // Get the requested fee
+        const fee = await this.requestedFee();
         // Simulate client call
         const { request } = await this.client.simulateContract({
             address: this.address,
@@ -278,6 +359,7 @@ export class Web3Doc implements IWeb3Doc {
                 toBytes32(to0x(emitter)),
                 signature
             ],
+            value: fee, // Include fee in the transaction value
         });
         // Use the wallet client to send the actual transaction
         const txhash = await this.walletClient!.writeContract(request);
@@ -292,8 +374,10 @@ export class Web3Doc implements IWeb3Doc {
      * @param dochash The keccak256 hash of the document used to find the timestamp from the document and verify their integrity.
      * @param signature A detached binary OpenPGP signature made over the raw bytes of the keccak256 hash of the document.
      */
-    async timestamp(emitter: `0x${string}`, dochash: `0x${string}`, signature: `0x${string}`): Promise<TransactionReceipt> {
+    public async timestamp(emitter: `0x${string}`, dochash: `0x${string}`, signature: `0x${string}`): Promise<TransactionReceipt> {
         this.ensureWalletClient();
+        // Get the requested fee
+        const fee = await this.requestedFee();
         // Simulate client call
         const { request } = await this.client.simulateContract({
             address: this.address,
@@ -305,6 +389,7 @@ export class Web3Doc implements IWeb3Doc {
                 dochash,
                 signature
             ],
+            value: fee, // Include fee in the transaction value
         });
         // Use the wallet client to send the actual transaction
         const txhash = await this.walletClient!.writeContract(request);
@@ -321,7 +406,7 @@ export class Web3Doc implements IWeb3Doc {
      *
      * @return The address of the Web3PGP contract used by this contract.
      */
-    async getWeb3PGPAddress(): Promise<Address> {
+    public async getWeb3PGPAddress(): Promise<Address> {
         return this.client.readContract({
             address: this.address,
             abi: Web3DocABI,
@@ -335,7 +420,7 @@ export class Web3Doc implements IWeb3Doc {
      * @param id The ID of a document that may be a copy of another previously published document.
      * @return The ID of the original document if the given document is a copy, or 0 if it is not a copy.
      */
-    async isCopyOf(id: bigint): Promise<bigint> {
+    public async isCopyOf(id: bigint): Promise<bigint> {
         return this.client.readContract({
             address: this.address,
             abi: Web3DocABI,
@@ -350,7 +435,7 @@ export class Web3Doc implements IWeb3Doc {
      * @param id The ID of the document whose block number is to be retrieved.
      * @return The block number in which the document was published. 0 if the document does not exist.
      */
-    async getDocumentBlockNumberByID(id: bigint): Promise<bigint> {
+    public async getDocumentBlockNumberByID(id: bigint): Promise<bigint> {
         return this.client.readContract({
             address: this.address,
             abi: Web3DocABI,
@@ -365,7 +450,7 @@ export class Web3Doc implements IWeb3Doc {
      * @param ids The IDs of the documents whose block numbers are to be retrieved.
      * @return The block numbers in which the documents were published.
      */
-    async getDocumentBlockNumberByIDBatch(ids: bigint[]): Promise<bigint[]> {
+    public async getDocumentBlockNumberByIDBatch(ids: bigint[]): Promise<bigint[]> {
         return this.client.readContract({
             address: this.address,
             abi: Web3DocABI,
@@ -382,7 +467,7 @@ export class Web3Doc implements IWeb3Doc {
      * @param limit The maximum number of signatures to list.
      * @return An array of signature IDs associated with the document.
      */
-    async listSignatures(id: bigint, start: bigint, limit: bigint): Promise<bigint[]> {
+    public async listSignatures(id: bigint, start: bigint, limit: bigint): Promise<bigint[]> {
         return this.client.readContract({
             address: this.address,
             abi: Web3DocABI,
@@ -406,7 +491,7 @@ export class Web3Doc implements IWeb3Doc {
      * @param toBlock Filter events up to this block number. Latest block if not specified.
      * @returns The list of DocumentLog matching the provided filters.
      */
-    async searchDocumentLogs(
+    public async searchDocumentLogs(
         ids?: bigint[], 
         emitters?: `0x${string}`[], 
         dochashes?: `0x${string}`[], 
@@ -434,16 +519,24 @@ export class Web3Doc implements IWeb3Doc {
 
         const logs = await this.client.getLogs({
             address: this.address,
-            event: Web3DocABI.find(item => item.type === 'event' && item.name === 'Document')!,
+            event: Web3Doc.DOCUMENT_EVENT,
             fromBlock: from,
             toBlock: to,
             ...(args !== undefined && { args })
         });
         
-        return Promise.all(logs.map(async log => ({
+        // Batch fetch timestamps for unique block numbers
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockTimestamp: await this.getBlockTimestamp(log.blockNumber),
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
             id: log.args.id,
             emitter: log.args.emitter,
@@ -452,7 +545,7 @@ export class Web3Doc implements IWeb3Doc {
             document: log.args.document,
             uri: log.args.uri,
             mimeType: log.args.mimeType,
-        })));
+        }));
     }
 
     /**
@@ -468,10 +561,12 @@ export class Web3Doc implements IWeb3Doc {
      * const documentLog = await web3Doc.getDocumentLogByID(targetID, blockNumber);
      * ```
      */
-    async getDocumentLogByID(id: bigint, blockNumber: bigint): Promise<DocumentLog | undefined> {
-        let logs = await this.searchDocumentLogs([id], undefined, undefined, blockNumber, blockNumber);
-        return logs.length > 0 ? logs[0] : undefined;
-        
+    public async getDocumentLogByID(id: bigint, blockNumber: bigint): Promise<DocumentLog | undefined> {
+        const logs = await this.searchDocumentLogs([id], undefined, undefined, blockNumber, blockNumber);
+        if (logs.length === 1) return logs[0];
+        if (logs.length === 0) return undefined;
+        // This should never happen as document IDs are unique but we guard against it anyway
+        throw new Web3DocCriticalError(`Multiple Document logs found for document ID ${id} at block ${blockNumber}`);
     }
 
     /**
@@ -485,14 +580,59 @@ export class Web3Doc implements IWeb3Doc {
      * @param toBlock Filter events up to this block number. Latest block if not specified.
      * @returns The list of CopyLog matching the provided filters.
      */
-    async searchCopyLogs(
+    public async searchCopyLogs(
         copies?: bigint[], 
         originals?: bigint[], 
         emitters?: `0x${string}`[], 
         fromBlock?: bigint, 
         toBlock?: bigint
     ): Promise<CopyLog[]> {
-        throw new Error('Not implemented');
+        // Use default values: fromBlock = 0n, toBlock = latest block
+        const from = fromBlock ?? 0n;
+        const to = toBlock ?? await this.client.getBlockNumber();
+        
+        // Build args only if a filter is provided
+        let args: any = undefined;
+        if (copies !== undefined || originals !== undefined || emitters !== undefined) {
+            args = {};
+            if (copies !== undefined) {
+                args.copy = copies;
+            }
+            if (originals !== undefined) {
+                args.original = originals;
+            }
+            if (emitters !== undefined) {
+                args.emitter = emitters.map(toBytes32);
+            }
+        }
+
+        const logs = await this.client.getLogs({
+            address: this.address,
+            event: Web3Doc.COPY_EVENT,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+        
+        // Batch fetch timestamps for unique block numbers
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            copy: log.args.copy,
+            original: log.args.original,
+            emitter: log.args.emitter,
+            document: log.args.document,
+            uri: log.args.uri,
+        }));
     }
 
     /**
@@ -501,15 +641,19 @@ export class Web3Doc implements IWeb3Doc {
      * @param copy The unique ID of the copy.
      * @param blockNumber The block number where to search for the copy.
      * @returns The CopyLog if found, otherwise undefined.
-     * @exampletypescript
+     * @example
      * ```typescript
      * const targetCopyID = 1n;
      * const blockNumber = await web3Doc.getDocumentBlockNumberByID(targetCopyID);
      * const copyLog = await web3Doc.getCopyLogByID(targetCopyID, blockNumber);
      * ```
      */
-    async getCopyLogByID(copy: bigint, blockNumber: bigint): Promise<CopyLog | undefined> {
-        throw new Error('Not implemented');
+    public async getCopyLogByID(copy: bigint, blockNumber: bigint): Promise<CopyLog | undefined> {
+        const logs = await this.searchCopyLogs([copy], undefined, undefined, blockNumber, blockNumber);
+        if (logs.length === 1) return logs[0];
+        if (logs.length === 0) return undefined;
+        // This should never happen as copy IDs are unique but we guard against it anyway
+        throw new Web3DocCriticalError(`Multiple Copy logs found for copy ID ${copy} at block ${blockNumber}`);
     }
 
     /**
@@ -523,14 +667,82 @@ export class Web3Doc implements IWeb3Doc {
      * @param toBlock Filter events up to this block number. Latest block if not specified.
      * @returns The list of NotificationLog matching the provided filters.
      */
-    async searchNotificationLogs(
+    public async searchNotificationLogs(
         ids?: bigint[],
         recipients?: `0x${string}`[],
         signatureRequested?: boolean,
         fromBlock?: bigint, 
         toBlock?: bigint
     ): Promise<NotificationLog[]> {
-        throw new Error('Not implemented');
+        // Use default values: fromBlock = 0n, toBlock = latest block
+        const from = fromBlock ?? 0n;
+        const to = toBlock ?? await this.client.getBlockNumber();
+        
+        // Build args only if a filter is provided
+        let args: any = undefined;
+        if (ids !== undefined || recipients !== undefined || signatureRequested !== undefined) {
+            args = {};
+            if (ids !== undefined) {
+                args.id = ids;
+            }
+            if (recipients !== undefined) {
+                args.recipient = recipients.map(toBytes32);
+            }
+            if (signatureRequested !== undefined) {
+                args.signatureRequested = signatureRequested;
+            }
+        }
+
+        const logs = await this.client.getLogs({
+            address: this.address,
+            event: Web3Doc.NOTIFICATION_EVENT,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+        
+        // Batch fetch timestamps for unique block numbers
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            id: log.args.id,
+            recipient: log.args.recipient,
+            emitter: log.args.emitter,
+            source: log.args.source,
+            signatureRequested: log.args.signatureRequested,
+        }));
+    }
+
+    /**
+     * Retrieves a Notification event by its unique ID and recipient.
+     * 
+     * @param id The unique ID of the document that is the subject of the notification. 
+     * @param recipient The fingerprint of the recipient who received the notification.
+     * @param blockNumber The block number where to search for the notification.
+     * @returns The NotificationLog if found, otherwise undefined.
+     * @example
+     * ```typescript
+     * const targetID = 1n;
+     * const recipientFingerprint = '0x...';
+     * const blockNumber = await web3Doc.getDocumentBlockNumberByID(targetID);
+     * const notificationLog = await web3Doc.getNotificationLog(targetID, recipientFingerprint, blockNumber);
+     * ```
+     */
+    public async getNotificationLog(id: bigint, recipient: `0x${string}`, blockNumber: bigint): Promise<NotificationLog | undefined> {
+        const logs = await this.searchNotificationLogs([id], [recipient], undefined, blockNumber, blockNumber);
+        if (logs.length === 1) return logs[0];
+        if (logs.length === 0) return undefined;
+        // This should never happen as document ID + recipient uniqueness is guaranteed by the smart contract but we guard against it anyway
+        throw new Web3DocCriticalError(`Multiple Notification logs found for document ID ${id} and recipient ${recipient} at block ${blockNumber}`);
     }
 
     /**
@@ -543,17 +755,57 @@ export class Web3Doc implements IWeb3Doc {
      * @param toBlock Filter events up to this block number. Latest block if not specified.
      * @returns The list of SignatureLog matching the provided filters.
      */
-    async searchSignatureLogs(
+    public async searchSignatureLogs(
         ids?: bigint[], 
         emitters?: `0x${string}`[], 
         fromBlock?: bigint, 
         toBlock?: bigint
     ): Promise<SignatureLog[]> {
-        throw new Error('Not implemented');
+        // Use default values: fromBlock = 0n, toBlock = latest block
+        const from = fromBlock ?? 0n;
+        const to = toBlock ?? await this.client.getBlockNumber();
+
+        // Build args only if a filter is provided
+        let args: any = undefined;
+        if (ids !== undefined || emitters !== undefined) {
+            args = {};
+            if (ids !== undefined) {
+                args.id = ids;
+            }
+            if (emitters !== undefined) {
+                args.emitter = emitters.map(toBytes32);
+            }
+        }
+
+        const logs = await this.client.getLogs({
+            address: this.address,
+            event: Web3Doc.SIGNATURE_EVENT,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+        
+        // Batch fetch timestamps for unique block numbers
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            id: log.args.id,
+            emitter: log.args.emitter,
+            signature: log.args.signature,
+        }));
     }
 
     /**
-     * Retries Timestamp events emitted by the smart contract, filtered by the provided criteria.
+     * Retrieves Timestamp events emitted by the smart contract, filtered by the provided criteria.
      * Each value in a filter is combined using a logical OR, while all defined filters are combined using a logical AND.
      * 
      * @param ids Filter by timestamp IDs. Timestamp IDs uniqueness is guaranteed by the smart contract. 
@@ -563,34 +815,259 @@ export class Web3Doc implements IWeb3Doc {
      * @param toBlock Filter events up to this block number. Latest block if not specified.
      * @returns The list of TimestampLog matching the provided filters.
      */
-    async searchTimestampLogs(
+    public async searchTimestampLogs(
         ids?: bigint[],
         emitters?: `0x${string}`[], 
         dochashes?: `0x${string}`[], 
         fromBlock?: bigint, 
         toBlock?: bigint
     ): Promise<TimestampLog[]> {
-        throw new Error('Not implemented');
+        // Use default values: fromBlock = 0n, toBlock = latest block
+        const from = fromBlock ?? 0n;
+        const to = toBlock ?? await this.client.getBlockNumber();
+
+        // Build args only if a filter is provided
+        let args: any = undefined;
+        if (ids !== undefined || emitters !== undefined || dochashes !== undefined) {
+            args = {};
+            if (ids !== undefined) {
+                args.id = ids;
+            }
+            if (emitters !== undefined) {
+                args.emitter = emitters.map(toBytes32);
+            }
+            if (dochashes !== undefined) {
+                args.dochash = dochashes;
+            }
+        }
+
+        const logs = await this.client.getLogs({
+            address: this.address,
+            event: Web3Doc.TIMESTAMP_EVENT,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+        
+        // Batch fetch timestamps for unique block numbers
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            id: log.args.id,
+            emitter: log.args.emitter,
+            dochash: log.args.dochash,
+            signature: log.args.signature,
+        }));
     }
 
     /**
-     * Retrieves a Timestamp event by its unique ID.
-     * 
-     * @param id The unique ID of the timestamp.
-     * @param blockNumber The block number where to search for the timestamp.
-     * @returns The TimestampLog if found, otherwise undefined.
-     * @example
-     * ```typescript
-     * const targetID = 1n;
-     * const blockNumber = await web3Doc.getDocumentBlockNumberByID(targetID);
-     * const timestampLog = await web3Doc.getTimestampLogById(targetID, blockNumber);
-     * ```
+     * Extracts Document logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns A promise that resolves to an array of DocumentLog objects.
      */
-    async getTimestampLogById(id: bigint, blockNumber: bigint): Promise<TimestampLog | undefined> {
-        throw new Error('Not implemented');
+    public async extractDocumentLog(receipt: TransactionReceipt): Promise<DocumentLog[]> {
+        const parsedLogs = parseEventLogs({
+            abi: Web3DocABI,
+            eventName: 'Document',
+            logs: receipt.logs
+        });
+
+        const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+        
+        return parsedLogs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            id: log.args.id,
+            emitter: log.args.emitter,
+            dochash: log.args.dochash,
+            signature: log.args.signature,
+            document: log.args.document,
+            uri: log.args.uri,
+            mimeType: log.args.mimeType,
+        }));
     }
 
-    getBlockTimestamp(blockNumber: bigint): any {
-        throw new Error('Method not implemented.');
+    /**
+     * Extracts Copy logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns A promise that resolves to an array of CopyLog objects.
+     */
+    public async extractCopyLog(receipt: TransactionReceipt): Promise<CopyLog[]> {
+        const parsedLogs = parseEventLogs({
+            abi: Web3DocABI,
+            eventName: 'Copy',
+            logs: receipt.logs
+        });
+
+        const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+        
+        return parsedLogs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            copy: log.args.copy,
+            original: log.args.original,
+            emitter: log.args.emitter,
+            document: log.args.document,
+            uri: log.args.uri,
+        }));
+    }
+
+    /**
+     * Extracts Signature logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns A promise that resolves to an array of SignatureLog objects.
+     */
+    public async extractSignatureLog(receipt: TransactionReceipt): Promise<SignatureLog[]> {
+        const parsedLogs = parseEventLogs({
+            abi: Web3DocABI,
+            eventName: 'Signature',
+            logs: receipt.logs
+        });
+
+        const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+        
+        return parsedLogs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            id: log.args.id,
+            emitter: log.args.emitter,
+            signature: log.args.signature,
+        }));
+    }
+
+    /**
+     * Extracts Timestamp logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns A promise that resolves to an array of TimestampLog objects.
+     */
+    public async extractTimestampLog(receipt: TransactionReceipt): Promise<TimestampLog[]> {
+        const parsedLogs = parseEventLogs({
+            abi: Web3DocABI,
+            eventName: 'Timestamp',
+            logs: receipt.logs
+        });
+
+        const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return parsedLogs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            id: log.args.id,
+            emitter: log.args.emitter,
+            dochash: log.args.dochash,
+            signature: log.args.signature,
+        }));
+    }
+
+    /**
+     * Extracts Notification logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns A promise that resolves to an array of NotificationLog objects.
+     */
+    public async extractNotificationLog(receipt: TransactionReceipt): Promise<NotificationLog[]> {
+        const parsedLogs = parseEventLogs({
+            abi: Web3DocABI,
+            eventName: 'Notification',
+            logs: receipt.logs
+        });
+
+        const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return parsedLogs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            id: log.args.id,
+            recipient: log.args.recipient,
+            emitter: log.args.emitter,
+            source: log.args.source,
+            signatureRequested: log.args.signatureRequested,
+        }));
+    }
+
+    /**
+     * Searches for RequestedFeeUpdated events emitted by the smart contract, filtered by the provided criteria.
+     * @param fromBlock Filter events from this block number. Genesis block if not specified.
+     * @param toBlock Filter events up to this block number. Latest block if not specified.
+     * @returns A promise that resolves to an array of RequestedFeeUpdatedLog objects.
+     */
+    public searchRequestedFeeUpdatedLogs(fromBlock?: bigint, toBlock?: bigint): Promise<RequestedFeeUpdatedLog[]> {
+        // Delegate to downstream
+        return this._flatfee.searchRequestedFeeUpdatedLogs(fromBlock, toBlock);
+    }
+
+    /**
+     * Searches for FeesWithdrawn events emitted by the smart contract, filtered by the provided criteria.
+     * @param recipients Filter by recipient addresses.
+     * @param fromBlock Filter events from this block number. Genesis block if not specified.
+     * @param toBlock Filter events up to this block number. Latest block if not specified.
+     * @returns A promise that resolves to an array of FeesWithdrawnLog objects.
+     */
+    public searchFeesWithdrawnLogs(recipients?: Address[], fromBlock?: bigint, toBlock?: bigint): Promise<FeesWithdrawnLog[]> {
+        // Delegate to downstream
+        return this._flatfee.searchFeesWithdrawnLogs(recipients, fromBlock, toBlock);
+    }
+
+    /**
+     * Extracts FeesWithdrawn logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns A promise that resolves to an array of FeesWithdrawnLog objects.
+     */
+    public extractFeesWithdrawnLog(receipt: TransactionReceipt): Promise<FeesWithdrawnLog[]> {
+        // Delegate to downstream
+        return this._flatfee.extractFeesWithdrawnLog(receipt);
+    }
+
+    /**
+     * Extracts RequestedFeeUpdated logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns A promise that resolves to an array of RequestedFeeUpdatedLog objects.
+     */
+    public extractRequestedFeeUpdatedLog(receipt: TransactionReceipt): Promise<RequestedFeeUpdatedLog[]> {
+        // Delegate to downstream
+        return this._flatfee.extractRequestedFeeUpdatedLog(receipt);
     }
 }
