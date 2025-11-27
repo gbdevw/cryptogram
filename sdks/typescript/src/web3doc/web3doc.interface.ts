@@ -1,12 +1,13 @@
 import { Address, TransactionReceipt } from 'viem';
 import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, NotificationLog } from './types/types'
+import { IFlatFee } from '../flatfee/flatefee.interface';
 
 /**
  * TypeScript interface for the Web3Doc smart contract.
  * 
  * This interface provides low-level bindings to interact with the Web3Doc contract deployed on the blockchain.
  */
-export interface IWeb3Doc {
+export interface IWeb3Doc extends IFlatFee {
 
     /*****************************************************************************************************************/
     /* WRITE FUNCTIONS                                                                                               */
@@ -280,4 +281,48 @@ export interface IWeb3Doc {
      * ```
      */
     getTimestampLogById(id: bigint, blockNumber: bigint): Promise<TimestampLog | undefined>;
+
+    /*****************************************************************************************************************/
+    /* LOGS PARSING FUNCTIONS                                                                                        */
+    /*****************************************************************************************************************/
+
+    /**
+     * Extracts DocumentLog entries from a given transaction receipt.
+     * 
+     * @param txReceipt The transaction receipt containing the logs to be parsed.
+     * @returns A promise that resolves to an array of DocumentLog entries extracted from the transaction receipt.
+     */
+    extractDocumentLog(txReceipt: TransactionReceipt): Promise<DocumentLog[]>;
+
+    /**
+     * Extracts CopyLog entries from a given transaction receipt.
+     * 
+     * @param txReceipt The transaction receipt containing the logs to be parsed.
+     * @returns A promise that resolves to an array of CopyLog entries extracted from the transaction receipt.
+     */
+    extractCopyLog(txReceipt: TransactionReceipt): Promise<CopyLog[]>;
+
+    /**
+     * Extracts SignatureLog entries from a given transaction receipt.
+     * 
+     * @param txReceipt The transaction receipt containing the logs to be parsed.
+     * @returns A promise that resolves to an array of SignatureLog entries extracted from the transaction receipt.
+     */
+    extractSignatureLog(txReceipt: TransactionReceipt): Promise<SignatureLog[]>;
+
+    /**
+     * Extracts TimestampLog entries from a given transaction receipt.
+     * 
+     * @param txReceipt The transaction receipt containing the logs to be parsed.
+     * @returns A promise that resolves to an array of TimestampLog entries extracted from the transaction receipt.
+     */
+    extractTimestampLog(txReceipt: TransactionReceipt): Promise<TimestampLog[]>;
+
+    /**
+     * Extracts NotificationLog entries from a given transaction receipt.
+     * 
+     * @param txReceipt The transaction receipt containing the logs to be parsed.
+     * @returns A promise that resolves to an array of NotificationLog entries extracted from the transaction receipt.
+     */
+    extractNotificationLog(txReceipt: TransactionReceipt): Promise<NotificationLog[]>;
 }
