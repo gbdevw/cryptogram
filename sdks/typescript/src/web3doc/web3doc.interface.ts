@@ -233,6 +233,22 @@ export interface IWeb3Doc extends IFlatFee {
         toBlock?: bigint): Promise<NotificationLog[]>;
 
     /**
+     * Retrieves a Notification event by its document ID and recipient.
+     * @param id The unique ID of the document.
+     * @param recipient The fingerprint of the recipient's key.
+     * @param blockNumber The block number where to search for the notification.
+     * @returns The NotificationLog if found, otherwise undefined.
+     * @example
+     * ```typescript
+     * const targetID = 1n;
+     * const recipient = '0xABCDEF...'; // recipient fingerprint
+     * const blockNumber = await web3Doc.getDocumentBlockNumberByID(targetID);
+     * const notificationLog = await web3Doc.getNotificationLog(targetID, recipient, blockNumber);
+     * ```
+     */
+    getNotificationLog(id: bigint, recipient: `0x${string}`, blockNumber: bigint): Promise<NotificationLog | undefined>;
+
+    /**
      * Searches for Signature events emitted by the smart contract, filtered by the provided criteria.
      * Each value in a filter is combined using a logical OR, while all defined filters are combined using a logical AND.
      * 
@@ -267,21 +283,6 @@ export interface IWeb3Doc extends IFlatFee {
         fromBlock?: bigint, 
         toBlock?: bigint): Promise<TimestampLog[]>;
 
-    /**
-     * Retrieves a Timestamp event by its unique ID.
-     * 
-     * @param id The unique ID of the timestamp.
-     * @param blockNumber The block number where to search for the timestamp.
-     * @returns The TimestampLog if found, otherwise undefined.
-     * @example
-     * ```typescript
-     * const targetID = 1n;
-     * const blockNumber = await web3Doc.getDocumentBlockNumberByID(targetID);
-     * const timestampLog = await web3Doc.getTimestampLogById(targetID, blockNumber);
-     * ```
-     */
-    getTimestampLogById(id: bigint, blockNumber: bigint): Promise<TimestampLog | undefined>;
-
     /*****************************************************************************************************************/
     /* LOGS PARSING FUNCTIONS                                                                                        */
     /*****************************************************************************************************************/
@@ -289,40 +290,40 @@ export interface IWeb3Doc extends IFlatFee {
     /**
      * Extracts DocumentLog entries from a given transaction receipt.
      * 
-     * @param txReceipt The transaction receipt containing the logs to be parsed.
+     * @param receipt The transaction receipt containing the logs to be parsed.
      * @returns A promise that resolves to an array of DocumentLog entries extracted from the transaction receipt.
      */
-    extractDocumentLog(txReceipt: TransactionReceipt): Promise<DocumentLog[]>;
+    extractDocumentLog(receipt: TransactionReceipt): Promise<DocumentLog[]>;
 
     /**
      * Extracts CopyLog entries from a given transaction receipt.
      * 
-     * @param txReceipt The transaction receipt containing the logs to be parsed.
+     * @param receipt The transaction receipt containing the logs to be parsed.
      * @returns A promise that resolves to an array of CopyLog entries extracted from the transaction receipt.
      */
-    extractCopyLog(txReceipt: TransactionReceipt): Promise<CopyLog[]>;
+    extractCopyLog(receipt: TransactionReceipt): Promise<CopyLog[]>;
 
     /**
      * Extracts SignatureLog entries from a given transaction receipt.
      * 
-     * @param txReceipt The transaction receipt containing the logs to be parsed.
+     * @param receipt The transaction receipt containing the logs to be parsed.
      * @returns A promise that resolves to an array of SignatureLog entries extracted from the transaction receipt.
      */
-    extractSignatureLog(txReceipt: TransactionReceipt): Promise<SignatureLog[]>;
+    extractSignatureLog(receipt: TransactionReceipt): Promise<SignatureLog[]>;
 
     /**
      * Extracts TimestampLog entries from a given transaction receipt.
      * 
-     * @param txReceipt The transaction receipt containing the logs to be parsed.
+     * @param receipt The transaction receipt containing the logs to be parsed.
      * @returns A promise that resolves to an array of TimestampLog entries extracted from the transaction receipt.
      */
-    extractTimestampLog(txReceipt: TransactionReceipt): Promise<TimestampLog[]>;
+    extractTimestampLog(receipt: TransactionReceipt): Promise<TimestampLog[]>;
 
     /**
      * Extracts NotificationLog entries from a given transaction receipt.
      * 
-     * @param txReceipt The transaction receipt containing the logs to be parsed.
+     * @param receipt The transaction receipt containing the logs to be parsed.
      * @returns A promise that resolves to an array of NotificationLog entries extracted from the transaction receipt.
      */
-    extractNotificationLog(txReceipt: TransactionReceipt): Promise<NotificationLog[]>;
+    extractNotificationLog(receipt: TransactionReceipt): Promise<NotificationLog[]>;
 }
