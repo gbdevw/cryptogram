@@ -1,6 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
 import { createPublicClient, createWalletClient, http, publicActions, Address, encodeFunctionData } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
 import { foundry } from 'viem/chains';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -33,21 +32,15 @@ export class AnvilHelper {
     private accountsCount: number;
     private initialBalance: bigint;
     private ready: boolean = false;
-
-    // Anvil default accounts (deterministic)
-    public readonly accounts = [
-        '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as `0x${string}`, // Account 0
-        '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as `0x${string}`, // Account 1
-        '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a' as `0x${string}`, // Account 2
-        '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6' as `0x${string}`, // Account 3
-        '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a' as `0x${string}`, // Account 4
-    ].map(pk => privateKeyToAccount(pk));
+    
+    // Anvil's default first account (deterministic)
+    private deployerAddress: Address = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' as Address;
 
     constructor(config: AnvilConfig = {}) {
         this.port = config.port ?? 8545;
         this.blockTime = config.blockTime ?? 1;
-        this.accountsCount = config.accounts ?? 5;
-        this.initialBalance = config.balance ?? BigInt(1000) * BigInt(10 ** 18); // 1000 ETH (was 10000)
+        this.accountsCount = config.accounts ?? 10;
+        this.initialBalance = config.balance ?? BigInt(10000) * BigInt(10 ** 18); // 10000 ETH
     }
 
     /**
@@ -64,7 +57,6 @@ export class AnvilHelper {
                 '--block-time', this.blockTime.toString(),
                 '--accounts', this.accountsCount.toString(),
                 '--chain-id', '31337',
-                // Don't set balance - use Anvil's default (10000 ETH)
             ];
 
             this.anvilProcess = spawn('anvil', args);
@@ -74,33 +66,38 @@ export class AnvilHelper {
                 return;
             }
 
+            let resolved = false;
+
             // Listen for ready signal
             this.anvilProcess.stdout.on('data', (data: Buffer) => {
                 const output = data.toString();
-                if (output.includes('Listening on')) {
+                if (!resolved && output.includes('Listening on')) {
                     this.ready = true;
+                    resolved = true;
                     // Give it a moment to be fully ready
                     setTimeout(() => resolve(), 500);
                 }
             });
 
             this.anvilProcess.stderr.on('data', (data: Buffer) => {
-                console.error('Anvil stderr:', data.toString());
+                // Ignore stderr
             });
 
             this.anvilProcess.on('error', (error) => {
-                reject(new Error(`Failed to start Anvil: ${error.message}`));
+                if (!resolved) {
+                    reject(new Error(`Failed to start Anvil: ${error.message}`));
+                }
             });
 
             this.anvilProcess.on('exit', (code) => {
-                if (!this.ready && code !== 0) {
+                if (!resolved && code !== 0) {
                     reject(new Error(`Anvil exited with code ${code}`));
                 }
             });
 
             // Timeout after 10 seconds
             setTimeout(() => {
-                if (!this.ready) {
+                if (!resolved) {
                     this.stop();
                     reject(new Error('Anvil failed to start within 10 seconds'));
                 }
@@ -138,14 +135,11 @@ export class AnvilHelper {
 
     /**
      * Create a wallet client for the Anvil instance
+     * Uses Anvil's native accounts (unlocked)
      */
-    getWalletClient(accountIndex: number = 0) {
-        if (accountIndex >= this.accounts.length) {
-            throw new Error(`Account index ${accountIndex} out of range`);
-        }
-
+    getWalletClient(address: Address = this.deployerAddress) {
         return createWalletClient({
-            account: this.accounts[accountIndex],
+            account: address,
             chain: foundry,
             transport: http(this.getRpcUrl()),
         }).extend(publicActions);
@@ -163,15 +157,13 @@ export class AnvilHelper {
         const contractsPath = path.resolve(__dirname, '../../../../contracts');
         
         return new Promise((resolve, reject) => {
-            // Anvil's first default account address (deterministic)
-            const anvilSender = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
-
             const args = [
                 'script',
                 scriptPath,
                 '--rpc-url', this.getRpcUrl(),
                 '--broadcast',
-                '--sender', anvilSender,
+                '--sender', this.deployerAddress,
+                '--unlocked',
             ];
 
             const proc = spawn('forge', args, {
@@ -201,12 +193,9 @@ export class AnvilHelper {
 
             proc.on('close', (code) => {
                 if (code === 0) {
-                    console.log(`  ✓ Script ${scriptPath} executed successfully`);
                     resolve();
                 } else {
-                    console.error(`  ✗ Script failed with code ${code}`);
-                    console.error('STDERR:', stderr);
-                    reject(new Error(`forge script failed: ${stderr}`));
+                    reject(new Error(`forge script failed: ${stderr || 'Unknown error'}`));
                 }
             });
 

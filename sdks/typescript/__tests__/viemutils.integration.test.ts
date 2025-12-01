@@ -67,7 +67,7 @@ describe('Viemutils Integration Tests', () => {
             const currentBlock = await publicClient.getBlockNumber();
             
             // Mine a few new blocks to ensure we have multiple blocks
-            const walletClient = anvil.getWalletClient(0);
+            const walletClient = anvil.getWalletClient();
             
             // Send some transactions to mine new blocks
             for (let i = 0; i < 3; i++) {

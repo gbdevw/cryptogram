@@ -59,7 +59,7 @@ describe('Web3PGP Integration Tests', () => {
 
         // Create Web3PGP instance with real clients
         const publicClient = anvil.getPublicClient();
-        const walletClient = anvil.getWalletClient(0);
+        const walletClient = anvil.getWalletClient();
 
         web3pgp = new Web3PGP(contractAddress, publicClient, walletClient);
         console.log('✓ Web3PGP SDK initialized');
@@ -388,7 +388,7 @@ describe('Web3PGP Integration Tests', () => {
 
         test('should withdraw accumulated fees (admin only)', async () => {
             const publicClient = anvil.getPublicClient();
-            const recipientAddress = anvil.accounts[1]!.address;
+            const recipientAddress = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' as Address;
 
             // Set a fee
             const fee = BigInt(100000);
@@ -458,7 +458,7 @@ describe('Web3PGP Integration Tests', () => {
         });
 
         test('should search FeesWithdrawn event logs', async () => {
-            const recipientAddress = anvil.accounts[2]!.address;
+            const recipientAddress = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC' as Address;
 
             // Set fee and register keys to accumulate fees
             await web3pgp.updateRequestedFee(BigInt(100000));
@@ -483,7 +483,7 @@ describe('Web3PGP Integration Tests', () => {
         });
 
         test('should extract FeesWithdrawn log from receipt', async () => {
-            const recipientAddress = anvil.accounts[3]!.address;
+            const recipientAddress = '0x90F79bf6EB2c4f870365E785982E1f101E93b906' as Address;
 
             // Set fee and register keys
             await web3pgp.updateRequestedFee(BigInt(100000));
