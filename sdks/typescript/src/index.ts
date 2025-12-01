@@ -1,11 +1,6 @@
 // Export utilities
 export * from './utils/0xstr';
 
-// Export accessmanaged functions
-export * from './accessmanaged/types/types';
-export * from './accessmanaged/accessmanaged.interface';
-export * from './accessmanaged/accessmanaged';
-
 // Export flatfee functions
 export * from './flatfee/types/types';
 export * from './flatfee/flatefee.interface';
