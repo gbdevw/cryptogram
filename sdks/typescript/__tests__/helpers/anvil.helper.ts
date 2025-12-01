@@ -152,112 +152,127 @@ export class AnvilHelper {
     }
 
     /**
-     * Deploy a contract using forge script
+     * Execute a Foundry script on the Anvil instance
+     * @param scriptPath - Relative path to the script file from contracts/ directory
+     * @param envVars - Environment variables to pass to the script
      */
-    async deployContracts(): Promise<{
-        web3pgp: DeployedContract;
-        flatFee: DeployedContract;
-        accessManager: DeployedContract;
-    }> {
+    private async runForgeScript(
+        scriptPath: string,
+        envVars: Record<string, string> = {}
+    ): Promise<void> {
         const contractsPath = path.resolve(__dirname, '../../../../contracts');
         
-        // Use forge script to deploy contracts
         return new Promise((resolve, reject) => {
-            const deployScript = spawn('forge', [
+            // Anvil's first default account address (deterministic)
+            const anvilSender = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+
+            const args = [
                 'script',
-                'script/Deploy.s.sol',
+                scriptPath,
                 '--rpc-url', this.getRpcUrl(),
-                '--private-key', this.accounts[0]!.source,
                 '--broadcast',
-                '--json',
-            ], {
+                '--sender', anvilSender,
+            ];
+
+            const proc = spawn('forge', args, {
                 cwd: contractsPath,
+                env: {
+                    ...process.env,
+                    // Only pass FEE_IN_WEIS if provided
+                    ...(envVars.FEE_IN_WEIS && { FEE_IN_WEIS: envVars.FEE_IN_WEIS }),
+                },
+                stdio: ['ignore', 'pipe', 'pipe'], // Capture stdout and stderr
             });
 
-            let output = '';
-            let errorOutput = '';
+            let stdout = '';
+            let stderr = '';
 
-            if (deployScript.stdout) {
-                deployScript.stdout.on('data', (data: Buffer) => {
-                    output += data.toString();
+            if (proc.stdout) {
+                proc.stdout.on('data', (data: Buffer) => {
+                    stdout += data.toString();
                 });
             }
 
-            if (deployScript.stderr) {
-                deployScript.stderr.on('data', (data: Buffer) => {
-                    errorOutput += data.toString();
+            if (proc.stderr) {
+                proc.stderr.on('data', (data: Buffer) => {
+                    stderr += data.toString();
                 });
             }
 
-            deployScript.on('close', (code) => {
-                if (code !== 0) {
-                    reject(new Error(`Deployment failed with code ${code}:\n${errorOutput}`));
-                    return;
+            proc.on('close', (code) => {
+                if (code === 0) {
+                    console.log(`  ✓ Script ${scriptPath} executed successfully`);
+                    resolve();
+                } else {
+                    console.error(`  ✗ Script failed with code ${code}`);
+                    console.error('STDERR:', stderr);
+                    reject(new Error(`forge script failed: ${stderr}`));
                 }
+            });
 
-                try {
-                    // Parse deployment output to get contract addresses
-                    // This is a simplified version - you may need to adjust based on actual output
-                    const broadcastPath = path.join(
-                        contractsPath,
-                        'broadcast',
-                        'Deploy.s.sol',
-                        '31337', // Anvil chain ID
-                        'run-latest.json'
-                    );
-
-                    if (!fs.existsSync(broadcastPath)) {
-                        // Fallback: use deterministic addresses or environment variables
-                        // For now, we'll reject and ask for manual deployment
-                        reject(new Error('Deployment broadcast file not found. Please deploy contracts manually first.'));
-                        return;
-                    }
-
-                    const broadcast = JSON.parse(fs.readFileSync(broadcastPath, 'utf-8'));
-                    
-                    // Extract contract addresses from broadcast
-                    // This needs to be adjusted based on your actual deployment script
-                    const web3pgpAddress = broadcast.transactions?.find((tx: any) => 
-                        tx.contractName === 'Web3PGP'
-                    )?.contractAddress;
-
-                    const flatFeeAddress = broadcast.transactions?.find((tx: any) => 
-                        tx.contractName === 'FlatFee'
-                    )?.contractAddress;
-
-                    const accessManagerAddress = broadcast.transactions?.find((tx: any) => 
-                        tx.contractName === 'AccessManager'
-                    )?.contractAddress;
-
-                    if (!web3pgpAddress || !flatFeeAddress || !accessManagerAddress) {
-                        reject(new Error('Failed to parse contract addresses from deployment'));
-                        return;
-                    }
-
-                    resolve({
-                        web3pgp: {
-                            address: web3pgpAddress as Address,
-                            deploymentBlock: BigInt(0),
-                        },
-                        flatFee: {
-                            address: flatFeeAddress as Address,
-                            deploymentBlock: BigInt(0),
-                        },
-                        accessManager: {
-                            address: accessManagerAddress as Address,
-                            deploymentBlock: BigInt(0),
-                        },
-                    });
-                } catch (error) {
-                    reject(new Error(`Failed to parse deployment output: ${error}`));
-                }
+            proc.on('error', (error) => {
+                reject(new Error(`Failed to spawn forge: ${error.message}`));
             });
         });
     }
 
     /**
-     * Deploy Web3PGP contract with proper setup (AccessManager + UUPS Proxy)
-     * This follows the pattern from Web3PGP.t.sol tests
+     * Extract contract addresses from Foundry broadcast files
+     * @param scriptName - Name of the script file (e.g., 'DeployTestEnvironment.s.sol')
+     * @returns Object containing proxy, implementation, and all deployed contract addresses
+     */
+    private extractDeploymentAddresses(scriptName: string): {
+        proxy: Address | undefined;
+        implementation: Address | undefined;
+        contracts: Array<{ name: string; address: Address }>;
+    } {
+        const contractsPath = path.resolve(__dirname, '../../../../contracts');
+        const broadcastPath = path.join(
+            contractsPath,
+            'broadcast',
+            scriptName,
+            '31337', // Anvil chain ID
+            'run-latest.json'
+        );
+
+        if (!fs.existsSync(broadcastPath)) {
+            throw new Error(`Broadcast file not found: ${broadcastPath}`);
+        }
+
+        const broadcast = JSON.parse(fs.readFileSync(broadcastPath, 'utf-8'));
+        
+        // Extract all deployed contracts
+        const contracts: Array<{ name: string; address: Address }> = [];
+        
+        if (broadcast.transactions) {
+            for (const tx of broadcast.transactions) {
+                if (tx.contractAddress && tx.transactionType === 'CREATE') {
+                    contracts.push({
+                        name: tx.contractName || 'Unknown',
+                        address: tx.contractAddress as Address,
+                    });
+                }
+            }
+        }
+
+        // Heuristic: Last contract is usually the proxy (if applicable)
+        const proxy: Address | undefined = contracts.length > 0 
+            ? contracts[contracts.length - 1]?.address 
+            : undefined;
+        
+        // Second-to-last is usually implementation
+        const implementation: Address | undefined = contracts.length > 1
+            ? contracts[contracts.length - 2]?.address
+            : undefined;
+
+        return { proxy, implementation, contracts };
+    }
+
+    /**
+     * Deploy Web3PGP using Foundry deployment scripts
+     * This ensures test environment matches production deployment exactly
+     * Uses DeployTestEnvironment.s.sol which deploys AccessManager + Web3PGP with role configuration
+     * Uses Anvil's first provisioned account for deployment
      */
     async deployWeb3PGP(initialFee: bigint = 0n): Promise<{
         web3pgp: Address;
@@ -265,158 +280,51 @@ export class AnvilHelper {
         proxy: Address;
         accessManager: Address;
     }> {
-        const client = this.getWalletClient(0);
+        console.log('\n========================================');
+        console.log('Deploying Test Environment via Foundry');
+        console.log('========================================');
         
-        if (!client.account) {
-            throw new Error('Wallet client does not have an account');
+        const envVars: Record<string, string> = {};
+        if (initialFee > 0n) {
+            envVars.FEE_IN_WEIS = initialFee.toString();
         }
 
-        const admin = client.account.address;
+        // Execute DeployTestEnvironment.s.sol using Anvil's account
+        await this.runForgeScript('scripts/DeployTestEnvironment.s.sol', envVars);
+
+        // Extract addresses from broadcast
+        const deployment = this.extractDeploymentAddresses('DeployTestEnvironment.s.sol');
+
+        // The deployment order in DeployTestEnvironment.s.sol is:
+        // 1. AccessManagerUpgradeable (implementation)
+        // 2. ERC1967Proxy (AccessManager proxy)
+        // 3. Web3PGP (implementation)
+        // 4. ERC1967Proxy (Web3PGP proxy)
         
-        // Read ABIs and bytecode from contracts/out directory
-        const contractsOutPath = path.resolve(__dirname, '../../../../contracts/out');
-        
-        console.log('Loading contract artifacts...');
-        
-        // Load AccessManager
-        const accessManagerArtifact = JSON.parse(
-            fs.readFileSync(path.join(contractsOutPath, 'AccessManager.sol/AccessManager.json'), 'utf-8')
-        );
-
-        // Load Web3PGP implementation
-        const web3pgpArtifact = JSON.parse(
-            fs.readFileSync(path.join(contractsOutPath, 'Web3PGP.sol/Web3PGP.json'), 'utf-8')
-        );
-
-        // Load ERC1967Proxy
-        const proxyArtifact = JSON.parse(
-            fs.readFileSync(path.join(contractsOutPath, 'ERC1967Proxy.sol/ERC1967Proxy.json'), 'utf-8')
-        );
-
-        console.log('1. Deploying AccessManager...');
-        // 1. Deploy AccessManager with admin as initial admin
-        const accessManagerHash = await client.deployContract({
-            abi: accessManagerArtifact.abi,
-            bytecode: accessManagerArtifact.bytecode.object as `0x${string}`,
-            account: client.account,
-            args: [admin], // initialAdmin
-        });
-
-        const accessManagerReceipt = await client.waitForTransactionReceipt({ hash: accessManagerHash });
-        if (!accessManagerReceipt.contractAddress) {
-            throw new Error('AccessManager deployment failed');
+        if (deployment.contracts.length < 4) {
+            throw new Error(`Deployment did not create expected number of contracts (got ${deployment.contracts.length}, expected 4)`);
         }
-        const accessManagerAddress = accessManagerReceipt.contractAddress;
-        console.log('   ✓ AccessManager deployed at:', accessManagerAddress);
 
-        console.log('2. Deploying Web3PGP implementation...');
-        // 2. Deploy Web3PGP implementation
-        const implementationHash = await client.deployContract({
-            abi: web3pgpArtifact.abi,
-            bytecode: web3pgpArtifact.bytecode.object as `0x${string}`,
-            account: client.account,
-            args: [],
-        });
+        const accessManagerProxy = deployment.contracts[1]?.address;
+        const web3pgpImplementation = deployment.contracts[2]?.address;
+        const web3pgpProxy = deployment.contracts[3]?.address;
 
-        const implementationReceipt = await client.waitForTransactionReceipt({ hash: implementationHash });
-        if (!implementationReceipt.contractAddress) {
-            throw new Error('Web3PGP implementation deployment failed');
+        if (!accessManagerProxy || !web3pgpProxy || !web3pgpImplementation) {
+            throw new Error('Failed to extract all required addresses from deployment');
         }
-        const implementationAddress = implementationReceipt.contractAddress;
-        console.log('   ✓ Implementation deployed at:', implementationAddress);
 
-        console.log('3. Deploying ERC1967Proxy with initialization...');
-        // 3. Prepare initialization data
-        // initialize(uint256 fee, address manager)
-        const initData = encodeFunctionData({
-            abi: web3pgpArtifact.abi,
-            functionName: 'initialize',
-            args: [initialFee, accessManagerAddress],
-        });
-
-        // 4. Deploy proxy with initialization
-        const proxyHash = await client.deployContract({
-            abi: proxyArtifact.abi,
-            bytecode: proxyArtifact.bytecode.object as `0x${string}`,
-            account: client.account,
-            args: [implementationAddress, initData],
-        });
-
-        const proxyReceipt = await client.waitForTransactionReceipt({ hash: proxyHash });
-        if (!proxyReceipt.contractAddress) {
-            throw new Error('ERC1967Proxy deployment failed');
-        }
-        const proxyAddress = proxyReceipt.contractAddress;
-        console.log('   ✓ Proxy deployed at:', proxyAddress);
-        console.log('   ✓ Web3PGP initialized with fee:', initialFee.toString(), 'wei');
-
-        console.log('4. Web3PGP deployment complete!');
-        console.log('   Use proxy address for all interactions:', proxyAddress);
+        console.log('\n✓ Deployment complete:');
+        console.log('  AccessManager:', accessManagerProxy);
+        console.log('  Web3PGP Implementation:', web3pgpImplementation);
+        console.log('  Web3PGP Proxy:', web3pgpProxy);
+        console.log('  Roles configured: ADMIN(0), UPGRADE_MANAGER(1), TREASURER(2)');
+        console.log('========================================\n');
 
         return {
-            web3pgp: proxyAddress, // This is the address to use for SDK
-            implementation: implementationAddress,
-            proxy: proxyAddress,
-            accessManager: accessManagerAddress,
-        };
-    }
-
-    /**
-     * Simple deployment using Viem directly (alternative to forge script)
-     * This deploys contracts with minimal setup for testing purposes
-     * @deprecated Use deployWeb3PGP instead for proper UUPS setup
-     */
-    async deployContractsSimple(): Promise<{
-        web3pgp: Address;
-        flatFee: Address;
-    }> {
-        const client = this.getWalletClient(0);
-        
-        if (!client.account) {
-            throw new Error('Wallet client does not have an account');
-        }
-        
-        // Read ABIs and bytecode from contracts/out directory
-        const contractsOutPath = path.resolve(__dirname, '../../../../contracts/out');
-        
-        // Load Web3PGP contract
-        const web3pgpArtifact = JSON.parse(
-            fs.readFileSync(path.join(contractsOutPath, 'Web3PGP.sol/Web3PGP.json'), 'utf-8')
-        );
-
-        const flatFeeArtifact = JSON.parse(
-            fs.readFileSync(path.join(contractsOutPath, 'FlatFee.sol/FlatFee.json'), 'utf-8')
-        );
-
-        // Deploy FlatFee (fee provider)
-        const flatFeeHash = await client.deployContract({
-            abi: flatFeeArtifact.abi,
-            bytecode: flatFeeArtifact.bytecode.object as `0x${string}`,
-            account: client.account,
-            args: [],
-        });
-
-        const flatFeeReceipt = await client.waitForTransactionReceipt({ hash: flatFeeHash });
-        if (!flatFeeReceipt.contractAddress) {
-            throw new Error('FlatFee deployment failed');
-        }
-
-        // Deploy Web3PGP proxy
-        const web3pgpHash = await client.deployContract({
-            abi: web3pgpArtifact.abi,
-            bytecode: web3pgpArtifact.bytecode.object as `0x${string}`,
-            account: client.account,
-            args: [],
-        });
-
-        const web3pgpReceipt = await client.waitForTransactionReceipt({ hash: web3pgpHash });
-        if (!web3pgpReceipt.contractAddress) {
-            throw new Error('Web3PGP deployment failed');
-        }
-
-        return {
-            web3pgp: web3pgpReceipt.contractAddress,
-            flatFee: flatFeeReceipt.contractAddress,
+            web3pgp: web3pgpProxy,
+            implementation: web3pgpImplementation,
+            proxy: web3pgpProxy,
+            accessManager: accessManagerProxy,
         };
     }
 

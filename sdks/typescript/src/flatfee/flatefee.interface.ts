@@ -1,10 +1,13 @@
 import { Address, TransactionReceipt } from 'viem';
 import { RequestedFeeUpdatedLog, FeesWithdrawnLog } from './types/types';
+import { IAccessManaged } from '../accessmanaged/accessmanaged.interface';
 
 /**
  * Interface for flat fee management operations.
+ * 
+ * Extends IAccessManaged to include access control functionality.
  */
-export interface IFlatFee {
+export interface IFlatFee extends IAccessManaged {
 
     /*****************************************************************************************************************/
     /* WRITE FUNCTIONS                                                                                               */

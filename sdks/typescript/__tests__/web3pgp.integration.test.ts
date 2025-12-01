@@ -35,20 +35,26 @@ describe('Web3PGP Integration Tests', () => {
     const mockRevocationCert = '0xcafebabe' as `0x${string}`;
 
     beforeAll(async () => {
+        console.log('========================================');
+        console.log('Setting up Web3PGP Integration Tests');
+        console.log('========================================');
+        
         console.log('Starting Anvil blockchain...');
         anvil = new AnvilHelper({ port: 8545, blockTime: 1 });
         await anvil.start();
-        console.log('Anvil started at', anvil.getRpcUrl());
+        console.log('✓ Anvil started at', anvil.getRpcUrl());
 
-        console.log('Deploying Web3PGP contracts...');
-        // Deploy contracts with proper UUPS proxy setup
+        console.log('Deploying contracts via Foundry scripts...');
+        // Deploy contracts with proper UUPS proxy setup using Foundry scripts
+        // This matches production deployment exactly
         const deployed = await anvil.deployWeb3PGP(0n); // Initialize with 0 fee
         contractAddress = deployed.web3pgp; // Use proxy address
         
-        console.log('Deployment summary:');
+        console.log('✓ Deployment summary:');
         console.log('  - AccessManager:', deployed.accessManager);
         console.log('  - Implementation:', deployed.implementation);
         console.log('  - Proxy (Web3PGP):', deployed.proxy);
+        console.log('  - Roles: ADMIN(0), UPGRADE_MANAGER(1), TREASURER(2)');
         console.log('Using Web3PGP contract at:', contractAddress);
 
         // Create Web3PGP instance with real clients
@@ -56,7 +62,9 @@ describe('Web3PGP Integration Tests', () => {
         const walletClient = anvil.getWalletClient(0);
 
         web3pgp = new Web3PGP(contractAddress, publicClient, walletClient);
-    }, 60000); // Increased timeout for deployment
+        console.log('✓ Web3PGP SDK initialized');
+        console.log('========================================\n');
+    }, 120000); // Increased timeout for Foundry script execution (2 minutes)
 
     afterAll(async () => {
         console.log('Stopping Anvil...');

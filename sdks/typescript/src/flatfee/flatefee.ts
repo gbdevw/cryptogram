@@ -3,20 +3,15 @@ import { IFlatFee } from './flatefee.interface';
 import { RequestedFeeUpdatedLog, FeesWithdrawnLog } from './types/types';
 import { FlatFee as FlatFeeABI } from '../abis/FlatFee';
 import { getBlockTimestamp } from '../utils/viemutils';
+import { AccessManaged } from '../accessmanaged/accessmanaged';
 
 /**
  * Implementation of the FlatFee contract interface.
  * 
  * This class provides low-level bindings to interact with contracts implementing the IFlatFee interface.
+ * Extends AccessManaged to inherit access control functionality.
  */
-export class FlatFee implements IFlatFee {
-    
-    // Address of the FlatFee contract
-    private _address: Address;
-    // Viem public client instance used to read from the blockchain
-    private _client: PublicClient;
-    // Viem wallet client instance used to sign transactions
-    private _walletClient: WalletClient | undefined;
+export class FlatFee extends AccessManaged implements IFlatFee {
 
     /**
      * Creates a new FlatFee instance.
@@ -26,65 +21,7 @@ export class FlatFee implements IFlatFee {
      * @param walletClient Optional Viem wallet client for signing transactions.
      */
     constructor(address: Address, client: PublicClient, walletClient?: WalletClient) {
-        this._address = address;
-        this._client = client;
-        this._walletClient = walletClient;
-    }
-
-    /*****************************************************************************************************************/
-    /* GETTERS AND SETTERS                                                                                           */
-    /*****************************************************************************************************************/
-
-    /**
-     * Gets the contract address.
-     */
-    get address(): Address {
-        return this._address;
-    }
-
-    /**
-     * Sets the contract address.
-     */
-    set address(value: Address) {
-        this._address = value;
-    }
-
-    /**
-     * Gets the Viem public client.
-     */
-    get client(): PublicClient {
-        return this._client;
-    }
-
-    /**
-     * Sets the Viem public client.
-     */
-    set client(client: PublicClient) {
-        this._client = client;
-    }
-
-    /**
-     * Gets the Viem wallet client.
-     */
-    get walletClient(): WalletClient | undefined {
-        return this._walletClient;
-    }
-
-    /**
-     * Sets the Viem wallet client.
-     */
-    set walletClient(value: WalletClient | undefined) {
-        this._walletClient = value;
-    }
-
-    /**
-     * Validate that a wallet client is available for write operations.
-     * @throws Error if wallet client is not configured
-     */
-    private ensureWalletClient(): void {
-        if (!this._walletClient) {
-            throw new Error('WalletClient is required for write operations. Please set walletClient before calling this method.');
-        }
+        super(address, client, walletClient);
     }
 
     /*****************************************************************************************************************/

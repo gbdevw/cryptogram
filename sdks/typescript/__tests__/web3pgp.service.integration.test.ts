@@ -31,13 +31,19 @@ describe('Web3PGPService Integration Tests', () => {
     let publicKey: openpgp.PublicKey;
 
     beforeAll(async () => {
+        console.log('========================================');
+        console.log('Setting up Web3PGPService Integration Tests');
+        console.log('========================================');
+        
         console.log('Starting Anvil blockchain...');
-        anvil = new AnvilHelper({ port: 8545, blockTime: 1 });
+        anvil = new AnvilHelper({ port: 8546, blockTime: 1 }); // Different port to avoid conflict with web3pgp.integration.test.ts
         await anvil.start();
+        console.log('✓ Anvil started');
 
-        console.log('Deploying Web3PGP contract...');
+        console.log('Deploying Web3PGP via Foundry scripts...');
         let deployment = await anvil.deployWeb3PGP();
         contractAddress = deployment.web3pgp;
+        console.log('✓ Web3PGP deployed at:', contractAddress);
 
         console.log('Creating Web3PGP and Web3PGPService instances...');
         web3pgp = new Web3PGP(
@@ -46,9 +52,11 @@ describe('Web3PGPService Integration Tests', () => {
             anvil.getWalletClient()
         );
         service = new Web3PGPService(web3pgp);
+        console.log('✓ SDK instances initialized');
 
-        console.log('Setup complete!');
-    }, 120000); // 2 minute timeout for setup
+        console.log('✓ Setup complete!');
+        console.log('========================================\n');
+    }, 120000); // 2 minute timeout for Foundry script execution
 
     afterAll(async () => {
         console.log('Stopping Anvil...');

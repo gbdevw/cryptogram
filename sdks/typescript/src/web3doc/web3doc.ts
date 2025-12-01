@@ -4,7 +4,6 @@ import { IWeb3PGP } from '../web3pgp/web3pgp.interface';
 import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, NotificationLog } from './types/types';
 import { Web3Doc as Web3DocABI }  from '../abis/Web3Doc';
 import { to0x, toBytes32 } from '../utils/0xstr';
-import { RequestedFeeUpdatedLog, FeesWithdrawnLog } from '../flatfee/types/types';
 import { FlatFee } from '../flatfee/flatefee';
 import { getBlockTimestamp } from '../utils/viemutils';
 import { Web3DocCriticalError, Web3DocError } from './types/errors';
@@ -13,8 +12,9 @@ import { Web3DocCriticalError, Web3DocError } from './types/errors';
  * Implementation of the Web3Doc contract interface.
  * 
  * This class provides low-level bindings to interact with the Web3Doc contract deployed on the blockchain.
+ * Extends FlatFee to inherit fee management and access control functionality.
  */
-export class Web3Doc implements IWeb3Doc {
+export class Web3Doc extends FlatFee implements IWeb3Doc {
 
     public static readonly abi = Web3DocABI;
     
@@ -24,17 +24,6 @@ export class Web3Doc implements IWeb3Doc {
     private static readonly NOTIFICATION_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Notification')!;
     private static readonly SIGNATURE_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Signature')!;
     private static readonly TIMESTAMP_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Timestamp')!;
-    
-    // Address of the Web3Doc contract
-    private _address: Address;
-    // IWeb3PGP instance for public key operations
-    private _web3pgp: IWeb3PGP;
-    // Viem public client instance used to read from the blockchain
-    private _client: PublicClient;
-    // Viem wallet client instance used to sign transactions
-    private _walletClient: WalletClient | undefined;
-    // FlatFee client instance
-    private _flatfee: FlatFee
 
     /**
      * Creates a new Web3Doc instance.
@@ -45,120 +34,7 @@ export class Web3Doc implements IWeb3Doc {
      * @param walletClient Optional Viem wallet client for signing transactions.
      */
     public constructor(address: Address, web3pgp: IWeb3PGP, client: PublicClient, walletClient?: WalletClient) {
-        this._address = address;
-        this._web3pgp = web3pgp;
-        this._client = client;
-        this._walletClient = walletClient;
-        this._flatfee = new FlatFee(address, client, walletClient);
-    }
-
-    /*****************************************************************************************************************/
-    /* GETTERS AND SETTERS                                                                                           */
-    /*****************************************************************************************************************/
-
-    /**
-     * Gets the Web3PGP instance.
-     */
-    public get web3pgp(): IWeb3PGP {
-        return this._web3pgp;
-    }
-
-    /**
-     * Sets the Web3PGP instance.
-     */
-    public set web3pgp(web3pgp: IWeb3PGP) {
-        this._web3pgp = web3pgp;
-    }
-
-    /**
-     * Gets the Viem public client.
-     */
-    public get client(): PublicClient {
-        return this._client;
-    }
-
-    /**
-     * Sets the Viem public client.
-     */
-    public set client(client: PublicClient) {
-        this._client = client;
-        // Reflect downstream
-        this._flatfee.client = client;
-    }
-
-    /**
-     * Gets the Viem wallet client.
-     */
-    public get walletClient(): WalletClient | undefined {
-        return this._walletClient;
-    }
-
-    /**
-     * Sets the Viem wallet client.
-     */
-    public set walletClient(value: WalletClient | undefined) {
-        this._walletClient = value;
-        // Reflect downstream
-        this._flatfee.walletClient = value;
-    }
-
-    /**
-     * Gets the Web3Doc contract address.
-     */
-    public get address(): Address {
-        return this._address;
-    }
-
-    /**
-     * Sets the Web3Doc contract address.
-     */
-    public set address(address: Address) {
-        this._address = address;
-        // Reflect downstream
-        this._flatfee.address = address;
-    }
-
-    /**
-     * Validate that a wallet client is available for write operations.
-     * @throws Error if wallet client is not configured
-     */
-    private ensureWalletClient(): void {
-        if (!this._walletClient) {
-            throw new Web3DocError('WalletClient is required for write operations. Please set walletClient before calling this method.');
-        }
-    }
-
-    /*****************************************************************************************************************/
-    /* FEES MANAGEMENT FUNCTIONS                                                                                     */
-    /*****************************************************************************************************************/
-
-    /**
-     * Updates the requested fee for document operations.
-     * @param newFee The new fee amount in wei.
-     * @returns A promise that resolves to the transaction receipt.
-     */
-    public updateRequestedFee(newFee: bigint): Promise<TransactionReceipt> {
-        // Delegate to downstream
-        return this._flatfee.updateRequestedFee(newFee);
-    }
-
-    /**
-     * Withdraws accumulated fees to the specified address.
-     * @param to The address to which the fees will be withdrawn.
-     * @returns A promise that resolves to the transaction receipt.
-     */
-    public withdrawFees(to: Address): Promise<TransactionReceipt> {
-        // Delegate to downstream
-        return this._flatfee.withdrawFees(to);
-    }
-
-    /**
-     * Gets the currently requested fee for document operations.
-     * @returns A promise that resolves to the requested fee amount in wei.
-     */
-    public requestedFee(): Promise<bigint> {
-        // Delegate to downstream
-        return this._flatfee.requestedFee();
+        super(address, client, walletClient);
     }
 
     /*****************************************************************************************************************/
@@ -1026,48 +902,5 @@ export class Web3Doc implements IWeb3Doc {
             source: log.args.source,
             signatureRequested: log.args.signatureRequested,
         }));
-    }
-
-    /**
-     * Searches for RequestedFeeUpdated events emitted by the smart contract, filtered by the provided criteria.
-     * @param fromBlock Filter events from this block number. Genesis block if not specified.
-     * @param toBlock Filter events up to this block number. Latest block if not specified.
-     * @returns A promise that resolves to an array of RequestedFeeUpdatedLog objects.
-     */
-    public searchRequestedFeeUpdatedLogs(fromBlock?: bigint, toBlock?: bigint): Promise<RequestedFeeUpdatedLog[]> {
-        // Delegate to downstream
-        return this._flatfee.searchRequestedFeeUpdatedLogs(fromBlock, toBlock);
-    }
-
-    /**
-     * Searches for FeesWithdrawn events emitted by the smart contract, filtered by the provided criteria.
-     * @param recipients Filter by recipient addresses.
-     * @param fromBlock Filter events from this block number. Genesis block if not specified.
-     * @param toBlock Filter events up to this block number. Latest block if not specified.
-     * @returns A promise that resolves to an array of FeesWithdrawnLog objects.
-     */
-    public searchFeesWithdrawnLogs(recipients?: Address[], fromBlock?: bigint, toBlock?: bigint): Promise<FeesWithdrawnLog[]> {
-        // Delegate to downstream
-        return this._flatfee.searchFeesWithdrawnLogs(recipients, fromBlock, toBlock);
-    }
-
-    /**
-     * Extracts FeesWithdrawn logs from a transaction receipt.
-     * @param receipt The transaction receipt to extract logs from.
-     * @returns A promise that resolves to an array of FeesWithdrawnLog objects.
-     */
-    public extractFeesWithdrawnLog(receipt: TransactionReceipt): Promise<FeesWithdrawnLog[]> {
-        // Delegate to downstream
-        return this._flatfee.extractFeesWithdrawnLog(receipt);
-    }
-
-    /**
-     * Extracts RequestedFeeUpdated logs from a transaction receipt.
-     * @param receipt The transaction receipt to extract logs from.
-     * @returns A promise that resolves to an array of RequestedFeeUpdatedLog objects.
-     */
-    public extractRequestedFeeUpdatedLog(receipt: TransactionReceipt): Promise<RequestedFeeUpdatedLog[]> {
-        // Delegate to downstream
-        return this._flatfee.extractRequestedFeeUpdatedLog(receipt);
     }
 }

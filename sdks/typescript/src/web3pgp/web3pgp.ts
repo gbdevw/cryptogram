@@ -3,11 +3,10 @@ import { toBytes32 } from '../utils/0xstr';
 import { Address, PublicClient, TransactionReceipt, WalletClient, parseEventLogs } from 'viem';
 import { IWeb3PGP } from './web3pgp.interface';
 import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog } from './types/types';
-import { RequestedFeeUpdatedLog, FeesWithdrawnLog } from '../flatfee/types/types';
 import { FlatFee } from '../flatfee/flatefee';
 import { getBlockTimestamp } from '../utils/viemutils';
 
-export class Web3PGP implements IWeb3PGP {
+export class Web3PGP extends FlatFee implements IWeb3PGP {
 
     static readonly abi = Web3PGPABI;
 
@@ -16,60 +15,8 @@ export class Web3PGP implements IWeb3PGP {
     private static readonly SUBKEY_ADDED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'SubkeyAdded')!;
     private static readonly KEY_REVOKED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRevoked')!;
 
-    // Address of the Web3PGP contract
-    private _address: `0x${string}`;
-    // Viem public client instance used to read from the blockchain
-    private _client: PublicClient;
-    // Viem wallet client instance used to sign transaction
-    private _walletClient: WalletClient | undefined;
-    // Flatfee implementation
-    private _flatFee: FlatFee;
-    
     constructor(address: `0x${string}`, client: PublicClient, walletClient?: WalletClient) {
-        this._address = address;
-        this._client = client;
-        this._walletClient = walletClient;
-        this._flatFee = new FlatFee(address, client, walletClient);
-    }
-
-    public get address(): `0x${string}` {
-        return this._address;
-    }
-
-    public set address(value: `0x${string}`) {
-        this._address = value;
-        // Reflect the change in the flat fee instance
-        this._flatFee.address = value;
-    }
-
-    public get client(): PublicClient {
-        return this._client;
-    }
-
-    public set client(value: PublicClient) {
-        this._client = value;
-        // Reflect the change in the flat fee instance
-        this._flatFee.client = value;
-    }
-
-    public get walletClient(): WalletClient | undefined {
-        return this._walletClient;
-    }
-
-    public set walletClient(value: WalletClient | undefined) {
-        this._walletClient = value;
-        // Reflect the change in the flat fee instance
-        this._flatFee.walletClient = value;
-    }
-
-    /**
-     * Validate that a wallet client is available for write operations.
-     * @throws Error if wallet client is not configured
-     */
-    private ensureWalletClient(): void {
-        if (!this._walletClient) {
-            throw new Error('WalletClient is required for write operations. Please set walletClient before calling this method.');
-        }
+        super(address, client, walletClient);
     }
 
     /*****************************************************************************************************************/
@@ -178,15 +125,6 @@ export class Web3PGP implements IWeb3PGP {
         }) as Promise<`0x${string}`[]>;
     }
 
-    /**
-     * Get the requested fee for payable operations.
-     * @return The requested fee in wei.
-     */
-    public requestedFee(): Promise<bigint> {
-        // Delegate to the FlatFee instance
-        return this._flatFee.requestedFee();
-    }
-
     /*****************************************************************************************************************/
     /* WRITE FUNCTIONS (PAYABLE)                                                                                     */
     /*****************************************************************************************************************/
@@ -285,30 +223,6 @@ export class Web3PGP implements IWeb3PGP {
         const txhash = await this.walletClient!.writeContract(request);
         // Wait for transaction to be mined and return the receipt
         return this.client.waitForTransactionReceipt({ hash: txhash });
-    }
-
-    /*****************************************************************************************************************/
-    /* WRITE FUNCTIONS (FLATFEE)                                                                                     */
-    /*****************************************************************************************************************/
-
-    /**
-     * Update the requested service fee.
-     * @param newFee The new requested fee to be set in wei.
-     * @return Transaction receipt after updating the fee.
-     */
-    public async updateRequestedFee(newFee: bigint): Promise<TransactionReceipt> {
-        // Delegate to the FlatFee instance
-        return this._flatFee.updateRequestedFee(newFee);
-    }
-
-    /**
-     * Withdraw the full contract balance to the specified address.
-     * @param to The address to which the fees are withdrawn.
-     * @return Transaction receipt after withdrawing fees.
-     */
-    public async withdrawFees(to: Address): Promise<TransactionReceipt> {
-        // Delegate to the FlatFee instance
-        return this._flatFee.withdrawFees(to);
     }
 
     /*****************************************************************************************************************/
@@ -633,48 +547,5 @@ export class Web3PGP implements IWeb3PGP {
             fingerprint: log.args.fingerprint,
             revocationCertificate: log.args.revocationCertificate
         })));
-    }
-
-    /**
-     * Search for RequestedFeeUpdated event logs.
-     * @param fromBlock The starting block number of the search range.
-     * @param toBlock The ending block number of the search range.
-     * @returns An array of RequestedFeeUpdatedLog objects found within the specified block range.
-     */
-    searchRequestedFeeUpdatedLogs(fromBlock?: bigint, toBlock?: bigint): Promise<RequestedFeeUpdatedLog[]> {
-        // Delegate to the FlatFee instance
-        return this._flatFee.searchRequestedFeeUpdatedLogs(fromBlock, toBlock);
-    }
-
-    /**
-     * Search for FeesWithdrawn event logs.
-     * @param recipients Optional array of recipient addresses to filter the logs.
-     * @param fromBlock The starting block number of the search range.
-     * @param toBlock The ending block number of the search range.
-     * @returns An array of FeesWithdrawnLog objects found within the specified block range.
-     */
-    searchFeesWithdrawnLogs(recipients?: Address[], fromBlock?: bigint, toBlock?: bigint): Promise<FeesWithdrawnLog[]> {
-        // Delegate to the FlatFee instance
-        return this._flatFee.searchFeesWithdrawnLogs(recipients, fromBlock, toBlock);
-    }
-
-    /**
-     * Extract FeesWithdrawn event logs from a transaction receipt.
-     * @param receipt The transaction receipt to extract logs from.
-     * @returns An array of FeesWithdrawnLog objects extracted from the receipt.
-     */
-    extractFeesWithdrawnLog(receipt: TransactionReceipt): Promise<FeesWithdrawnLog[]> {
-        // Delegate to the FlatFee instance
-        return this._flatFee.extractFeesWithdrawnLog(receipt);
-    }
-
-    /**
-     * Extract RequestedFeeUpdated event logs from a transaction receipt.
-     * @param receipt The transaction receipt to extract logs from.
-     * @returns An array of RequestedFeeUpdatedLog objects extracted from the receipt.
-     */
-    extractRequestedFeeUpdatedLog(receipt: TransactionReceipt): Promise<RequestedFeeUpdatedLog[]> {
-        // Delegate to the FlatFee instance
-        return this._flatFee.extractRequestedFeeUpdatedLog(receipt);
     }
 }

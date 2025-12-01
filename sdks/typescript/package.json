@@ -4,11 +4,13 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc -p .",
+    "build:contracts": "cd ../../contracts && forge build",
     "clean": "find . -name '*.js' -o -name '*.d.ts' -o -name '*.map' | grep -E '(src|__tests__)' | xargs rm -f",
+    "clean:broadcasts": "rm -rf ../../contracts/broadcast/DeployTestEnvironment.s.sol",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:unit": "jest --runInBand --testPathIgnorePatterns=integration",
-    "test:integration": "jest --config jest.integration.config.js",
+    "test:integration": "npm run build:contracts && jest --config jest.integration.config.js",
     "test:all": "npm run test:unit && npm run test:integration"
   },
   "keywords": [],
