@@ -563,4 +563,140 @@ describe('Web3PGP Integration Tests', () => {
             expect(endBlock).toBeGreaterThan(startBlock);
         });
     });
+
+    describe('Log Extraction from Transaction Receipts', () => {
+        test('should extract KeyRegistered log from receipt', async () => {
+            const testKey = '0xc1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1' as `0x${string}`;
+            const testSubkey = '0xd1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1' as `0x${string}`;
+
+            // Register a key and capture the receipt
+            const receipt = await web3pgp.register(testKey, [testSubkey], mockOpenPGPMsg);
+
+            // Extract log from receipt
+            const logs = await web3pgp.extractKeyRegisteredLog(receipt);
+
+            expect(logs).toHaveLength(1);
+            expect(logs[0]!.primaryKeyFingerprint).toBe(testKey);
+            expect(logs[0]!.subkeyFingerprints).toContain(testSubkey);
+            expect(logs[0]!.openPGPMsg).toBe(mockOpenPGPMsg);
+            expect(logs[0]!.transactionHash).toBe(receipt.transactionHash);
+            expect(logs[0]!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should extract SubkeyAdded log from receipt', async () => {
+            const primary = '0xe1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1' as `0x${string}`;
+            const newSubkey = '0xf1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1' as `0x${string}`;
+
+            // Register primary key first
+            await web3pgp.register(primary, [], mockOpenPGPMsg);
+
+            // Add subkey and capture receipt
+            const receipt = await web3pgp.addSubkey(primary, newSubkey, mockOpenPGPMsg);
+
+            // Extract log from receipt
+            const logs = await web3pgp.extractSubkeyAddedLog(receipt);
+
+            expect(logs).toHaveLength(1);
+            expect(logs[0]!.primaryKeyFingerprint).toBe(primary);
+            expect(logs[0]!.subkeyFingerprint).toBe(newSubkey);
+            expect(logs[0]!.openPGPMsg).toBe(mockOpenPGPMsg);
+            expect(logs[0]!.transactionHash).toBe(receipt.transactionHash);
+            expect(logs[0]!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should extract KeyRevoked log from receipt', async () => {
+            const revokeKey = '0x0101010101010101010101010101010101010101010101010101010101010101' as `0x${string}`;
+            const revokeCert = '0xabcdef' as `0x${string}`;
+
+            // Register key and then revoke it
+            await web3pgp.register(revokeKey, [], mockOpenPGPMsg);
+            const receipt = await web3pgp.revoke(revokeKey, revokeCert);
+
+            // Extract log from receipt
+            const logs = await web3pgp.extractKeyRevokedLog(receipt);
+
+            expect(logs).toHaveLength(1);
+            expect(logs[0]!.fingerprint).toBe(revokeKey);
+            expect(logs[0]!.revocationCertificate).toBe(revokeCert);
+            expect(logs[0]!.transactionHash).toBe(receipt.transactionHash);
+            expect(logs[0]!.blockTimestamp).toBeInstanceOf(Date);
+        });
+    });
+
+    describe('Event Log Filtering and Pagination', () => {
+        test('should search KeyRegisteredLogs with array of fingerprints', async () => {
+            const key1 = generateUniqueFingerprint();
+            const key2 = generateUniqueFingerprint();
+            const key3 = generateUniqueFingerprint();
+
+            // Register three keys
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            await web3pgp.register(key2, [], mockOpenPGPMsg);
+            await web3pgp.register(key3, [], mockOpenPGPMsg);
+
+            // Search for logs of multiple keys at once
+            const logs = await web3pgp.searchKeyRegisteredLogs([key1, key2]);
+
+            expect(logs.length).toBeGreaterThanOrEqual(2);
+            const fingerprints = logs.map(l => l.primaryKeyFingerprint);
+            expect(fingerprints).toContain(key1);
+            expect(fingerprints).toContain(key2);
+            expect(fingerprints).not.toContain(key3);
+        });
+
+        test('should search SubkeyAddedLogs with filters', async () => {
+            const primaryKey = '0x0202020202020202020202020202020202020202020202020202020202020202' as `0x${string}`;
+            const subkey1 = '0x0303030303030303030303030303030303030303030303030303030303030303' as `0x${string}`;
+            const subkey2 = '0x0404040404040404040404040404040404040404040404040404040404040404' as `0x${string}`;
+
+            // Register primary key and add subkeys
+            await web3pgp.register(primaryKey, [], mockOpenPGPMsg);
+            await web3pgp.addSubkey(primaryKey, subkey1, mockOpenPGPMsg);
+            await web3pgp.addSubkey(primaryKey, subkey2, mockOpenPGPMsg);
+
+            // Search for subkey additions for specific primary key
+            const logs = await web3pgp.searchSubkeyAddedLogs(primaryKey);
+
+            expect(logs.length).toBeGreaterThanOrEqual(2);
+            const subkeyFps = logs.map(l => l.subkeyFingerprint);
+            expect(subkeyFps).toContain(subkey1);
+            expect(subkeyFps).toContain(subkey2);
+        });
+
+        test('should search SubkeyAddedLogs with specific subkey fingerprint', async () => {
+            const primaryKey = '0x0505050505050505050505050505050505050505050505050505050505050505' as `0x${string}`;
+            const targetSubkey = '0x0606060606060606060606060606060606060606060606060606060606060606' as `0x${string}`;
+            const otherSubkey = '0x0707070707070707070707070707070707070707070707070707070707070707' as `0x${string}`;
+
+            // Register and add subkeys
+            await web3pgp.register(primaryKey, [], mockOpenPGPMsg);
+            await web3pgp.addSubkey(primaryKey, targetSubkey, mockOpenPGPMsg);
+            await web3pgp.addSubkey(primaryKey, otherSubkey, mockOpenPGPMsg);
+
+            // Search for specific subkey additions
+            const logs = await web3pgp.searchSubkeyAddedLogs(undefined, targetSubkey);
+
+            expect(logs.length).toBeGreaterThanOrEqual(1);
+            const subkeyFps = logs.map(l => l.subkeyFingerprint);
+            expect(subkeyFps).toContain(targetSubkey);
+        });
+
+        test('should search KeyRevokedLogs with block range', async () => {
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            
+            const revokeKey = '0x0808080808080808080808080808080808080808080808080808080808080808' as `0x${string}`;
+            await web3pgp.register(revokeKey, [], mockOpenPGPMsg);
+            const revokeReceipt = await web3pgp.revoke(revokeKey, mockRevocationCert);
+            
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            // Search within specific block range
+            const logs = await web3pgp.searchKeyRevokedLogs(revokeKey, blockBefore, blockAfter);
+
+            expect(logs.length).toBeGreaterThanOrEqual(1);
+            const log = logs.find(l => l.transactionHash === revokeReceipt.transactionHash);
+            expect(log).toBeDefined();
+            expect(log!.fingerprint).toBe(revokeKey);
+        });
+    });
 });
