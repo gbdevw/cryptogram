@@ -104,32 +104,6 @@ export interface IWeb3PGP extends IFlatFee {
     revoke(fingerprint: `0x${string}`, revocationCertificate: `0x${string}`): Promise<TransactionReceipt>;
 
     /*****************************************************************************************************************/
-    /* INITIALIZATION & UPGRADE FUNCTIONS                                                                            */
-    /*****************************************************************************************************************/
-
-    /**
-     * Initialize the contract with fee and access manager settings.
-     * @param fee The service fee required to execute payable functions, expressed in wei.
-     * @param manager The address of the AccessManager contract that manages access control for this contract.
-     * @return Transaction receipt after initialization.
-     */
-    initialize(fee: bigint, manager: Address): Promise<TransactionReceipt>;
-
-    /**
-     * Reinitialize the contract after an upgrade.
-     * @return Transaction receipt after reinitialization.
-     */
-    initializeUpgrade(): Promise<TransactionReceipt>;
-
-    /**
-     * Upgrade the contract to a new implementation and optionally call a function.
-     * @param newImplementation The address of the new implementation contract.
-     * @param data The calldata to execute on the new implementation (can be empty bytes).
-     * @return Transaction receipt after upgrade.
-     */
-    upgradeToAndCall(newImplementation: Address, data: `0x${string}`): Promise<TransactionReceipt>;
-
-    /*****************************************************************************************************************/
     /* LOGS FUNCTIONS                                                                                                */
     /*****************************************************************************************************************/
 
