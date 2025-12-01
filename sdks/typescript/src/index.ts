@@ -6,11 +6,6 @@ export * from './accessmanaged/types/types';
 export * from './accessmanaged/accessmanaged.interface';
 export * from './accessmanaged/accessmanaged';
 
-// Export accessmanager functions
-export * from './accessmanager/types/types';
-export * from './accessmanager/accessmanager.interface';
-export * from './accessmanager/accessmanager';
-
 // Export flatfee functions
 export * from './flatfee/types/types';
 export * from './flatfee/flatefee.interface';
