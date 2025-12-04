@@ -5,7 +5,8 @@ import { IWeb3PGP } from './web3pgp.interface';
 import { BYTES32_ZERO, to0x, toBytes32 } from '../utils/0xstr';
 import { OpenPGPUtils } from '../utils/openpgp';
 import { KeyRegisteredLog, KeyRevokedLog, SubkeyAddedLog } from './types/types';
-import pLimit = require('p-limit');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pLimit = require('p-limit');
 
 /*****************************************************************************************************************/
 /* CUSTOM ERRORS                                                                                                 */
@@ -89,7 +90,8 @@ export class Web3PGPService implements IWeb3PGPService {
      * Prevents overwhelming the RPC provider with too many simultaneous requests. Also prevents
      * excessive CPU and memory usage when processing large numbers of keys.
      */
-    private readonly concurrencyLimit: ReturnType<typeof pLimit>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private readonly concurrencyLimit: any;
 
     /**
      * Create a new Web3PGPService instance.

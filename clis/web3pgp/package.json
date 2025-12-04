@@ -1,0 +1,41 @@
+{
+  "name": "@web3pgp/cli",
+  "version": "0.1.0",
+  "description": "Web3PGP CLI - Decentralized OpenPGP key infrastructure on Ethereum",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "web3pgp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write src"
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "pino": "^8.16.0",
+    "yaml": "^2.3.0",
+    "viem": "^2.21.0",
+    "openpgp": "^6.1.0",
+    "dexes": "file:../../sdks/typescript"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.0",
+    "@types/node": "^20.10.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "@types/jest": "^29.5.0",
+    "eslint": "^8.54.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "prettier": "^3.1.0"
+  }
+}

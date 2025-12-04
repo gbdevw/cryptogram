@@ -4,6 +4,11 @@
  */
 export class Web3DocError extends Error {
     /**
+     * Optional underlying error that caused this error.
+     */
+    cause?: Error | undefined;
+
+    /**
      * Creates a new Web3DocError instance.
      * @param message - Human-readable error description
      * @param cause - Optional underlying error that caused this error
@@ -41,6 +46,11 @@ export class Web3DocCriticalError extends Web3DocError {
  * Used for errors that occur during service operations.
  */
 export class Web3DocServiceError extends Error {
+    /**
+     * Optional underlying error that caused this error.
+     */
+    cause?: Error | undefined;
+
     /**
      * Creates a new Web3DocServiceError instance.
      * @param message - Human-readable error description
