@@ -469,6 +469,29 @@ Implement all 8 CLI commands (5 blockchain + 3 configuration) with full error ha
 
 ### Deliverables
 
+#### 4.0 Flag Strategy
+**Design Decision:** CLI flags are used only for providing input/context to commands, not for overriding configuration.
+
+**Configuration Precedence (for all commands):**
+1. CLI flags from `--config` (global, set on root program)
+2. DEXES_* environment variables
+3. Configuration file (~/.web3pgp/config.yaml)
+4. Built-in defaults
+
+**All commands use the same MergedConfig** loaded at startup via this precedence chain. There are no per-command flags for overriding chainId, RPC endpoints, contract address, or private key. This simplifies both the CLI interface and command implementation.
+
+**Flags are only for command-specific input:**
+- `--key <path>` - PGP key file location
+- `--stdin` - Read PGP data from stdin
+- `--fingerprint <fp>` - Fingerprint to operate on
+- `--cert <path>` - Revocation certificate file
+- `--parent-fingerprint <fp>` - Parent key fingerprint for subkeys
+
+Configuration changes require one of:
+- Modifying the config file and rerunning
+- Setting DEXES_* environment variables
+- Using `configuration generate` to create a new config file
+
 #### 4.1 Base Command Factory Pattern
 Create shared infrastructure for command creation.
 
@@ -484,7 +507,7 @@ Create shared infrastructure for command creation.
 
 **4.2.1 Register Command**
 - **File:** `src/commands/blockchain/register.ts`
-- **Flags:** `--key <path>`, `--stdin`, `--chain-id`, `--rpc-url`, `--web3pgp-address`, `--private-key`
+- **Flags:** `--key <path>`, `--stdin`
 - **Input:** Armored OpenPGP public key (from file/stdin/arg)
 - **Process:**
   1. Read and parse PGP key
@@ -498,7 +521,7 @@ Create shared infrastructure for command creation.
 
 **4.2.2 AddSubkey Command**
 - **File:** `src/commands/blockchain/addSubkey.ts`
-- **Flags:** `--key <path>`, `--stdin`, `--parent-fingerprint <fp>`, `--chain-id`, `--rpc-url`, `--web3pgp-address`, `--private-key`
+- **Flags:** `--key <path>`, `--stdin`, `--parent-fingerprint <fp>`
 - **Input:** Armored OpenPGP subkey
 - **Process:**
   1. Read and parse subkey
@@ -512,19 +535,20 @@ Create shared infrastructure for command creation.
 
 **4.2.3 Revoke Command**
 - **File:** `src/commands/blockchain/revoke.ts`
-- **Flags:** `--fingerprint <fp>`, `--cert <path>`, `--stdin`, `--chain-id`, `--rpc-url`, `--web3pgp-address`, `--private-key`
-- **Input:** Full-length fingerprint or revocation certificate
+- **Flags:** `--fingerprint <fp>`, `--key <path>`, `--stdin`
+- **Input:** Fingerprint, or armored revocation certificate/key file, or stdin data
 - **Process:**
-  1. If certificate provided: Parse and extract revocation fingerprint
-  2. If standalone certificate: Download key from blockchain and verify certificate
-  3. Submit revocation transaction
+  1. If fingerprint provided: Use it directly
+  2. If certificate/key data provided: SDK extracts fingerprint from it
+  3. SDK validates and submits revocation transaction
   4. Wait for receipt
 - **Output:** JSON transaction receipt to stdout
 - **Errors:** ValidationError (exit 3), BlockchainError (exit 4)
+- **Note:** SDK handles determining whether input is a certificate or key
 
 **4.2.4 GetPublicKey Command**
 - **File:** `src/commands/blockchain/getPublicKey.ts`
-- **Flags:** `--chain-id`, `--rpc-url`, `--web3pgp-address`
+- **Flags:** (none)
 - **Input:** Full-length fingerprint (argument)
 - **Process:**
   1. Parse fingerprint argument
@@ -536,7 +560,7 @@ Create shared infrastructure for command creation.
 
 **4.2.5 Listen Command**
 - **File:** `src/commands/blockchain/listen.ts`
-- **Flags:** `--fingerprint <fp>`, `--chain-id`, `--rpc-url`, `--web3pgp-address`
+- **Flags:** `--fingerprint <fp>`
 - **Input:** Optional fingerprint filter
 - **Process:**
   1. Set up event listeners on blockchain
@@ -567,10 +591,22 @@ Create main CLI entry point that sets up Commander.js and registers all commands
 
 **Functionality:**
 - Initialize Pino logger with DEXES_LOG_LEVEL env var
+- Load configuration once at startup using 4-tier precedence
+- Inject loaded config into all commands
 - Register all 8 commands
-- Set up global options: `--config`, `--log-level`, `--help`, `--version`
+- Set up global options: `--config`, `--help`, `--version`
 - Implement error handler for uncaught errors
 - Proper exit code handling
+
+**Global Options (applied to root program):**
+- `--config <path>` - Custom config file path (overrides ~/.web3pgp/config.yaml)
+- `--help` - Show help
+- `--version` - Show version
+
+**Important:** Log level is NOT a CLI flag. It's configured via:
+- DEXES_LOG_LEVEL environment variable
+- `monitoring.logging.level` in config file
+- Built-in default: 'info'
 
 **Structure:**
 ```typescript
@@ -579,13 +615,15 @@ const program = new Command()
   .version('1.0.0')
   .description('Web3PGP CLI - Decentralized OpenPGP key infrastructure on Ethereum')
   .option('--config <path>', 'Config file path')
-  .option('--log-level <level>', 'Logging level')
   .option('--help', 'Show help')
   .option('--version', 'Show version');
 
-// Register command groups
-program.addCommand(createBlockchainCommands(deps));
-program.addCommand(createConfigurationCommands(deps));
+// Load config once at startup
+const config = loadConfig({ configPath: program.config });
+
+// Register command groups with loaded config
+program.addCommand(createBlockchainCommands({ config, logger }));
+program.addCommand(createConfigurationCommands({ config, logger }));
 
 program.parse(process.argv);
 ```

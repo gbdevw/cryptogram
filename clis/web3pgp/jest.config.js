@@ -1,7 +1,7 @@
-export default {
+module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/__tests__/**/*.test.ts'],
+  testMatch: ['**/__tests__/**/*.test.ts', '!**/__tests__/integration/**'],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
