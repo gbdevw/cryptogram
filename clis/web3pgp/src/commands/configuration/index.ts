@@ -1,21 +1,17 @@
 import { Command } from 'commander';
 import { Logger } from 'pino';
-import { MergedConfig } from '../../config/types';
-
-export interface ConfigurationCommandsDeps {
-  logger: Logger;
-  config: MergedConfig;
-}
+import { createRootLogger } from '../../utils/logger';
+import { createConfigDisplayCommand } from './display';
 
 /**
  * Create all configuration commands and add them to a group
  */
 export function createConfigurationCommands(): Command {
+  const logger = createRootLogger('info');
   const group = new Command('configuration').description('Configuration management (generate, display, validate)');
 
-  // These commands were already implemented in Phase 2
-  // Import them when they're available
-  // For now, create placeholder structure
+  // Add display command
+  group.addCommand(createConfigDisplayCommand({ logger }));
 
   return group;
 }

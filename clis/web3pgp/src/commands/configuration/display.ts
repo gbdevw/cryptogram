@@ -1,3 +1,4 @@
+import { Command } from 'commander';
 import { stringify as stringifyYaml } from 'yaml';
 import { Logger } from 'pino';
 import { loadConfig } from '../../config/loader';
@@ -29,29 +30,26 @@ export interface ConfigDisplayCommandDeps {
 /**
  * Create the 'configuration display' command
  */
-export function createConfigDisplayCommand(deps: ConfigDisplayCommandDeps) {
+export function createConfigDisplayCommand(deps: ConfigDisplayCommandDeps): Command {
   const { logger } = deps;
   const cmdLogger = logger.child({ command: 'configuration.display' });
 
-  return {
-    description: 'Display the current configuration (merged from all sources)',
-    options: [
-      ['--show-secrets', 'Show full private key (not masked)'],
-      ['--config <path>', 'Custom config file path'],
-    ],
-    action(options: Record<string, string | boolean | undefined>) {
+  return new Command('display')
+    .description('Display the current configuration (merged from all sources)')
+    .option('--show-secrets', 'Show full private key (not masked)')
+    .option('--config <path>', 'Custom config file path')
+    .action(async (options: { 'show-secrets'?: boolean; config?: string }) => {
       try {
         cmdLogger.info('Loading configuration');
 
         const config = loadConfig({
-          configPath: options.config as string | undefined,
+          configPath: options.config,
         });
 
         cmdLogger.info({ chain: config.ethereum.chain }, 'Configuration loaded');
 
         // Mask sensitive data unless explicitly requested
-        const displayConfig =
-          options['show-secrets'] === true ? config : maskSensitiveData(config);
+        const displayConfig = options['show-secrets'] ? config : maskSensitiveData(config);
 
         // Convert to YAML for display
         const yaml = stringifyYaml(displayConfig, {
@@ -61,10 +59,12 @@ export function createConfigDisplayCommand(deps: ConfigDisplayCommandDeps) {
 
         console.log('# Current Configuration (merged from defaults/file/env/flags)\n');
         console.log(yaml);
+
+        process.exit(0);
       } catch (error) {
-        cmdLogger.error({ error }, 'Failed to display config');
+        const msg = error instanceof Error ? error.message : String(error);
+        cmdLogger.error({ error: msg }, 'Failed to display config');
         process.exit(2);
       }
-    },
-  };
+    });
 }
