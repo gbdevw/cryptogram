@@ -8,9 +8,9 @@ import {
   http,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { mainnet, sepolia } from 'viem/chains';
+import { mainnet, sepolia, foundry, ink, inkSepolia } from 'viem/chains';
 
-import { MergedConfig } from '../config/types';
+import { ChainConfig, MergedConfig } from '../config/types';
 import { ConfigError } from '../errors';
 import { createRootLogger } from '../utils/logger';
 import { IWeb3PGPService, Web3PGP, Web3PGPService } from 'dexes';
@@ -18,35 +18,21 @@ import { IWeb3PGPService, Web3PGP, Web3PGPService } from 'dexes';
 const logger = createRootLogger();
 
 /**
- * Map of chain IDs to Viem chain objects.
+ * Map of well-known Viem chain names to chain objects.
+ */
+const CHAIN_MAP: Record<string, Chain> = {
+  'mainnet': mainnet,
+  'sepolia': sepolia,
+  'anvil': foundry,
+  'ink-sepolia': inkSepolia,
+};
+
+/**
+ * Map of custom chain IDs to Viem chain objects.
  * Extend this as more networks are supported.
  */
-const CHAIN_MAP: Record<number, Chain> = {
-  1: mainnet,
-  11155111: sepolia, // Ethereum Sepolia
-  763373: {
-    id: 763373,
-    name: 'Ink Sepolia',
-    network: 'ink-sepolia',
-    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-    rpcUrls: {
-      default: {
-        http: ['https://rpc-gel-sepolia.inkonchain.com', 'https://rpc-qnd-sepolia.inkonchain.com'],
-        webSocket: undefined,
-      },
-      public: {
-        http: ['https://rpc-gel-sepolia.inkonchain.com', 'https://rpc-qnd-sepolia.inkonchain.com'],
-        webSocket: undefined,
-      },
-    },
-    blockExplorers: {
-      default: {
-        name: 'Blockscout',
-        url: 'https://sepolia-blockscout.inkonchain.com',
-      },
-    },
-    testnet: true,
-  } as Chain,
+const CHAIN_ID_MAP: Record<number, Chain> = {
+  57073: ink,
 };
 
 /**
@@ -71,32 +57,114 @@ function validatePrivateKeyFormat(privateKey: string): void {
 }
 
 /**
- * Get Viem chain object for the given chain ID.
+ * Get Viem chain object for the given chain config.
+ * If a well-known chain name is provided, use Viem's default.
+ * If a numeric chainId is provided, look it up in CHAIN_ID_MAP or create a generic chain.
  */
-function getChainForId(chainId: number): Chain {
-  const chain = CHAIN_MAP[chainId];
-  if (!chain) {
-    throw new ConfigError(
-      `Unsupported chain ID: ${chainId}. Supported chains: ${Object.keys(CHAIN_MAP).join(', ')}`,
-    );
+function getChainForConfig(chainConfig: ChainConfig): Chain {
+  if (typeof chainConfig === 'string') {
+    const chain = CHAIN_MAP[chainConfig];
+    if (chain) {
+      return chain;
+    }
+    throw new ConfigError(`Unsupported chain name: ${chainConfig}`);
   }
-  return chain;
+
+  // chainConfig is a number
+  const chain = CHAIN_ID_MAP[chainConfig];
+  if (chain) {
+    return chain;
+  }
+
+  // For unsupported chain IDs, create a generic chain object
+  // The RPC endpoints from config will be used for actual connections
+  return {
+    id: chainConfig,
+    name: `Chain ${chainConfig}`,
+    network: `chain-${chainConfig}`,
+    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+    rpcUrls: {
+      default: { http: [], webSocket: undefined },
+      public: { http: [], webSocket: undefined },
+    },
+  } as Chain;
+}
+
+/**
+ * Resolve RPC endpoints with intelligent fallback.
+ * Priority order:
+ * 1. User-provided config.ethereum.rpc.endpoints (explicit)
+ * 2. Predefined endpoints from the well-known chain
+ * 3. Error if chain is unknown and no RPC endpoints provided
+ *
+ * @param config - Merged configuration
+ * @returns Sorted RPC endpoints by priority
+ * @throws ConfigError if no endpoints can be resolved
+ */
+function resolveRpcEndpoints(config: MergedConfig): Array<{ url: string; priority: number }> {
+  const { chain, rpc } = config.ethereum;
+
+  // Priority 1: User-provided endpoints
+  if (rpc?.endpoints && rpc.endpoints.length > 0) {
+    logger.debug(
+      { count: rpc.endpoints.length, endpoints: rpc.endpoints.map(e => e.url) },
+      'Using user-provided RPC endpoints',
+    );
+    return rpc.endpoints;
+  }
+
+  // Priority 2: Try to get predefined endpoints from the chain
+  if (typeof chain === 'string') {
+    const chainObj = CHAIN_MAP[chain];
+    if (chainObj?.rpcUrls?.default?.http && chainObj.rpcUrls.default.http.length > 0) {
+      const predefinedEndpoints = chainObj.rpcUrls.default.http.map((url, index) => ({
+        url,
+        priority: index,
+      }));
+      logger.debug(
+        { count: predefinedEndpoints.length, endpoints: predefinedEndpoints.map(e => e.url) },
+        'Using predefined RPC endpoints for well-known chain',
+      );
+      return predefinedEndpoints;
+    }
+  } else if (typeof chain === 'number') {
+    // For numeric chain IDs, check if we have a predefined chain
+    const chainObj = CHAIN_ID_MAP[chain];
+    if (chainObj?.rpcUrls?.default?.http && chainObj.rpcUrls.default.http.length > 0) {
+      const predefinedEndpoints = chainObj.rpcUrls.default.http.map((url, index) => ({
+        url,
+        priority: index,
+      }));
+      logger.debug(
+        { count: predefinedEndpoints.length, endpoints: predefinedEndpoints.map(e => e.url) },
+        'Using predefined RPC endpoints for known chain ID',
+      );
+      return predefinedEndpoints;
+    }
+  }
+
+  // No RPC endpoints available
+  const chainName = typeof chain === 'string' ? chain : `chain ${chain}`;
+  throw new ConfigError(
+    `No RPC endpoints available for ${chainName}. ` +
+    `Provide endpoints in ethereum.rpc.endpoints or use a well-known chain with predefined RPC endpoints.`,
+  );
 }
 
 /**
  * Create Viem PublicClient with RPC endpoint fallback chain.
  * Automatically retries failed RPC calls across all configured endpoints.
+ * If gasLimit is configured, injects it into simulateContract to skip gas estimation.
  */
 function createPublicClientWithFallback(config: MergedConfig): PublicClient {
-  const { chainId, rpc } = config.ethereum;
-  const chain = getChainForId(chainId);
+  const { chain: chainConfig } = config.ethereum;
+  const chainObj = getChainForConfig(chainConfig);
 
-  if (!rpc.endpoints || rpc.endpoints.length === 0) {
-    throw new ConfigError('No RPC endpoints configured in ethereum.rpc.endpoints');
-  }
+  // Resolve RPC endpoints (user config > predefined defaults > error)
+  const rpcEndpoints = resolveRpcEndpoints(config);
 
   // Sort endpoints by priority (lower priority value = higher priority)
-  const sortedEndpoints = [...rpc.endpoints].sort((a, b) => a.priority - b.priority);
+  const sortedEndpoints = [...rpcEndpoints].sort((a, b) => a.priority - b.priority);
 
   logger.debug(
     { endpoints: sortedEndpoints.map(e => e.url) },
@@ -106,10 +174,27 @@ function createPublicClientWithFallback(config: MergedConfig): PublicClient {
   // Create fallback transport with all endpoints
   const fallbackTransport = fallback(sortedEndpoints.map(ep => http(ep.url)));
 
-  return createPublicClient({
-    chain,
+  const publicClient = createPublicClient({
+    chain: chainObj,
     transport: fallbackTransport,
   });
+
+  // If gasLimit is configured, extend the client to inject it into simulateContract
+  if (config.ethereum.gasLimit) {
+    logger.debug({ gasLimit: config.ethereum.gasLimit.toString() }, 'Extending PublicClient to inject gas limit into simulateContract');
+    return publicClient.extend((client) => ({
+      async simulateContract(args: any) {
+        // Inject gas limit into simulation to skip gas estimation
+        logger.debug('Injecting configured gasLimit into simulateContract');
+        return client.simulateContract({
+          ...args,
+          gas: args.gas ?? config.ethereum.gasLimit,
+        }) as any;
+      },
+    })) as any;
+  }
+
+  return publicClient;
 }
 
 /**
@@ -119,7 +204,7 @@ function createPublicClientWithFallback(config: MergedConfig): PublicClient {
 function createWalletClientIfConfigured(
   config: MergedConfig,
 ): WalletClient | undefined {
-  const { wallet, chainId } = config.ethereum;
+  const { wallet, chain: chainConfig } = config.ethereum;
 
   // Check if wallet configuration exists
   if (!wallet.type) {
@@ -142,22 +227,40 @@ function createWalletClientIfConfigured(
   logger.debug({ address: account.address }, 'Creating WalletClient with derived account');
 
   // Create wallet client with chain and primary RPC endpoint
-  const chain = getChainForId(chainId);
-  const { rpc } = config.ethereum;
-  
-  if (!rpc.endpoints || rpc.endpoints.length === 0) {
-    throw new ConfigError('No RPC endpoints configured in ethereum.rpc.endpoints');
-  }
+  const chainObj = getChainForConfig(chainConfig);
+
+  // Resolve RPC endpoints (user config > predefined defaults > error)
+  const rpcEndpoints = resolveRpcEndpoints(config);
 
   // Use the primary endpoint for the wallet client
-  const primaryEndpoint = [...rpc.endpoints].sort((a, b) => a.priority - b.priority)[0];
+  const sortedEndpoints = [...rpcEndpoints].sort((a, b) => a.priority - b.priority);
+  const primaryEndpoint = sortedEndpoints[0];
   const primaryTransport = http(primaryEndpoint.url);
 
+  // Create wallet client with optional gas limit override
   const walletClient = createWalletClient({
     account,
-    chain,
+    chain: chainObj,
     transport: primaryTransport,
   });
+
+  // If gasLimit is configured, extend the client to use it
+  if (config.ethereum.gasLimit) {
+    logger.debug({ gasLimit: config.ethereum.gasLimit.toString() }, 'Using explicit gas limit for transactions');
+    return walletClient.extend((client) => ({
+      async estimateGas(args: any) {
+        // Skip gas estimation and return the configured limit
+        logger.debug('Skipping gas estimation - using configured gasLimit');
+        return config.ethereum.gasLimit!;
+      },
+      async sendTransaction(args: any) {
+        return client.sendTransaction({
+          ...args,
+          gas: args.gas ?? config.ethereum.gasLimit,
+        });
+      },
+    })) as any;
+  }
 
   return walletClient;
 }
@@ -171,7 +274,7 @@ function createWalletClientIfConfigured(
  * @throws ConfigError if configuration is invalid
  */
 export async function createWeb3PGPService(config: MergedConfig): Promise<IWeb3PGPService> {
-  logger.debug({ chainId: config.ethereum.chainId }, 'Initializing Web3PGP service');
+  logger.debug({ chain: config.ethereum.chain }, 'Initializing Web3PGP service');
 
   try {
     // Step 1: Create PublicClient with RPC fallback
@@ -201,7 +304,7 @@ export async function createWeb3PGPService(config: MergedConfig): Promise<IWeb3P
 
     logger.info(
       {
-        chainId: config.ethereum.chainId,
+        chain: config.ethereum.chain,
         contractAddress,
         hasWallet: !!walletClient,
       },

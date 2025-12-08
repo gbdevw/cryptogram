@@ -74,10 +74,20 @@ function loadConfigFile(filePath: string): Record<string, unknown> {
 function loadEnvVarsConfig(env: Record<string, string | undefined>): Partial<MergedConfig> {
   const config: Record<string, unknown> = {};
 
-  // DEXES_CHAIN_ID
+  // DEXES_CHAIN (well-known chain name or numeric chain ID)
+  if (env.DEXES_CHAIN) {
+    if (!config.ethereum) config.ethereum = {};
+    // Try to parse as number, otherwise treat as string
+    const chainValue = isNaN(Number(env.DEXES_CHAIN))
+      ? env.DEXES_CHAIN
+      : Number(env.DEXES_CHAIN);
+    (config.ethereum as Record<string, unknown>).chain = chainValue;
+  }
+
+  // Legacy: DEXES_CHAIN_ID (numeric only, converts to number)
   if (env.DEXES_CHAIN_ID) {
     if (!config.ethereum) config.ethereum = {};
-    (config.ethereum as Record<string, unknown>).chainId = parseInt(
+    (config.ethereum as Record<string, unknown>).chain = parseInt(
       env.DEXES_CHAIN_ID,
       10
     );
@@ -149,11 +159,11 @@ function mergeConfigs(...configs: Partial<MergedConfig>[]): MergedConfig {
 
     // Merge ethereum config
     if (config.ethereum) {
-      if (config.ethereum.chainId !== undefined) {
-        result.ethereum.chainId = config.ethereum.chainId;
+      if (config.ethereum.chain !== undefined) {
+        result.ethereum.chain = config.ethereum.chain;
       }
       if (config.ethereum.rpc?.endpoints) {
-        result.ethereum.rpc.endpoints = config.ethereum.rpc.endpoints;
+        result.ethereum.rpc = { endpoints: config.ethereum.rpc.endpoints };
       }
       if (config.ethereum.wallet?.privateKey !== undefined) {
         result.ethereum.wallet.privateKey = config.ethereum.wallet.privateKey;

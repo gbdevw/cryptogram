@@ -22,7 +22,7 @@ describe('Configuration Loader', () => {
   describe('loadConfig', () => {
     it('should load defaults when no config provided', () => {
       const config = loadConfig({ configPath: '/nonexistent/path' });
-      expect(config.ethereum.chainId).toBe(763373);
+      expect(config.ethereum.chain).toBe('ink-sepolia');
       expect(config.web3pgp.contract).toBe('0x72d02B94317ac899B34459a4e6685eFe12Ac17a8');
       expect(config.monitoring.logging.level).toBe('info');
     });
@@ -31,7 +31,7 @@ describe('Configuration Loader', () => {
       const configPath = path.join(tempDir, 'config.yaml');
       const configContent = `
 ethereum:
-  chainId: 57073
+  chain: 57073
   rpc:
     endpoints:
       - url: https://custom-rpc.example.com
@@ -47,7 +47,7 @@ monitoring:
       fs.writeFileSync(configPath, configContent);
 
       const config = loadConfig({ configPath });
-      expect(config.ethereum.chainId).toBe(57073);
+      expect(config.ethereum.chain).toBe(57073);
       expect(config.web3pgp.contract).toBe('0xABCDEF1234567890ABCDEF1234567890ABCDEF12');
       expect(config.monitoring.logging.level).toBe('debug');
     });
@@ -56,7 +56,7 @@ monitoring:
       const configPath = path.join(tempDir, 'config.yaml');
       const configContent = `
 ethereum:
-  chainId: 57073
+  chain: 57073
   rpc:
     endpoints:
       - url: https://file-rpc.example.com
@@ -80,8 +80,8 @@ monitoring:
       });
 
       // Env vars should override file config
-      expect(config.ethereum.chainId).toBe(763373);
-      expect(config.ethereum.rpc.endpoints[0].url).toBe('https://env-rpc.example.com');
+      expect(config.ethereum.chain).toBe(763373);
+      expect(config.ethereum.rpc?.endpoints[0].url).toBe('https://env-rpc.example.com');
     });
 
     it('should override with CLI flags', () => {
@@ -90,14 +90,14 @@ monitoring:
         envVars: {},
         cliFlags: {
           ethereum: {
-            chainId: 999,
+            chain: 999,
             rpc: { endpoints: [] },
             wallet: { type: WalletType.PrivateKey },
           },
         },
       });
 
-      expect(config.ethereum.chainId).toBe(999);
+      expect(config.ethereum.chain).toBe(999);
     });
 
     it('should parse DEXES_RPC_ENDPOINTS JSON array', () => {
@@ -111,9 +111,9 @@ monitoring:
         },
       });
 
-      expect(config.ethereum.rpc.endpoints).toHaveLength(2);
-      expect(config.ethereum.rpc.endpoints[0].url).toBe('https://rpc1.example.com');
-      expect(config.ethereum.rpc.endpoints[1].url).toBe('https://rpc2.example.com');
+      expect(config.ethereum.rpc?.endpoints).toHaveLength(2);
+      expect(config.ethereum.rpc?.endpoints[0].url).toBe('https://rpc1.example.com');
+      expect(config.ethereum.rpc?.endpoints[1].url).toBe('https://rpc2.example.com');
     });
 
     it('should set wallet private key from env var', () => {
@@ -144,7 +144,7 @@ monitoring:
       const configPath = path.join(tempDir, 'config.yaml');
       const configContent = `
 ethereum:
-  chainId: 763373
+  chain: ink-sepolia
   rpc:
     endpoints:
       - url: https://rpc.example.com
@@ -176,7 +176,7 @@ monitoring:
       const configPath = path.join(tempDir, 'config.yaml');
       const configContent = `
 ethereum:
-  chainId: 111
+  chain: 111
   rpc:
     endpoints:
       - url: https://file.example.com
@@ -198,7 +198,7 @@ monitoring:
         },
         cliFlags: {
           ethereum: {
-            chainId: 222,
+            chain: 222,
             rpc: { endpoints: [] },
             wallet: { type: WalletType.PrivateKey },
           },
@@ -206,7 +206,7 @@ monitoring:
       });
 
       // CLI flags override everything
-      expect(config.ethereum.chainId).toBe(222);
+      expect(config.ethereum.chain).toBe(222);
       // Env vars override file and defaults
       expect(config.monitoring.logging.level).toBe('debug');
       // File overrides defaults

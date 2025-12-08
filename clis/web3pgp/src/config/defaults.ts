@@ -6,7 +6,7 @@ import { MergedConfig, WalletType } from './types';
  */
 export const DEFAULT_CONFIG: MergedConfig = {
   ethereum: {
-    chainId: 763373, // Ink Sepolia
+    chain: 'ink-sepolia',
     rpc: {
       endpoints: [
         { url: 'https://rpc-gel-sepolia.inkonchain.com', priority: 1 },

@@ -42,22 +42,20 @@ export function validateYamlStructure(data: unknown): void {
   if (typeof ethereum !== 'object' || ethereum === null) {
     throw new ConfigError('ethereum must be an object');
   }
-  if (!('chainId' in ethereum)) {
-    throw new ConfigError('Missing required field: ethereum.chainId');
-  }
-  if (!('rpc' in ethereum)) {
-    throw new ConfigError('Missing required field: ethereum.rpc');
+  if (!('chain' in ethereum)) {
+    throw new ConfigError('Missing required field: ethereum.chain');
   }
   if (!('wallet' in ethereum)) {
     throw new ConfigError('Missing required field: ethereum.wallet');
   }
 
-  // Validate rpc section
+  // Validate rpc section (optional)
   const rpc = (ethereum as Record<string, unknown>).rpc;
-  if (typeof rpc !== 'object' || rpc === null) {
-    throw new ConfigError('ethereum.rpc must be an object');
-  }
-  if (!('endpoints' in rpc)) {
+  if (rpc !== undefined) {
+    if (typeof rpc !== 'object' || rpc === null) {
+      throw new ConfigError('ethereum.rpc must be an object');
+    }
+    if (!('endpoints' in rpc)) {
     throw new ConfigError('Missing required field: ethereum.rpc.endpoints');
   }
   if (!Array.isArray((rpc as Record<string, unknown>).endpoints)) {
@@ -77,6 +75,7 @@ export function validateYamlStructure(data: unknown): void {
     if (!('priority' in (ep as Record<string, unknown>))) {
       throw new ConfigError(`Missing required field: ethereum.rpc.endpoints[${i}].priority`);
     }
+  }
   }
 
   // Validate wallet section

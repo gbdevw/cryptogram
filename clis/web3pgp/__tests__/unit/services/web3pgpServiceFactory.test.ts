@@ -35,15 +35,14 @@ describe('Web3PGPServiceFactory', () => {
         ...DEFAULT_CONFIG,
         ethereum: {
           ...DEFAULT_CONFIG.ethereum,
-          rpc: {
-            endpoints: [],
-          },
+          chain: 99999, // Unknown chain ID
+          rpc: undefined, // No RPC endpoints provided
         },
       };
 
       await expect(createWeb3PGPService(config)).rejects.toThrow(ConfigError);
       await expect(createWeb3PGPService(config)).rejects.toThrow(
-        'No RPC endpoints configured',
+        'No RPC endpoints available',
       );
     });
 
@@ -52,12 +51,13 @@ describe('Web3PGPServiceFactory', () => {
         ...DEFAULT_CONFIG,
         ethereum: {
           ...DEFAULT_CONFIG.ethereum,
-          chainId: 99999,
+          chain: 88888, // Different unknown chain
+          rpc: undefined, // No RPC endpoints provided
         },
       };
 
       await expect(createWeb3PGPService(config)).rejects.toThrow(ConfigError);
-      await expect(createWeb3PGPService(config)).rejects.toThrow('Unsupported chain ID');
+      await expect(createWeb3PGPService(config)).rejects.toThrow('No RPC endpoints available');
     });
 
     it('should create service in read-only mode when wallet type not configured', async () => {
@@ -230,7 +230,7 @@ describe('Web3PGPServiceFactory', () => {
         ...DEFAULT_CONFIG,
         ethereum: {
           ...DEFAULT_CONFIG.ethereum,
-          chainId: 11155111,
+          chain: 'sepolia',
           rpc: {
             endpoints: [{ url: 'https://sepolia.infura.io/v3/...', priority: 1 }],
           },
@@ -247,7 +247,7 @@ describe('Web3PGPServiceFactory', () => {
         ...DEFAULT_CONFIG,
         ethereum: {
           ...DEFAULT_CONFIG.ethereum,
-          chainId: 1,
+          chain: 'mainnet',
           rpc: {
             endpoints: [{ url: 'https://mainnet.infura.io/v3/...', priority: 1 }],
           },

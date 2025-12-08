@@ -1,9 +1,9 @@
 import { execSync, spawn } from 'child_process';
-import * as fs from 'fs';
 import * as path from 'path';
+import * as openpgp from 'openpgp';
+import { Address } from 'viem';
 import { AnvilHelper } from '../../../../sdks/typescript/__tests__/helpers/anvil.helper';
-import { MergedConfig } from '../../src/config/types';
-import { WalletType } from '../../src/config/types';
+import { Web3PGP, Web3PGPService } from 'dexes';
 
 /**
  * Integration tests for Web3PGP CLI using real blockchain (Anvil)
@@ -18,8 +18,8 @@ import { WalletType } from '../../src/config/types';
  */
 describe('Web3PGP CLI Integration Tests', () => {
   let anvil: AnvilHelper;
-  let testConfigPath: string;
-  let testConfig: MergedConfig;
+  let contractAddress: Address;
+  let service: Web3PGPService;
 
   /**
    * Execute a CLI command and capture output
@@ -42,55 +42,73 @@ describe('Web3PGP CLI Integration Tests', () => {
     }
   };
 
+  /**
+   * Execute a CLI command with stdin input and capture output
+   */
+  const runCliWithStdin = (
+    args: string[],
+    stdinData: string
+  ): { stdout: string; stderr: string; code: number } => {
+    return new Promise((resolve) => {
+      const cwd = path.join(__dirname, '../../');
+      const child = spawn('node', ['dist/index.js', ...args], {
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      child.on('close', (code) => {
+        resolve({ stdout, stderr, code: code || 0 });
+      });
+
+      // Send stdin data and close
+      child.stdin.write(stdinData);
+      child.stdin.end();
+    }) as any; // Type assertion since we're in async context
+  };
+
   beforeAll(async () => {
     console.log('========================================');
     console.log('Setting up Web3PGP CLI Integration Tests');
     console.log('========================================');
 
+    // Step 1: Start Anvil blockchain
     console.log('Starting Anvil blockchain...');
     anvil = new AnvilHelper({ port: 8545, blockTime: 1 });
     await anvil.start();
-    console.log('✓ Anvil started at', anvil.getRpcUrl());
+    console.log(`✓ Anvil started at ${anvil.getRpcUrl()}`);
 
+    // Step 2: Deploy contracts via Foundry scripts
     console.log('Deploying contracts via Foundry scripts...');
     const deployed = await anvil.deployWeb3PGP(0n); // Initialize with 0 fee
+    contractAddress = deployed.web3pgp;
+
     console.log('✓ Deployment summary:');
-    console.log('  - AccessManager:', deployed.accessManager);
-    console.log('  - Implementation:', deployed.implementation);
-    console.log('  - Proxy (Web3PGP):', deployed.proxy);
-    console.log('Using Web3PGP contract at:', deployed.proxy);
+    console.log(`  - AccessManager: ${deployed.accessManager}`);
+    console.log(`  - Implementation: ${deployed.implementation}`);
+    console.log(`  - Proxy (Web3PGP): ${deployed.proxy}`);
+    console.log('  - Roles: ADMIN(0), UPGRADE_MANAGER(1), TREASURER(2)');
+    console.log(`Using Web3PGP contract at: ${contractAddress}`);
 
-    // Create test configuration
-    testConfig = {
-      ethereum: {
-        chainId: 31337, // Anvil default
-        rpc: {
-          endpoints: [
-            { url: anvil.getRpcUrl(), priority: 1 },
-          ],
-        },
-        wallet: {
-          type: WalletType.PrivateKey,
-          // Use Anvil's first account private key (test account)
-          privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb476c6b8d6c1f02b98b19009145f', // pragma: allowlist secret
-        },
-      },
-      web3pgp: {
-        contract: deployed.proxy,
-      },
-      monitoring: {
-        logging: {
-          level: 'info',
-        },
-      },
-    };
+    // Step 3: Create service instance (using AnvilHelper's properly configured clients)
+    console.log('Initializing Web3PGP service...');
+    const publicClient = anvil.getPublicClient();
+    const walletClient = anvil.getWalletClient();
+    const web3pgp = new Web3PGP(contractAddress, publicClient, walletClient);
+    service = new Web3PGPService(web3pgp);
+    console.log('✓ Web3PGP service initialized');
 
-    // Write test config to temporary file
-    testConfigPath = path.join(__dirname, 'test-config.yaml');
-    const yaml = require('yaml');
-    fs.writeFileSync(testConfigPath, yaml.stringify(testConfig));
-    console.log('✓ Test config written to:', testConfigPath);
-
+    // Step 4: Build CLI
     console.log('Building CLI...');
     execSync('npm run build', { cwd: path.join(__dirname, '../../'), stdio: 'inherit' });
     console.log('✓ CLI built');
@@ -99,17 +117,8 @@ describe('Web3PGP CLI Integration Tests', () => {
   }, 120000); // 2 minute timeout for setup
 
   afterAll(async () => {
-    console.log('Cleaning up...');
-    
-    // Clean up test config
-    if (fs.existsSync(testConfigPath)) {
-      fs.unlinkSync(testConfigPath);
-      console.log('✓ Test config removed');
-    }
-
-    // Stop Anvil
+    console.log('Cleaning up Web3PGP CLI Integration Tests');
     anvil.stop();
-    console.log('✓ Anvil stopped');
   });
 
   describe('CLI Setup & Configuration', () => {
@@ -134,12 +143,12 @@ describe('Web3PGP CLI Integration Tests', () => {
       
       // Verify contract is deployed
       const publicClient = anvil.getPublicClient();
-      const code = await publicClient.getBytecode({ address: testConfig.web3pgp.contract as `0x${string}` });
+      const code = await publicClient.getBytecode({ address: contractAddress });
       expect(code).toBeDefined();
       expect(code).not.toBe('0x');
       
-      // Verify we can read contract state
-      expect(testConfig.ethereum.wallet.privateKey).toBeDefined();
+      // Verify service is initialized
+      expect(service).toBeDefined();
     });
   });
 
@@ -173,6 +182,32 @@ describe('Web3PGP CLI Integration Tests', () => {
       expect(result.stdout).toContain('generate');
       expect(result.stdout).toContain('display');
       expect(result.stdout).toContain('validate');
+    });
+  });
+
+  describe('Blockchain Register Command', () => {
+    test('should register a public key', async () => {
+      // Generate a test PGP keypair
+      const keyPair = await openpgp.generateKey({
+        format: 'object',
+        type: 'rsa',
+        rsaBits: 2048,
+        userIDs: [{ name: 'Test User', email: 'testuser@example.com' }],
+      });
+
+      // Extract public key for registration
+      const publicKey = keyPair.publicKey;
+
+      // Register via service (tests blockchain integration)
+      const receipt = await service.register(publicKey);
+
+      expect(receipt.status).toBe('success');
+      expect(receipt.blockNumber).toBeGreaterThan(0n);
+
+      // Verify on-chain state
+      const fingerprint = publicKey.getFingerprint();
+      const exists = await service.contract.exists(`0x${fingerprint}`);
+      expect(exists).toBe(true);
     });
   });
 });

@@ -17,11 +17,14 @@ export function generateConfigTemplate(): string {
 
 ethereum:
   # Blockchain network configuration
-  chainId: 763373  # Ink Sepolia testnet (change to 57073 for mainnet)
+  # Use a well-known chain name (mainnet, sepolia, anvil, ink-sepolia)
+  # or a custom numeric chain ID
+  chain: ink-sepolia  # or use numeric ID: 763373
   
   rpc:
     # RPC endpoints to use (in priority order)
     # The CLI will use the first endpoint; if it fails, it falls back to the next
+    # For well-known chains, this is optional if default endpoints are available
     endpoints:
       - url: https://rpc-gel-sepolia.inkonchain.com
         priority: 1

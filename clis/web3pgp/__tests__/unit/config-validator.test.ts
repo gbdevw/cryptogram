@@ -6,7 +6,7 @@ describe('Configuration Validator', () => {
     it('should accept valid YAML', () => {
       const yaml = `
 ethereum:
-  chainId: 763373
+  chain: ink-sepolia
 `;
       expect(() => validateYamlFormat(yaml)).not.toThrow();
     });
@@ -14,7 +14,7 @@ ethereum:
     it('should reject malformed YAML', () => {
       const yaml = `
 ethereum:
-  chainId: 763373
+  chain: ink-sepolia
   invalid: [
 `;
       expect(() => validateYamlFormat(yaml)).toThrow(ConfigError);
@@ -24,7 +24,7 @@ ethereum:
       // This is actually valid YAML, so we need a truly invalid example
       const invalidYaml = `
 ethereum:
-  chainId: 763373
+  chain: ink-sepolia
     bad_indent:
 `;
       expect(() => validateYamlFormat(invalidYaml)).toThrow(ConfigError);
@@ -35,7 +35,7 @@ ethereum:
     it('should accept valid structure', () => {
       const data = {
         ethereum: {
-          chainId: 763373,
+          chain: 'ink-sepolia',
           rpc: {
             endpoints: [
               { url: 'https://rpc.example.com', priority: 1 },
@@ -70,7 +70,7 @@ ethereum:
     it('should reject missing web3pgp field', () => {
       const data = {
         ethereum: {
-          chainId: 763373,
+          chain: 'ink-sepolia',
           rpc: { endpoints: [] },
           wallet: { type: 'private-key' },
         },
@@ -84,7 +84,7 @@ ethereum:
     it('should reject missing monitoring field', () => {
       const data = {
         ethereum: {
-          chainId: 763373,
+          chain: 'ink-sepolia',
           rpc: { endpoints: [] },
           wallet: { type: 'private-key' },
         },
@@ -98,7 +98,7 @@ ethereum:
     it('should reject invalid wallet type', () => {
       const data = {
         ethereum: {
-          chainId: 763373,
+          chain: 'ink-sepolia',
           rpc: {
             endpoints: [{ url: 'https://rpc.example.com', priority: 1 }],
           },
@@ -121,7 +121,7 @@ ethereum:
     it('should reject missing rpc.endpoints', () => {
       const data = {
         ethereum: {
-          chainId: 763373,
+          chain: 'ink-sepolia',
           rpc: {},
           wallet: { type: 'private-key' },
         },
@@ -136,7 +136,7 @@ ethereum:
     it('should reject non-array endpoints', () => {
       const data = {
         ethereum: {
-          chainId: 763373,
+          chain: 'ink-sepolia',
           rpc: { endpoints: 'not an array' },
           wallet: { type: 'private-key' },
         },
@@ -153,7 +153,7 @@ ethereum:
     it('should validate complete YAML config', () => {
       const yaml = `
 ethereum:
-  chainId: 763373
+  chain: ink-sepolia
   rpc:
     endpoints:
       - url: https://rpc.example.com
@@ -172,7 +172,7 @@ monitoring:
     it('should reject invalid YAML and provide error', () => {
       const yaml = `
 ethereum:
-  chainId: 763373
+  chain: ink-sepolia
   invalid: [
 `;
       expect(() => validateConfigFormat(yaml)).toThrow(ConfigError);

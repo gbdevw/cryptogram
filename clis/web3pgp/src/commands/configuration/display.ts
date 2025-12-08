@@ -47,7 +47,7 @@ export function createConfigDisplayCommand(deps: ConfigDisplayCommandDeps) {
           configPath: options.config as string | undefined,
         });
 
-        cmdLogger.info({ chainId: config.ethereum.chainId }, 'Configuration loaded');
+        cmdLogger.info({ chain: config.ethereum.chain }, 'Configuration loaded');
 
         // Mask sensitive data unless explicitly requested
         const displayConfig =
