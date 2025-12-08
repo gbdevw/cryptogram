@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { Command } from 'commander';
 import { Logger } from 'pino';
 
 /**
@@ -31,14 +32,14 @@ ethereum:
       - url: https://rpc-qnd-sepolia.inkonchain.com
         priority: 2
   
-  wallet:
-    # Wallet configuration (currently only 'private-key' is supported)
-    type: private-key
-    
-    # Private key for signing transactions
-    # WARNING: Store this securely! Better to use the DEXES_WALLET_PRIVATE_KEY env var.
-    # Support for \${VAR_NAME} syntax: privateKey: "\${DEXES_WALLET_PRIVATE_KEY}"
-    # privateKey: "<YOUR_PRIVATE_KEY>"
+  # wallet: (OPTIONAL - required only for signing transactions)
+  #   # Wallet configuration (currently only 'private-key' is supported)
+  #   type: private-key
+  #   
+  #   # Private key for signing transactions
+  #   # WARNING: Store this securely! Better to use the DEXES_WALLET_PRIVATE_KEY env var.
+  #   # Support for \${VAR_NAME} syntax: privateKey: "\${DEXES_WALLET_PRIVATE_KEY}"
+  #   # privateKey: "<YOUR_PRIVATE_KEY>"
 
 web3pgp:
   # Web3PGP smart contract address
@@ -70,29 +71,30 @@ export interface ConfigGenerateCommandDeps {
 /**
  * Create the 'configuration generate' command
  */
-export function createConfigGenerateCommand(deps: ConfigGenerateCommandDeps) {
+export function createConfigGenerateCommand(deps: ConfigGenerateCommandDeps): Command {
   const { logger } = deps;
   const cmdLogger = logger.child({ command: 'configuration.generate' });
 
-  return {
-    description: 'Generate a template configuration file',
-    options: [['--output, -o <path>', 'Output file path (default: stdout)']],
-    async action(options: Record<string, string | boolean | undefined>) {
+  return new Command('generate')
+    .description('Generate a template configuration file')
+    .option('-o, --output <path>', 'Output file path (default: stdout)')
+    .action(async (options: { output?: string }) => {
       try {
         cmdLogger.info('Generating config template');
         const template = generateConfigTemplate();
 
         if (options.output) {
-          fs.writeFileSync(options.output as string, template);
+          fs.writeFileSync(options.output, template);
           cmdLogger.info({ path: options.output }, 'Config template written');
           console.log(`Configuration template written to ${options.output}`);
         } else {
           console.log(template);
         }
+        process.exit(0);
       } catch (error) {
-        cmdLogger.error({ error }, 'Failed to generate config');
+        const msg = error instanceof Error ? error.message : String(error);
+        cmdLogger.error({ error: msg }, 'Failed to generate config');
         process.exit(2);
       }
-    },
-  };
+    });
 }

@@ -34,7 +34,6 @@ async function main(): Promise<void> {
       .name('web3pgp')
       .version('0.1.0', '-v, --version')
       .description('Web3PGP CLI - Decentralized OpenPGP key infrastructure on Ethereum')
-      .option('--config <path>', 'Custom config file path')
       .helpOption('-h, --help', 'Show help');
 
     const blockchainCommands = createBlockchainCommands({ logger, service });

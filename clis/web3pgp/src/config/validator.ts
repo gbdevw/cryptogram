@@ -45,9 +45,6 @@ export function validateYamlStructure(data: unknown): void {
   if (!('chain' in ethereum)) {
     throw new ConfigError('Missing required field: ethereum.chain');
   }
-  if (!('wallet' in ethereum)) {
-    throw new ConfigError('Missing required field: ethereum.wallet');
-  }
 
   // Validate rpc section (optional)
   const rpc = (ethereum as Record<string, unknown>).rpc;
@@ -78,19 +75,21 @@ export function validateYamlStructure(data: unknown): void {
   }
   }
 
-  // Validate wallet section
+  // Validate wallet section (optional - for read-only mode)
   const wallet = (ethereum as Record<string, unknown>).wallet;
-  if (typeof wallet !== 'object' || wallet === null) {
-    throw new ConfigError('ethereum.wallet must be an object');
-  }
-  if (!('type' in wallet)) {
-    throw new ConfigError('Missing required field: ethereum.wallet.type');
-  }
-  const walletType = (wallet as Record<string, unknown>).type;
-  if (walletType !== WalletType.PrivateKey) {
-    throw new ConfigError(
-      `ethereum.wallet.type must be '${WalletType.PrivateKey}', got '${walletType}'`
-    );
+  if (wallet !== undefined) {
+    if (typeof wallet !== 'object' || wallet === null) {
+      throw new ConfigError('ethereum.wallet must be an object');
+    }
+    if (!('type' in wallet)) {
+      throw new ConfigError('Missing required field: ethereum.wallet.type');
+    }
+    const walletType = (wallet as Record<string, unknown>).type;
+    if (walletType !== WalletType.PrivateKey) {
+      throw new ConfigError(
+        `ethereum.wallet.type must be '${WalletType.PrivateKey}', got '${walletType}'`
+      );
+    }
   }
 
   // Validate web3pgp section

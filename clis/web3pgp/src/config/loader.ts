@@ -4,7 +4,7 @@ import { parse as parseYaml } from 'yaml';
 import { ConfigError } from '../errors';
 import { DEFAULT_CONFIG } from './defaults';
 import { validateYamlStructure } from './validator';
-import { MergedConfig } from './types';
+import { MergedConfig, WalletType } from './types';
 
 export interface LoadConfigOptions {
   configPath?: string; // Custom config file path or uses ~/.web3pgp/config.yaml
@@ -165,11 +165,12 @@ function mergeConfigs(...configs: Partial<MergedConfig>[]): MergedConfig {
       if (config.ethereum.rpc?.endpoints) {
         result.ethereum.rpc = { endpoints: config.ethereum.rpc.endpoints };
       }
-      if (config.ethereum.wallet?.privateKey !== undefined) {
-        result.ethereum.wallet.privateKey = config.ethereum.wallet.privateKey;
-      }
-      if (config.ethereum.wallet?.type !== undefined) {
-        result.ethereum.wallet.type = config.ethereum.wallet.type;
+      if (config.ethereum.wallet) {
+        // Wallet can be completely replaced if provided
+        result.ethereum.wallet = {
+          type: config.ethereum.wallet.type || result.ethereum.wallet?.type || WalletType.PrivateKey,
+          privateKey: config.ethereum.wallet.privateKey,
+        };
       }
     }
 

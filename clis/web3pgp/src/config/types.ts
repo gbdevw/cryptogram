@@ -25,7 +25,7 @@ export interface EthereumConfig {
   rpc?: {
     endpoints: RpcEndpoint[];
   };
-  wallet: {
+  wallet?: {
     type: WalletType;
     privateKey?: `0x${string}`; // pragma: allowlist secret
   };

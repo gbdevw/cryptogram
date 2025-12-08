@@ -207,7 +207,7 @@ function createWalletClientIfConfigured(
   const { wallet, chain: chainConfig } = config.ethereum;
 
   // Check if wallet configuration exists
-  if (!wallet.type) {
+  if (!wallet || !wallet.type) {
     logger.debug('No wallet type configured - read-only mode');
     return undefined;
   }

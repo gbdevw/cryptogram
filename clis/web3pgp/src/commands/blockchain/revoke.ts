@@ -74,7 +74,7 @@ export function createRevokeCommand(deps: RevokeDeps): Command {
           fingerprint: fingerprintArg,
           transaction: {
             hash: result.transactionHash,
-            blockNumber: result.blockNumber,
+            blockNumber: result.blockNumber.toString(),
           },
         });
 

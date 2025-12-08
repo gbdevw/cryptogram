@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { Command } from 'commander';
 import { Logger } from 'pino';
 import { validateConfigFormat } from '../../config/validator';
 
@@ -10,18 +11,17 @@ export interface ConfigValidateCommandDeps {
 /**
  * Create the 'configuration validate' command
  */
-export function createConfigValidateCommand(deps: ConfigValidateCommandDeps) {
+export function createConfigValidateCommand(deps: ConfigValidateCommandDeps): Command {
   const { logger } = deps;
   const cmdLogger = logger.child({ command: 'configuration.validate' });
 
-  return {
-    description: 'Validate configuration file format',
-    options: [['--config <path>', 'Config file path (default: ~/.web3pgp/config.yaml)']],
-    action(options: Record<string, string | boolean | undefined>) {
+  return new Command('validate')
+    .description('Validate configuration file format')
+    .option('--config <path>', 'Config file path (default: ~/.web3pgp/config.yaml)')
+    .action((options: { config?: string }) => {
       try {
         const configPath =
-          (options.config as string) ||
-          path.join(process.env.HOME || '~', '.web3pgp', 'config.yaml');
+          options.config || path.join(process.env.HOME || '~', '.web3pgp', 'config.yaml');
 
         cmdLogger.info({ path: configPath }, 'Validating config file');
 
@@ -45,6 +45,5 @@ export function createConfigValidateCommand(deps: ConfigValidateCommandDeps) {
         console.error(`Error: ${message}`);
         process.exit(2);
       }
-    },
-  };
+    });
 }

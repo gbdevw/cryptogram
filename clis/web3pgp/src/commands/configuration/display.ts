@@ -11,7 +11,7 @@ function maskSensitiveData(config: MergedConfig): MergedConfig {
   const masked = JSON.parse(JSON.stringify(config)) as MergedConfig;
 
   // Mask private key: show only first 4 and last 4 chars
-  if (masked.ethereum.wallet.privateKey) {
+  if (masked.ethereum.wallet?.privateKey) {
     const key = masked.ethereum.wallet.privateKey;
     if (key.length > 8) {
       const start = key.substring(0, 4);

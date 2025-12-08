@@ -14,6 +14,7 @@ export interface BlockchainCommandsDeps {
 
 /**
  * Create all blockchain commands as direct subcommands
+ * Excludes listen command (to be added later)
  */
 export function createBlockchainCommands(deps: BlockchainCommandsDeps): Command[] {
   return [
@@ -21,6 +22,6 @@ export function createBlockchainCommands(deps: BlockchainCommandsDeps): Command[
     createRegisterCommand(deps),
     createAddSubkeyCommand(deps),
     createRevokeCommand(deps),
-    createListenCommand(deps),
+    // createListenCommand(deps), // TODO: Add listen command later
   ];
 }

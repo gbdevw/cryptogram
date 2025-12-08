@@ -50,7 +50,7 @@ export function createAddSubkeyCommand(deps: AddSubkeyDeps): Command {
           success: true,
           message: 'Subkey added successfully',
           subkeyFingerprint: subkeyFingerprintArg,
-          transaction: { hash: result.transactionHash, blockNumber: result.blockNumber },
+          transaction: { hash: result.transactionHash, blockNumber: result.blockNumber.toString() },
         });
 
         process.exit(0);

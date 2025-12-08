@@ -12,7 +12,7 @@ export function createGetPublicKeyCommand(deps: GetPublicKeyDeps): Command {
   const { logger, service } = deps;
   const cmdLogger = logger.child({ command: 'blockchain.get-public-key' });
 
-  return new Command('get-public-key')
+  return new Command('get')
     .description('Retrieve a public key from the blockchain by fingerprint')
     .argument('<fingerprint>', 'Key fingerprint')
     .action(async (fingerprintArg: string) => {
