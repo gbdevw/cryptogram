@@ -16,4 +16,11 @@ module.exports = {
       statements: 70,
     },
   },
+  globals: {
+    'ts-jest': {
+      tsconfig: {
+        types: ['jest', 'node'],
+      },
+    },
+  },
 };

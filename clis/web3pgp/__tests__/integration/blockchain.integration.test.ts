@@ -1,3 +1,5 @@
+/// <reference types="jest" />
+/// <reference types="node" />
 import { execSync, spawn } from 'child_process';
 import * as path from 'path';
 import * as openpgp from 'openpgp';
@@ -33,11 +35,12 @@ describe('Web3PGP CLI Integration Tests', () => {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
       return { stdout, stderr: '', code: 0 };
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as { stdout?: string; stderr?: string; status?: number };
       return {
-        stdout: error.stdout ? error.stdout.toString() : '',
-        stderr: error.stderr ? error.stderr.toString() : '',
-        code: error.status || 1,
+        stdout: err.stdout ? err.stdout.toString() : '',
+        stderr: err.stderr ? err.stderr.toString() : '',
+        code: err.status || 1,
       };
     }
   };
@@ -45,10 +48,11 @@ describe('Web3PGP CLI Integration Tests', () => {
   /**
    * Execute a CLI command with stdin input and capture output
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const runCliWithStdin = (
     args: string[],
     stdinData: string
-  ): { stdout: string; stderr: string; code: number } => {
+  ): Promise<{ stdout: string; stderr: string; code: number }> => {
     return new Promise((resolve) => {
       const cwd = path.join(__dirname, '../../');
       const child = spawn('node', ['dist/index.js', ...args], {
@@ -59,22 +63,22 @@ describe('Web3PGP CLI Integration Tests', () => {
       let stdout = '';
       let stderr = '';
 
-      child.stdout.on('data', (data) => {
+      child.stdout?.on('data', (data: Buffer) => {
         stdout += data.toString();
       });
 
-      child.stderr.on('data', (data) => {
+      child.stderr?.on('data', (data: Buffer) => {
         stderr += data.toString();
       });
 
-      child.on('close', (code) => {
+      child.on('close', (code: number | null) => {
         resolve({ stdout, stderr, code: code || 0 });
       });
 
       // Send stdin data and close
-      child.stdin.write(stdinData);
-      child.stdin.end();
-    }) as any; // Type assertion since we're in async context
+      child.stdin?.write(stdinData);
+      child.stdin?.end();
+    });
   };
 
   beforeAll(async () => {
@@ -114,7 +118,7 @@ describe('Web3PGP CLI Integration Tests', () => {
     console.log('✓ CLI built');
 
     console.log('========================================\n');
-  }, 120000); // 2 minute timeout for setup
+  });
 
   afterAll(async () => {
     console.log('Cleaning up Web3PGP CLI Integration Tests');
@@ -209,5 +213,63 @@ describe('Web3PGP CLI Integration Tests', () => {
       const exists = await service.contract.exists(`0x${fingerprint}`);
       expect(exists).toBe(true);
     });
+
+    test('should reject duplicate public key registration', async () => {
+      // Generate a test PGP keypair
+      const keyPair = await openpgp.generateKey({
+        format: 'object',
+        type: 'rsa',
+        rsaBits: 2048,
+        userIDs: [{ name: 'Duplicate User', email: 'duplicateuser@example.com' }],
+      });
+
+      // Extract public key for registration
+      const publicKey = keyPair.publicKey;
+
+      // First registration should succeed
+      const firstReceipt = await service.register(publicKey);
+      expect(firstReceipt.status).toBe('success');
+
+      // Second registration should fail
+      await expect(service.register(publicKey)).rejects.toThrow();
+    });
+
+    test('should reject revoked public key', async () => {
+      // Generate a test PGP keypair
+      const keyPair = await openpgp.generateKey({
+        format: 'object',
+        type: 'rsa',
+        rsaBits: 2048,
+        userIDs: [{ name: 'Revoked User', email: 'revokeduser@example.com' }],
+      });
+
+      // Revoke the key locally
+      const revoked = await openpgp.revokeKey({
+        format: 'object',
+        key: keyPair.privateKey,
+        revocationCertificate: keyPair.revocationCertificate,
+      });
+      expect(await revoked.privateKey.isRevoked()).toBe(true);
+
+      // Attempt to register the revoked key
+      await expect(service.register(revoked.publicKey)).rejects.toThrow();
+    }); 
+
+    test('should reject expired public keys', async () => {
+      // Generate a test PGP keypair
+      const keyPair = await openpgp.generateKey({
+        format: 'object',
+        type: 'rsa',
+        rsaBits: 2048,
+        keyExpirationTime: 1, // Expires in 1 second
+        userIDs: [{ name: 'Revoked User', email: 'revokeduser@example.com' }],
+      });
+
+      // Wait for key to expire
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Attempt to register the revoked key
+      await expect(service.register(keyPair.publicKey)).rejects.toThrow();
+    }); 
   });
 });
