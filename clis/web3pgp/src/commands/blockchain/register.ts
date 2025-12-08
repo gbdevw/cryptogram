@@ -64,7 +64,7 @@ export function createRegisterCommand(deps: RegisterDeps): Command {
           subkeys: publicKey.getSubkeys().map((sk) => sk.getFingerprint()),
           transaction: {
             hash: result.transactionHash,
-            blockNumber: result.blockNumber,
+            blockNumber: result.blockNumber.toString(),
           },
         });
 
