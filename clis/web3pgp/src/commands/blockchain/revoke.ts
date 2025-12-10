@@ -3,6 +3,7 @@ import { Logger } from 'pino';
 import { IWeb3PGPService, to0x } from 'dexes';
 import { outputJson, exitWithError } from '../factory';
 import { readInputFromFile, readInputFromStdin } from '../../utils/input';
+import * as openpgp from 'openpgp';
 
 export interface RevokeDeps {
   logger: Logger;
@@ -26,35 +27,43 @@ export function createRevokeCommand(deps: RevokeDeps): Command {
   return new Command('revoke')
     .arguments('<fingerprint>')
     .description('Revoke a public key on the blockchain')
-    .option('--key <path>', 'Path to revocation certificate or key file')
+    .option('--key <path>', 'Path to armored revocation certificate file')
     .action(async (fingerprintArg: string, options: { key?: string }) => {
       try {
         // Fingerprint is mandatory
         cmdLogger.debug({ fingerprint: fingerprintArg }, 'Processing fingerprint');
 
-        let certificateOrKeyData: string;
+        let keyBuffer: Buffer;
 
         if (options.key) {
-          cmdLogger.info({ path: options.key }, 'Reading certificate/key from file');
-          const keyBuffer = readInputFromFile(options.key);
-          // Convert Buffer to string (SDK will detect format)
-          certificateOrKeyData = keyBuffer.toString('utf-8');
+          cmdLogger.info({ path: options.key }, 'Reading armored revocation certificate from file');
+          keyBuffer = readInputFromFile(options.key);
         } else {
-          cmdLogger.info('Reading certificate/key from stdin');
-          const keyBuffer = await readInputFromStdin();
-          // Convert Buffer to string (SDK will detect format)
-          certificateOrKeyData = keyBuffer.toString('utf-8');
+          cmdLogger.info('Reading armored revocation certificate from stdin');
+          keyBuffer = await readInputFromStdin();
         }
 
-        cmdLogger.info(
-          { fingerprint: fingerprintArg },
-          'Submitting revocation to blockchain'
-        );
+        let keyOrCert: openpgp.Key | string;
+        try {
+          // Try to read as key using binary format first
+          keyOrCert = await openpgp.readKey({ binaryKey: keyBuffer });
+          cmdLogger.debug('Parsed key revocation certificate (binary format) successfully');
+        } catch {
+          // Try to read as key using armored format
+          try {
+            // Using ascii for the toString as we expect armored text here
+            keyOrCert = await openpgp.readKey({ armoredKey: keyBuffer.toString('ascii') });
+            cmdLogger.debug('Parsed revocation certificate (armored format) successfully');
+          } catch {
+            // Cast to string (ascii encoding) because we probably have an armored standalone certificate (sdk service will check)
+            keyOrCert = keyBuffer.toString('ascii');
+            cmdLogger.debug('Parsing input as armored standalone revocation certificate');
+          }
+        }
 
-        // Call revoke with certificate/key data and the fingerprint
-        // SDK handles: validate armored format, extract fingerprint if needed, submit
+        // Call revoke with certificate data and the fingerprint
         const result = await service.revoke(
-          certificateOrKeyData,
+          keyOrCert,
           to0x(fingerprintArg)
         );
 

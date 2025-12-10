@@ -71,3 +71,38 @@ export async function readKeyData(
     }
   }
 }
+
+/**
+ * Try to read a revocation certificate using armor format first, then binary format
+ * Accepts standalone revocation certificates (certificates without key packets)
+ * @param data Buffer or string containing certificate data
+ * @returns Parsed key object
+ */
+export async function readCertificateData(
+  data: Buffer | string
+): Promise<openpgp.PublicKey | openpgp.PrivateKey> {
+  // Convert to string for armor format attempt
+  const dataStr = typeof data === 'string' ? data : data.toString('utf-8');
+  
+  // Try armor format first (preferred) with permissive options for standalone revocation certificates
+  try {
+    return await openpgp.readKey({ 
+      armoredKey: dataStr,
+      config: {
+        allowMissingKeyFlags: true,
+        allowUnauthenticatedMessages: true
+      }
+    });
+  } catch (armorError) {
+    // Fallback to binary format (without special config)
+    try {
+      const binaryData = typeof data === 'string' ? Buffer.from(data, 'binary') : data;
+      return await openpgp.readKey({ binaryKey: binaryData });
+    } catch (binaryError) {
+      throw new Error(
+        `Failed to parse revocation certificate data. ` +
+        `Armor format error: ${armorError instanceof Error ? armorError.message : String(armorError)}`
+      );
+    }
+  }
+}

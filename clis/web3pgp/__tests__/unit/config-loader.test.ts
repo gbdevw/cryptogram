@@ -21,7 +21,8 @@ describe('Configuration Loader', () => {
 
   describe('loadConfig', () => {
     it('should load defaults when no config provided', () => {
-      const config = loadConfig({ configPath: '/nonexistent/path' });
+      // Pass empty env vars to prevent DEXES_LOG_LEVEL override from process.env
+      const config = loadConfig({ configPath: '/nonexistent/path', envVars: {} });
       expect(config.ethereum.chain).toBe('ink-sepolia');
       expect(config.web3pgp.contract).toBe('0x72d02B94317ac899B34459a4e6685eFe12Ac17a8');
       expect(config.monitoring.logging.level).toBe('info');
