@@ -7,6 +7,11 @@ import { LogLevel } from '../types';
 export function createRootLogger(level: LogLevel = 'info'): PinoLogger {
   return pino({
     level,
+    formatters: {
+      level(label) {
+        return { level: label };
+      },
+    },
     transport: {
       target: 'pino/file',
       options: {

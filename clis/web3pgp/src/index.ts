@@ -7,7 +7,16 @@ import { createConfigurationCommands } from './commands/configuration';
 import { ConfigError } from './errors';
 
 async function main(): Promise<void> {
-  const logger = createRootLogger();
+  // Load config first to get logging level
+  // Extract --config option if provided
+  let configPath: string | undefined;
+  const configIndex = process.argv.indexOf('--config');
+  if (configIndex > -1 && configIndex + 1 < process.argv.length) {
+    configPath = process.argv[configIndex + 1];
+  }
+
+  const config = loadConfig({ configPath });
+  const logger = createRootLogger(config.monitoring.logging.level);
   const rootLogger = logger.child({ component: 'cli' });
 
   try {
@@ -15,19 +24,11 @@ async function main(): Promise<void> {
     const isHelp = process.argv.includes('--help') || process.argv.includes('-h');
     const isVersion = process.argv.includes('--version') || process.argv.includes('-v');
 
-    rootLogger.info('Web3PGP CLI starting');
+    rootLogger.debug('Web3PGP CLI starting');
 
-    // Extract --config option if provided
-    let configPath: string | undefined;
-    const configIndex = process.argv.indexOf('--config');
-    if (configIndex > -1 && configIndex + 1 < process.argv.length) {
-      configPath = process.argv[configIndex + 1];
-    }
-
-    const config = loadConfig({ configPath });
     rootLogger.debug('Configuration loaded');
 
-    const service = await createWeb3PGPService(config);
+    const service = await createWeb3PGPService(config, logger);
     rootLogger.debug('Web3PGP service initialized');
 
     const program = new Command()

@@ -12,10 +12,8 @@ import { mainnet, sepolia, foundry, ink, inkSepolia } from 'viem/chains';
 
 import { ChainConfig, MergedConfig } from '../config/types';
 import { ConfigError } from '../errors';
-import { createRootLogger } from '../utils/logger';
+import { createRootLogger, Logger } from '../utils/logger';
 import { IWeb3PGPService, Web3PGP, Web3PGPService } from 'dexes';
-
-const logger = createRootLogger();
 
 /**
  * Map of well-known Viem chain names to chain objects.
@@ -98,10 +96,11 @@ function getChainForConfig(chainConfig: ChainConfig): Chain {
  * 3. Error if chain is unknown and no RPC endpoints provided
  *
  * @param config - Merged configuration
+ * @param logger - Logger instance to use for logging
  * @returns Sorted RPC endpoints by priority
  * @throws ConfigError if no endpoints can be resolved
  */
-function resolveRpcEndpoints(config: MergedConfig): Array<{ url: string; priority: number }> {
+function resolveRpcEndpoints(config: MergedConfig, logger: Logger): Array<{ url: string; priority: number }> {
   const { chain, rpc } = config.ethereum;
 
   // Priority 1: User-provided endpoints
@@ -156,12 +155,12 @@ function resolveRpcEndpoints(config: MergedConfig): Array<{ url: string; priorit
  * Automatically retries failed RPC calls across all configured endpoints.
  * If gasLimit is configured, injects it into simulateContract to skip gas estimation.
  */
-function createPublicClientWithFallback(config: MergedConfig): PublicClient {
+function createPublicClientWithFallback(config: MergedConfig, logger: Logger): PublicClient {
   const { chain: chainConfig } = config.ethereum;
   const chainObj = getChainForConfig(chainConfig);
 
   // Resolve RPC endpoints (user config > predefined defaults > error)
-  const rpcEndpoints = resolveRpcEndpoints(config);
+  const rpcEndpoints = resolveRpcEndpoints(config, logger);
 
   // Sort endpoints by priority (lower priority value = higher priority)
   const sortedEndpoints = [...rpcEndpoints].sort((a, b) => a.priority - b.priority);
@@ -203,6 +202,7 @@ function createPublicClientWithFallback(config: MergedConfig): PublicClient {
  */
 function createWalletClientIfConfigured(
   config: MergedConfig,
+  logger: Logger,
 ): WalletClient | undefined {
   const { wallet, chain: chainConfig } = config.ethereum;
 
@@ -214,7 +214,7 @@ function createWalletClientIfConfigured(
 
   // Check if private key is provided
   if (!wallet.privateKey) {
-    logger.warn('Wallet type set but private key not configured - read-only mode');
+    logger.debug('Wallet type set but private key not configured - read-only mode');
     return undefined;
   }
 
@@ -230,7 +230,7 @@ function createWalletClientIfConfigured(
   const chainObj = getChainForConfig(chainConfig);
 
   // Resolve RPC endpoints (user config > predefined defaults > error)
-  const rpcEndpoints = resolveRpcEndpoints(config);
+  const rpcEndpoints = resolveRpcEndpoints(config, logger);
 
   // Use the primary endpoint for the wallet client
   const sortedEndpoints = [...rpcEndpoints].sort((a, b) => a.priority - b.priority);
@@ -270,18 +270,19 @@ function createWalletClientIfConfigured(
  * Orchestrates Viem client setup, contract initialization, and service creation.
  *
  * @param config - Merged configuration with Ethereum and Web3PGP settings
+ * @param logger - Logger instance to use for logging
  * @returns Promise resolving to IWeb3PGPService instance
  * @throws ConfigError if configuration is invalid
  */
-export async function createWeb3PGPService(config: MergedConfig): Promise<IWeb3PGPService> {
+export async function createWeb3PGPService(config: MergedConfig, logger: Logger): Promise<IWeb3PGPService> {
   logger.debug({ chain: config.ethereum.chain }, 'Initializing Web3PGP service');
 
   try {
     // Step 1: Create PublicClient with RPC fallback
-    const publicClient = createPublicClientWithFallback(config);
+    const publicClient = createPublicClientWithFallback(config, logger);
 
     // Step 2: Create WalletClient if private key configured
-    const walletClient = createWalletClientIfConfigured(config);
+    const walletClient = createWalletClientIfConfigured(config, logger);
 
     // Step 3: Initialize low-level Web3PGP contract wrapper
     const contractAddress = config.web3pgp.contract as `0x${string}`;
@@ -302,7 +303,7 @@ export async function createWeb3PGPService(config: MergedConfig): Promise<IWeb3P
     // Step 4: Create high-level Web3PGP service
     const service = new Web3PGPService(web3pgpContract);
 
-    logger.info(
+    logger.debug(
       {
         chain: config.ethereum.chain,
         contractAddress,
