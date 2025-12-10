@@ -456,7 +456,6 @@ export class Web3PGPService implements IWeb3PGPService {
             if (toBytes32(to0x(pk.getFingerprint())) !== toBytes32(to0x(log.primaryKeyFingerprint))) {
                 throw new Web3PGPServiceValidationError(`The primary key fingerprint ${pk.getFingerprint()} does not match the declared primary key fingerprint ${log.primaryKeyFingerprint} in SubkeyAddedLog event.`);
             }
-            console.debug(`[Web3PGP - Service] Successfully extracted subkey ${log.subkeyFingerprint} for primary key ${log.primaryKeyFingerprint} from SubkeyAddedLog event`);
             return pk.toPublic();
         } catch (err) {
             if (err instanceof Web3PGPServiceValidationError) {
@@ -550,7 +549,7 @@ export class Web3PGPService implements IWeb3PGPService {
                     throw new Web3PGPServiceValidationError(`The primary key with fingerprint ${pk.getFingerprint()} is not revoked as expected in the KeyRevokedLog event.`);
                 }
                 // Return the revoked key and no standalone revocation certificate
-                console.debug(`[Web3PGP - Service] Successfully extracted revoked primary key ${log.fingerprint} from KeyRevokedLog event`);
+                console.debug(`[Web3PGP - Service] Successfully extracted revocation for primary key ${log.fingerprint} from KeyRevokedLog event`);
                 return [pk.toPublic(), undefined];
             } else {
                 // Sanitize to keep only the target subkey - Will throw an error if not found
@@ -560,7 +559,7 @@ export class Web3PGPService implements IWeb3PGPService {
                     throw new Web3PGPServiceValidationError(`The subkey with fingerprint ${log.fingerprint} is not revoked as expected in the KeyRevokedLog event.`);
                 }
                 // Return the revoked key and no standalone revocation certificate
-                console.debug(`[Web3PGP - Service] Successfully extracted revoked subkey ${log.fingerprint} from KeyRevokedLog event`);
+                console.debug(`[Web3PGP - Service] Successfully extracted revocation for subkey ${log.fingerprint} from KeyRevokedLog event`);
                 return [pk.toPublic(), undefined];
             }
         } catch (err) {
@@ -592,7 +591,6 @@ export class Web3PGPService implements IWeb3PGPService {
         // 1. Get the publication block number of the target key and its parent if any
         const normalizedFingerprint = toBytes32(to0x(fingerprint));
         console.debug(`[Web3PGP - Service] Retrieving public key for fingerprint: ${normalizedFingerprint}`);
-        
         const [publicationBlock, parent] = await Promise.allSettled([
             this.web3pgp.getKeyPublicationBlock(normalizedFingerprint),
             this.web3pgp.parentOf(normalizedFingerprint)
@@ -624,7 +622,7 @@ export class Web3PGPService implements IWeb3PGPService {
             return await this.getPublicKey(parentFingerprint);
         } else {
             // This is a primary key - download it from chain
-            console.debug(`[Web3PGP - Service] Key ${normalizedFingerprint} is a primary key, downloading from chain`);
+            console.debug(`[Web3PGP - Service] Key ${normalizedFingerprint} is a primary key`);
             primaryKey = await this.getPrimaryPublicKey(normalizedFingerprint, publicationBlockNumber);
         }
 
@@ -633,11 +631,11 @@ export class Web3PGPService implements IWeb3PGPService {
         primaryKey = await this.importAddedSubkeys(primaryKey);
 
         // 4. Import and apply revocation certificates to the key and its subkeys
-        console.debug(`[Web3PGP - Service] Importing and applying revocations for primary key ${primaryKey.getFingerprint()}`);
+        console.debug(`[Web3PGP - Service] Importing and applying revocations to primary key ${primaryKey.getFingerprint()} and its ${primaryKey.getSubkeys().length} subkeys`);
         primaryKey = await this.importAndApplyRevocations(primaryKey);
 
         // 5. Return the reconstructed public key
-        console.debug(`[Web3PGP - Service] Successfully retrieved and reconstructed public key ${normalizedFingerprint}`);
+        console.debug(`[Web3PGP - Service] Successfully retrieved and reconstructed the public key`);
         return primaryKey;
     }
 
@@ -652,6 +650,7 @@ export class Web3PGPService implements IWeb3PGPService {
         console.debug(`[Web3PGP - Service] Fetching KeyRegistered log for ${primaryKeyFingerprint} at block ${blockNumber}`);
         const normalizedPrimaryKeyFingerprint = toBytes32(to0x(primaryKeyFingerprint));
         const registration = await this.web3pgp.getKeyRegisteredLog(normalizedPrimaryKeyFingerprint, blockNumber);
+        console.debug(`[Web3PGP - Service] KeyRegistered log found for key ${primaryKeyFingerprint} at block ${blockNumber} in transaction ${registration.transactionHash}`);
         // Extract the key data from the log
         const primaryKey = await this.extractFromKeyRegisteredLog(registration);
         return primaryKey.toPublic();
@@ -666,16 +665,18 @@ export class Web3PGPService implements IWeb3PGPService {
         // List subkeys related to the primary key
         const normalizedFingerprint = toBytes32(to0x(primaryKey.getFingerprint()));
         let copyPk = primaryKey.toPublic();
+        console.debug(`[Web3PGP - Service] Listing declared subkeys for primary key ${normalizedFingerprint}`);
         const declaredSubkeys = await this.fetchAllPaginated(
             (start, limit) => this.web3pgp.listSubkeys(normalizedFingerprint, start, limit)
         );
+        console.debug(`[Web3PGP - Service] Found ${declaredSubkeys.length} declared subkeys for primary key ${normalizedFingerprint}`);
         
         // Remove subkeys from declaredSubkeys that are already in primaryKey
         const existingSubkeyFingerprints = new Set(primaryKey.subkeys.map(sk => toBytes32(to0x(sk.getFingerprint()))));
         const subkeysToImport = declaredSubkeys.filter(skFp => !existingSubkeyFingerprints.has(skFp));
         
         // Get the list of block numbers where the remaining subkeys were added
-        console.debug(`[Web3PGP - Service] Listing block numbers with subkeys added to primary key ${normalizedFingerprint}`);
+        console.debug(`[Web3PGP - Service] Listing blocks with subkeys added to primary key ${normalizedFingerprint}`);
         const subkeyBlockNumbers = await this.web3pgp.getKeyPublicationBlockBatch(subkeysToImport);
         // Merge both arrays to create tuples of (subkeyFingerprint, blockNumber)
         const subkeysWithBlocks: Array<{ subkeyFingerprint: `0x${string}`, blockNumber: bigint }> = subkeysToImport.map((skFp, index) => ({
@@ -683,13 +684,13 @@ export class Web3PGPService implements IWeb3PGPService {
             blockNumber: subkeyBlockNumbers[index]!
         }));
         // Import and verify each subkey
-        console.debug(`[Web3PGP - Service] Importing ${subkeysToImport.length} subkeys for primary key ${normalizedFingerprint}`);
         const importedSubkeys = await Promise.allSettled(
             subkeysWithBlocks.map(({ subkeyFingerprint, blockNumber }) => {
                 return this.concurrencyLimit(async () => {
                     // Retrieve the subkey data from the blockchain
                     console.debug(`[Web3PGP - Service] Fetching SubkeyAdded log for subkey ${subkeyFingerprint} at block ${blockNumber}`);
                     const subkeyData = await this.web3pgp.getSubkeyAddedLog(normalizedFingerprint, subkeyFingerprint, blockNumber);
+                    console.debug(`[Web3PGP - Service] SubkeyAdded log found for subkey ${subkeyFingerprint} at block ${blockNumber} in transaction ${subkeyData.transactionHash}`);
                     // Extract and validate the subkey
                     const subkey = await this.extractFromSubkeyAddedLog(subkeyData);
                     return subkey.toPublic();
@@ -711,7 +712,7 @@ export class Web3PGPService implements IWeb3PGPService {
             }
         }
         // Return the updated primary key with imported subkeys
-        console.debug(`[Web3PGP - Service] Successfully imported ${subkeysToImport.length} subkeys for ${normalizedFingerprint}`);
+        console.debug(`[Web3PGP - Service] Successfully imported ${subkeysToImport.length} subkeys in key ${normalizedFingerprint}`);
         return copyPk;
     }
 
@@ -725,7 +726,7 @@ export class Web3PGPService implements IWeb3PGPService {
         const normalizedFingerprint = toBytes32(to0x(primaryKey.getFingerprint()));
         let copyPk = primaryKey.toPublic();
         const allFingerprints = OpenPGPUtils.listAllFingerprints(copyPk).map(fp => toBytes32(to0x(fp)));
-        console.debug(`[Web3PGP - Service] Checking revocations for key ${normalizedFingerprint} and its ${allFingerprints.length - 1} subkeys`);
+        console.debug(`[Web3PGP - Service] Checking revocations for key ${normalizedFingerprint} and its ${primaryKey.getSubkeys().length} subkeys`);
         const revocationBlocksPromises = Promise.allSettled(
             allFingerprints.map((fp) => {
                 return this.concurrencyLimit(async () => {
@@ -753,7 +754,7 @@ export class Web3PGPService implements IWeb3PGPService {
             uniqueRevocationBlocks.map((blockNumber) => {
                 return this.concurrencyLimit(async () => {
                     // Search for revocation logs in this block for all fingerprints
-                    console.debug(`[Web3PGP - Service] Fetching KeyRevoked logs for fingerprints at block ${blockNumber}`);
+                    console.debug(`[Web3PGP - Service] Fetching KeyRevoked logs for the key and its subkeys at block ${blockNumber}`);
                     const revocationLog = await this.web3pgp.searchKeyRevokedLogs(allFingerprints, blockNumber, blockNumber);
                     // Extract the key/certificate from each log
                     let validRevokedKeys: openpgp.PublicKey[] = [];
@@ -761,6 +762,7 @@ export class Web3PGPService implements IWeb3PGPService {
                         try {
                             console.debug(`[Web3PGP - Service] Processing revocation log for fingerprint ${log.fingerprint} at block ${blockNumber}`);
                             const [revokedKey, cert] = await this.extractFromKeyRevokedLog(log); 
+                            console.debug(`[Web3PGP - Service] Successfully extracted revocation data for fingerprint ${log.fingerprint} at block ${blockNumber} in transaction ${log.transactionHash}`);
                             if (revokedKey) {
                                 validRevokedKeys.push(revokedKey);
                             } else {
@@ -794,7 +796,7 @@ export class Web3PGPService implements IWeb3PGPService {
             }
         }
         // Return the updated primary key with revocations applied
-        console.debug(`[Web3PGP - Service] Successfully applied revocations for ${normalizedFingerprint}`);
+        console.debug(`[Web3PGP - Service] Successfully applied revocations to key ${normalizedFingerprint} and its subkeys`);
         return copyPk;
     }
 
