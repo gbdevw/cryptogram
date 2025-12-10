@@ -619,9 +619,9 @@ export class Web3PGPService implements IWeb3PGPService {
         // 2. Get the primary key and verify it
         let primaryKey: openpgp.PublicKey;
         if (parentFingerprint !== BYTES32_ZERO) {
-            // This is a subkey, retrieve the parent key to reconstruct the full key
+            // This is a subkey, retrieve the parent key and return the reconstructed full key
             console.debug(`[Web3PGP - Service] Key ${normalizedFingerprint} is a subkey, retrieving parent key to reconstruct full key`);
-            primaryKey = await this.getPublicKey(parentFingerprint);
+            return await this.getPublicKey(parentFingerprint);
         } else {
             // This is a primary key - download it from chain
             console.debug(`[Web3PGP - Service] Key ${normalizedFingerprint} is a primary key, downloading from chain`);
