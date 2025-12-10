@@ -11,11 +11,13 @@ export interface RevokeDeps {
 
 /**
  * Revoke a key on the blockchain
- * Usage: web3pgp revoke <fingerprint> [--key <path> | --stdin]
+ * Usage: web3pgp revoke <fingerprint> [--key <path>]
+ *        cat revocation.cert | web3pgp revoke <fingerprint>
  *
  * Both fingerprint and revocation certificate/key data are mandatory.
  * The fingerprint specifies which key (primary or subkey) to revoke.
  * The certificate/key data is the revocation certificate or key to revoke.
+ * Key data can be provided via --key flag or stdin (stdin is default).
  */
 export function createRevokeCommand(deps: RevokeDeps): Command {
   const { logger, service } = deps;
@@ -24,17 +26,11 @@ export function createRevokeCommand(deps: RevokeDeps): Command {
   return new Command('revoke')
     .arguments('<fingerprint>')
     .description('Revoke a public key on the blockchain')
-    .option('--key <path>', 'Path to revocation certificate or key')
-    .option('--stdin', 'Read revocation certificate or key from stdin')
-    .action(async (fingerprintArg: string, options: { key?: string; stdin?: boolean }) => {
+    .option('--key <path>', 'Path to revocation certificate or key file')
+    .action(async (fingerprintArg: string, options: { key?: string }) => {
       try {
         // Fingerprint is mandatory
         cmdLogger.debug({ fingerprint: fingerprintArg }, 'Processing fingerprint');
-
-        // Certificate/key data is mandatory (must provide --key or --stdin)
-        if (!options.key && !options.stdin) {
-          throw new Error('Must provide revocation certificate/key via --key <path> or --stdin');
-        }
 
         let certificateOrKeyData: string;
 

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import * as openpgp from 'openpgp';
 
 /**
  * Read input from a file
@@ -40,4 +41,29 @@ export async function readInputFromStdin(timeoutMs: number = 30000): Promise<str
       reject(error);
     });
   });
+}
+
+/**
+ * Try to read a key in armored format first, then binary format
+ * Returns the parsed key object
+ */
+export async function readKeyData(
+  data: string
+): Promise<openpgp.PublicKey | openpgp.PrivateKey> {
+  // Try armored format first
+  try {
+    return await openpgp.readKey({ armoredKey: data });
+  } catch (armoredError) {
+    // If armored fails, try binary format
+    try {
+      const binaryData = Buffer.from(data, 'binary');
+      return await openpgp.readKey({ binaryKey: binaryData });
+    } catch (binaryError) {
+      // Both formats failed, throw a helpful error
+      throw new Error(
+        `Failed to parse key data as either armored or binary format. ` +
+        `Armored error: ${armoredError instanceof Error ? armoredError.message : String(armoredError)}`
+      );
+    }
+  }
 }

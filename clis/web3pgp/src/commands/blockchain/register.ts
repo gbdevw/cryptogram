@@ -3,7 +3,7 @@ import { Logger } from 'pino';
 import { IWeb3PGPService } from 'dexes';
 import * as openpgp from 'openpgp';
 import { outputJson, exitWithError } from '../factory';
-import { readInputFromFile, readInputFromStdin } from '../../utils/input';
+import { readInputFromFile, readInputFromStdin, readKeyData } from '../../utils/input';
 
 export interface RegisterDeps {
   logger: Logger;
@@ -12,7 +12,7 @@ export interface RegisterDeps {
 
 /**
  * Register a public key on the blockchain
- * Usage: web3pgp blockchain register --key <path> | --stdin
+ * Usage: web3pgp register --key <path> | read from stdin
  */
 export function createRegisterCommand(deps: RegisterDeps): Command {
   const { logger, service } = deps;
@@ -20,28 +20,25 @@ export function createRegisterCommand(deps: RegisterDeps): Command {
 
   return new Command('register')
     .description('Register a public key on the blockchain')
-    .option('--key <path>', 'Path to armored PGP public key file')
-    .option('--stdin', 'Read armored PGP public key from stdin')
-    .action(async (options: { key?: string; stdin?: boolean }) => {
+    .option('--key <path>', 'Path to PGP public key file (armored or binary)')
+    .action(async (options: { key?: string }) => {
       try {
-        let armoredKey: string;
+        let keyData: string;
 
-        // Read input from file or stdin
+        // Read input from file or stdin (stdin is default/fallback)
         if (options.key) {
           cmdLogger.info({ path: options.key }, 'Reading PGP key from file');
-          armoredKey = readInputFromFile(options.key);
-        } else if (options.stdin) {
-          cmdLogger.info('Reading PGP key from stdin');
-          armoredKey = await readInputFromStdin();
+          keyData = readInputFromFile(options.key);
         } else {
-          throw new Error('Must provide either --key <path> or --stdin');
+          cmdLogger.info('Reading PGP key from stdin');
+          keyData = await readInputFromStdin();
         }
 
-        cmdLogger.debug({ keyLength: armoredKey.length }, 'Key data received');
+        cmdLogger.debug({ keyLength: keyData.length }, 'Key data received');
 
-        // Parse armored key
+        // Parse key - tries armored format first, then binary
         cmdLogger.info('Parsing and validating PGP key');
-        const publicKey = await openpgp.readKey({ armoredKey });
+        const publicKey = (await readKeyData(keyData)) as openpgp.PublicKey;
 
         cmdLogger.debug({ fingerprint: publicKey.getFingerprint() }, 'Key parsed successfully');
 

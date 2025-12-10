@@ -3,7 +3,7 @@ import { Logger } from 'pino';
 import { IWeb3PGPService, to0x } from 'dexes';
 import * as openpgp from 'openpgp';
 import { outputJson, exitWithError } from '../factory';
-import { readInputFromFile, readInputFromStdin } from '../../utils/input';
+import { readInputFromFile, readInputFromStdin, readKeyData } from '../../utils/input';
 
 export interface AddSubkeyDeps {
   logger: Logger;
@@ -17,31 +17,25 @@ export function createAddSubkeyCommand(deps: AddSubkeyDeps): Command {
   return new Command('add-subkey')
     .arguments('<subkeyFingerprint>')
     .description('Add a subkey to an existing key on the blockchain')
-    .option('--key <path>', 'Path to armored PGP key file containing the subkey')
-    .option('--stdin', 'Read armored PGP key from stdin')
-    .action(async (subkeyFingerprintArg: string, options: { key?: string; stdin?: boolean }) => {
+    .option('--key <path>', 'Path to PGP key file containing the subkey (armored or binary)')
+    .action(async (subkeyFingerprintArg: string, options: { key?: string }) => {
       try {
         // Subkey fingerprint is mandatory
         cmdLogger.debug({ subkeyFingerprint: subkeyFingerprintArg }, 'Processing subkey fingerprint');
 
-        // Key data is mandatory (must provide --key or --stdin)
-        if (!options.key && !options.stdin) {
-          throw new Error('Must provide armored key via --key <path> or --stdin');
-        }
-
-        let armoredKey: string;
+        let keyData: string;
         if (options.key) {
           cmdLogger.info({ path: options.key }, 'Reading key from file');
-          armoredKey = readInputFromFile(options.key);
+          keyData = readInputFromFile(options.key);
         } else {
           cmdLogger.info('Reading key from stdin');
-          armoredKey = await readInputFromStdin();
+          keyData = await readInputFromStdin();
         }
 
-        cmdLogger.debug({ dataLength: armoredKey.length }, 'Key data received');
+        cmdLogger.debug({ dataLength: keyData.length }, 'Key data received');
 
-        // Parse the key (contains the subkey we want to add)
-        const key = await openpgp.readKey({ armoredKey });
+        // Parse the key - tries armored format first, then binary
+        const key = (await readKeyData(keyData)) as openpgp.PublicKey;
 
         cmdLogger.info({ subkeyFingerprint: subkeyFingerprintArg }, 'Adding subkey to blockchain');
         const result = await service.addSubkey(key, to0x(subkeyFingerprintArg));

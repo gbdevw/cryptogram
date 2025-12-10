@@ -669,11 +669,11 @@ export class Web3PGPService implements IWeb3PGPService {
         const declaredSubkeys = await this.fetchAllPaginated(
             (start, limit) => this.web3pgp.listSubkeys(normalizedFingerprint, start, limit)
         );
-        console.debug(`[Web3PGP - Service] Found ${declaredSubkeys.length} declared subkeys for primary key ${normalizedFingerprint}`);
         
         // Remove subkeys from declaredSubkeys that are already in primaryKey
         const existingSubkeyFingerprints = new Set(primaryKey.subkeys.map(sk => toBytes32(to0x(sk.getFingerprint()))));
         const subkeysToImport = declaredSubkeys.filter(skFp => !existingSubkeyFingerprints.has(skFp));
+        console.debug(`[Web3PGP - Service] Found ${subkeysToImport.length} additional subkeys for primary key ${normalizedFingerprint}`);
         
         // Get the list of block numbers where the remaining subkeys were added
         console.debug(`[Web3PGP - Service] Listing blocks with subkeys added to primary key ${normalizedFingerprint}`);
@@ -712,7 +712,7 @@ export class Web3PGPService implements IWeb3PGPService {
             }
         }
         // Return the updated primary key with imported subkeys
-        console.debug(`[Web3PGP - Service] Successfully imported ${subkeysToImport.length} subkeys in key ${normalizedFingerprint}`);
+        console.debug(`[Web3PGP - Service] Successfully imported ${subkeysToImport.length} additional subkeys in key ${normalizedFingerprint}`);
         return copyPk;
     }
 
