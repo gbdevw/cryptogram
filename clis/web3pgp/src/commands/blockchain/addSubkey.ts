@@ -23,7 +23,7 @@ export function createAddSubkeyCommand(deps: AddSubkeyDeps): Command {
         // Subkey fingerprint is mandatory
         cmdLogger.debug({ subkeyFingerprint: subkeyFingerprintArg }, 'Processing subkey fingerprint');
 
-        let keyData: string;
+        let keyData: Buffer | string;
         if (options.key) {
           cmdLogger.info({ path: options.key }, 'Reading key from file');
           keyData = readInputFromFile(options.key);

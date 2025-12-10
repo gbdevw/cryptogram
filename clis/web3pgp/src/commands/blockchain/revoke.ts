@@ -36,10 +36,14 @@ export function createRevokeCommand(deps: RevokeDeps): Command {
 
         if (options.key) {
           cmdLogger.info({ path: options.key }, 'Reading certificate/key from file');
-          certificateOrKeyData = readInputFromFile(options.key);
+          const keyBuffer = readInputFromFile(options.key);
+          // Convert Buffer to string (SDK will detect format)
+          certificateOrKeyData = keyBuffer.toString('utf-8');
         } else {
           cmdLogger.info('Reading certificate/key from stdin');
-          certificateOrKeyData = await readInputFromStdin();
+          const keyBuffer = await readInputFromStdin();
+          // Convert Buffer to string (SDK will detect format)
+          certificateOrKeyData = keyBuffer.toString('utf-8');
         }
 
         cmdLogger.info(

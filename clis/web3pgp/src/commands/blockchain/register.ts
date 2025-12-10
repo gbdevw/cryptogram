@@ -23,9 +23,9 @@ export function createRegisterCommand(deps: RegisterDeps): Command {
     .option('--key <path>', 'Path to PGP public key file (armored or binary)')
     .action(async (options: { key?: string }) => {
       try {
-        let keyData: string;
+        let keyData: Buffer | string;
 
-        // Read input from file or stdin (stdin is default/fallback)
+        // Determine source and read input
         if (options.key) {
           cmdLogger.info({ path: options.key }, 'Reading PGP key from file');
           keyData = readInputFromFile(options.key);
@@ -34,9 +34,9 @@ export function createRegisterCommand(deps: RegisterDeps): Command {
           keyData = await readInputFromStdin();
         }
 
-        cmdLogger.debug({ keyLength: keyData.length }, 'Key data received');
+        cmdLogger.debug({ dataLength: keyData.length }, 'Key data received');
 
-        // Parse key - tries armored format first, then binary
+        // Parse key - tries armor format first, then binary
         cmdLogger.info('Parsing and validating PGP key');
         const publicKey = (await readKeyData(keyData)) as openpgp.PublicKey;
 
