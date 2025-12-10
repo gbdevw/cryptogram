@@ -20,10 +20,6 @@ async function main(): Promise<void> {
   const rootLogger = logger.child({ component: 'cli' });
 
   try {
-    // Check if user is asking for help or version before loading config
-    const isHelp = process.argv.includes('--help') || process.argv.includes('-h');
-    const isVersion = process.argv.includes('--version') || process.argv.includes('-v');
-
     rootLogger.debug('Web3PGP CLI starting');
 
     rootLogger.debug('Configuration loaded');
