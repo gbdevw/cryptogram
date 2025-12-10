@@ -124,7 +124,7 @@ monitoring:
         },
       });
 
-      expect(config.ethereum.wallet.privateKey).toBe(
+      expect(config.ethereum.wallet?.privateKey).toBe(
         '0x1234567890123456789012345678901234567890123456789012345678901234'
       );
     });
@@ -167,7 +167,7 @@ monitoring:
         },
       });
 
-      expect(config.ethereum.wallet.privateKey).toBe(
+      expect(config.ethereum.wallet?.privateKey).toBe(
         '0xABCD1234ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234'
       );
     });

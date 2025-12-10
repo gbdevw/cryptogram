@@ -32,7 +32,7 @@ export interface ConfigDisplayCommandDeps {
  */
 export function createConfigDisplayCommand(deps: ConfigDisplayCommandDeps): Command {
   const { logger } = deps;
-  const cmdLogger = logger.child({ command: 'configuration.display' });
+  const cmdLogger = logger.child({ command: 'display' });
 
   return new Command('display')
     .description('Display the current configuration (merged from all sources)')

@@ -3,6 +3,7 @@ import { MergedConfig } from '../../../src/config/types';
 import { ConfigError } from '../../../src/errors';
 import { DEFAULT_CONFIG } from '../../../src/config/defaults';
 import { WalletType } from '../../../src/config/types';
+import { createMockLogger } from '../../jest.setup';
 
 /**
  * Mock Web3PGP service
@@ -20,11 +21,13 @@ jest.mock('dexes', () => ({
 }));
 
 describe('Web3PGPServiceFactory', () => {
+  const mockLogger = createMockLogger();
+
   describe('createWeb3PGPService', () => {
     it('should create service with valid config containing default RPC endpoints', async () => {
       const config = { ...DEFAULT_CONFIG };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
 
       expect(service).toBeDefined();
       expect(service).toHaveProperty('contract');
@@ -40,8 +43,8 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      await expect(createWeb3PGPService(config)).rejects.toThrow(ConfigError);
-      await expect(createWeb3PGPService(config)).rejects.toThrow(
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow(ConfigError);
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow(
         'No RPC endpoints available',
       );
     });
@@ -56,8 +59,8 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      await expect(createWeb3PGPService(config)).rejects.toThrow(ConfigError);
-      await expect(createWeb3PGPService(config)).rejects.toThrow('No RPC endpoints available');
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow(ConfigError);
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow('No RPC endpoints available');
     });
 
     it('should create service in read-only mode when wallet type not configured', async () => {
@@ -71,7 +74,7 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
 
       expect(service).toBeDefined();
       // Service should be created but without wallet client
@@ -91,7 +94,7 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
 
       expect(service).toBeDefined();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -110,7 +113,7 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
 
       expect(service).toBeDefined();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,8 +132,8 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      await expect(createWeb3PGPService(config)).rejects.toThrow(ConfigError);
-      await expect(createWeb3PGPService(config)).rejects.toThrow('start with "0x"');
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow(ConfigError);
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow('start with "0x"');
     });
 
     it('should throw ConfigError when private key has wrong length', async () => {
@@ -145,8 +148,8 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      await expect(createWeb3PGPService(config)).rejects.toThrow(ConfigError);
-      await expect(createWeb3PGPService(config)).rejects.toThrow('exactly 64 hex characters');
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow(ConfigError);
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow('exactly 64 hex characters');
     });
 
     it('should throw ConfigError when private key contains non-hex characters', async () => {
@@ -161,8 +164,8 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      await expect(createWeb3PGPService(config)).rejects.toThrow(ConfigError);
-      await expect(createWeb3PGPService(config)).rejects.toThrow('0x-prefixed hex string');
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow(ConfigError);
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow('0x-prefixed hex string');
     });
 
     it('should throw ConfigError when contract address format is invalid (no 0x)', async () => {
@@ -173,8 +176,8 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      await expect(createWeb3PGPService(config)).rejects.toThrow(ConfigError);
-      await expect(createWeb3PGPService(config)).rejects.toThrow('Invalid contract address format');
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow(ConfigError);
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow('Invalid contract address format');
     });
 
     it('should throw ConfigError when contract address format is invalid (wrong length)', async () => {
@@ -185,8 +188,8 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      await expect(createWeb3PGPService(config)).rejects.toThrow(ConfigError);
-      await expect(createWeb3PGPService(config)).rejects.toThrow('Invalid contract address format');
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow(ConfigError);
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow('Invalid contract address format');
     });
 
     it('should create service with valid contract address', async () => {
@@ -197,7 +200,7 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
 
       expect(service).toBeDefined();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -219,7 +222,7 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
 
       expect(service).toBeDefined();
       // Service should be created with endpoints ordered by priority
@@ -237,7 +240,7 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
 
       expect(service).toBeDefined();
     });
@@ -254,7 +257,7 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
 
       expect(service).toBeDefined();
     });
@@ -271,7 +274,7 @@ describe('Web3PGPServiceFactory', () => {
         monitoring: { logging: { level: 'info' } },
       } as unknown as MergedConfig;
 
-      await expect(createWeb3PGPService(config)).rejects.toThrow(ConfigError);
+      await expect(createWeb3PGPService(config, mockLogger as any)).rejects.toThrow(ConfigError);
     });
   });
 
@@ -288,7 +291,7 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
       expect(service).toBeDefined();
     });
 
@@ -304,7 +307,7 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
       expect(service).toBeDefined();
     });
 
@@ -320,7 +323,7 @@ describe('Web3PGPServiceFactory', () => {
         },
       };
 
-      const service = await createWeb3PGPService(config);
+      const service = await createWeb3PGPService(config, mockLogger as any);
       expect(service).toBeDefined();
     });
   });

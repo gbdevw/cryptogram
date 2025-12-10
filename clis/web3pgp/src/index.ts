@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { initializeConsolePatch } from './setup';
 import { createRootLogger } from './utils/logger';
 import { loadConfig } from './config/loader';
 import { createWeb3PGPService } from './services/web3pgpServiceFactory';
@@ -18,6 +19,9 @@ async function main(): Promise<void> {
   const config = loadConfig({ configPath });
   const logger = createRootLogger(config.monitoring.logging.level);
   const rootLogger = logger.child({ component: 'cli' });
+
+  // Initialize console patching to capture SDK logs
+  initializeConsolePatch(logger);
 
   try {
     rootLogger.debug('Web3PGP CLI starting');

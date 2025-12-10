@@ -16,7 +16,7 @@ export interface RegisterDeps {
  */
 export function createRegisterCommand(deps: RegisterDeps): Command {
   const { logger, service } = deps;
-  const cmdLogger = logger.child({ command: 'blockchain.register' });
+  const cmdLogger = logger.child({ command: 'register' });
 
   return new Command('register')
     .description('Register a public key on the blockchain')

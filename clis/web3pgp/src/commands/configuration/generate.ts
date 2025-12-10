@@ -73,7 +73,7 @@ export interface ConfigGenerateCommandDeps {
  */
 export function createConfigGenerateCommand(deps: ConfigGenerateCommandDeps): Command {
   const { logger } = deps;
-  const cmdLogger = logger.child({ command: 'configuration.generate' });
+  const cmdLogger = logger.child({ command: 'generate' });
 
   return new Command('generate')
     .description('Generate a template configuration file')

@@ -13,7 +13,7 @@ export interface ConfigValidateCommandDeps {
  */
 export function createConfigValidateCommand(deps: ConfigValidateCommandDeps): Command {
   const { logger } = deps;
-  const cmdLogger = logger.child({ command: 'configuration.validate' });
+  const cmdLogger = logger.child({ command: 'validate' });
 
   return new Command('validate')
     .description('Validate configuration file format')

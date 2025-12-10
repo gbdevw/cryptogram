@@ -12,7 +12,7 @@ export interface AddSubkeyDeps {
 
 export function createAddSubkeyCommand(deps: AddSubkeyDeps): Command {
   const { logger, service } = deps;
-  const cmdLogger = logger.child({ command: 'blockchain.add-subkey' });
+  const cmdLogger = logger.child({ command: 'add-subkey' });
 
   return new Command('add-subkey')
     .arguments('<subkeyFingerprint>')

@@ -11,7 +11,7 @@ export interface ListenDeps {
 
 export function createListenCommand(deps: ListenDeps): Command {
   const { logger } = deps;
-  const cmdLogger = logger.child({ command: 'blockchain.listen' });
+  const cmdLogger = logger.child({ command: 'listen' });
 
   return new Command('listen')
     .description('Listen for blockchain events (placeholder - event support TBD)')

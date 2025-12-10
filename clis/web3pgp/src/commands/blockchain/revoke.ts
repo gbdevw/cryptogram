@@ -19,7 +19,7 @@ export interface RevokeDeps {
  */
 export function createRevokeCommand(deps: RevokeDeps): Command {
   const { logger, service } = deps;
-  const cmdLogger = logger.child({ command: 'blockchain.revoke' });
+  const cmdLogger = logger.child({ command: 'revoke' });
 
   return new Command('revoke')
     .arguments('<fingerprint>')
