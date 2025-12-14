@@ -166,6 +166,16 @@ export interface IWeb3PGP extends IFlatFee {
     searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRevokedLog[]>;
 
     /**
+     * Synchronize key-related (KeyRegistered, SubkeyAdded, KeyRevoked) events from the blockchain within the specified
+     * block range.
+     * 
+     * @param fromBlock Starting block number (inclusive). Defaults to 0 if not provided.
+     * @param toBlock Ending block number (inclusive). Defaults to the latest block if not provided.
+     * @return An array of key-related event logs (KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog).
+     */
+    synchronizeKeyEvents(fromBlock?: bigint, toBlock?: bigint): Promise<KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog[]>;
+
+    /**
      * Extracts KeyRegisteredLog entries from a transaction receipt.
      * @param receipt The transaction receipt to extract logs from.
      * @return The list of KeyRegisteredLog extracted from the receipt.
@@ -185,4 +195,14 @@ export interface IWeb3PGP extends IFlatFee {
      * @return The list of KeyRevokedLog extracted from the receipt.
      */
     extractKeyRevokedLog(receipt: TransactionReceipt): Promise<KeyRevokedLog[]>;
+
+    /*****************************************************************************************************************/
+    /* UTILITY FUNCTIONS                                                                                             */
+    /*****************************************************************************************************************/
+
+    /**
+     * Get the current block number of the connected blockchain.
+     * @return The current block number as a bigint.
+     */
+    getBlockNumber(): Promise<bigint>;
 }
