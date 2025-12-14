@@ -166,14 +166,14 @@ export interface IWeb3PGP extends IFlatFee {
     searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRevokedLog[]>;
 
     /**
-     * Search key-related (KeyRegistered, SubkeyAdded, KeyRevoked) events from the blockchain within the specified
+     * Searches for all key-related events (KeyRegistered, SubkeyAdded, KeyRevoked) within a specified
      * block range.
      * 
      * @param fromBlock Starting block number (inclusive). Defaults to 'earliest' if not provided. 'pending' is not allowed.
      * @param toBlock Ending block number (inclusive). Defaults to 'latest' if not provided. 'pending' is not allowed.
      * @return An array of key-related event logs (KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog).
      */
-    searchKeyEvents(fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog[]>;
+    searchKeyEvents(fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<(KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog)[]>;
 
     /**
      * Extracts KeyRegisteredLog entries from a transaction receipt.

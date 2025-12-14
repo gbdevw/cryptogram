@@ -2,6 +2,7 @@ import { getBlockTimestamp } from '../src/utils/viemutils';
 import { Web3PGP } from '../src/web3pgp/web3pgp';
 import { AnvilHelper } from './helpers/anvil.helper';
 import { Address } from 'viem';
+import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog } from '../src/web3pgp/types/types';
 
 /**
  * Integration tests for Web3PGP contract using real blockchain (Anvil)
@@ -18,6 +19,19 @@ describe('Web3PGP Integration Tests', () => {
     let anvil: AnvilHelper;
     let web3pgp: Web3PGP;
     let contractAddress: Address;
+
+    // Type guards for narrowing union types
+    const isKeyRegisteredLog = (log: KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog): log is KeyRegisteredLog => {
+        return 'subkeyFingerprints' in log && !('fingerprint' in log);
+    };
+
+    const isSubkeyAddedLog = (log: KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog): log is SubkeyAddedLog => {
+        return 'subkeyFingerprint' in log && 'primaryKeyFingerprint' in log && !('subkeyFingerprints' in log);
+    };
+
+    const isKeyRevokedLog = (log: KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog): log is KeyRevokedLog => {
+        return 'fingerprint' in log && 'revocationCertificate' in log;
+    };
 
     // Helper to generate unique fingerprints for test isolation
     const generateUniqueFingerprint = (): `0x${string}` => {
@@ -697,6 +711,245 @@ describe('Web3PGP Integration Tests', () => {
             const log = logs.find(l => l.transactionHash === revokeReceipt.transactionHash);
             expect(log).toBeDefined();
             expect(log!.fingerprint).toBe(revokeKey);
+        });
+    });
+
+    describe('searchKeyEvents Method', () => {
+        test('should search all key-related events without block range', async () => {
+            const key1 = generateUniqueFingerprint();
+            const subkey1 = generateUniqueFingerprint();
+
+            // Perform multiple key operations
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            await web3pgp.addSubkey(key1, subkey1, mockOpenPGPMsg);
+
+            // Search all key events without specifying block range
+            const events = await web3pgp.searchKeyEvents();
+
+            expect(Array.isArray(events)).toBe(true);
+            expect(events.length).toBeGreaterThan(0);
+
+            // Verify we got different event types
+            const hasKeyRegistered = events.some((e: any) => e.primaryKeyFingerprint !== undefined && e.subkeyFingerprints !== undefined);
+            const hasSubkeyAdded = events.some((e: any) => e.primaryKeyFingerprint !== undefined && e.subkeyFingerprint !== undefined && !e.subkeyFingerprints);
+            expect(hasKeyRegistered || hasSubkeyAdded).toBe(true);
+
+            // Verify all events have required properties
+            events.forEach((event: any) => {
+                expect(event.blockNumber).toBeGreaterThan(0n);
+                expect(event.blockHash).toBeDefined();
+                expect(event.blockTimestamp).toBeInstanceOf(Date);
+                expect(event.transactionHash).toBeDefined();
+            });
+        });
+
+        test('should search key events with specific block range', async () => {
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            
+            const key1 = generateUniqueFingerprint();
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            // Search events within specific block range
+            const events = await web3pgp.searchKeyEvents(blockBefore, blockAfter);
+
+            expect(Array.isArray(events)).toBe(true);
+            expect(events.length).toBeGreaterThanOrEqual(1);
+
+            // Verify all returned events are within the block range
+            events.forEach((event: any) => {
+                expect(event.blockNumber).toBeGreaterThanOrEqual(blockBefore);
+                expect(event.blockNumber).toBeLessThanOrEqual(blockAfter);
+            });
+        });
+
+        test('should search key events from specific block to latest', async () => {
+            const blockStart = await anvil.getPublicClient().getBlockNumber();
+            
+            const key1 = generateUniqueFingerprint();
+            const key2 = generateUniqueFingerprint();
+            
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            await web3pgp.register(key2, [], mockOpenPGPMsg);
+
+            // Search events from a specific block to latest
+            const events = await web3pgp.searchKeyEvents(blockStart);
+
+            expect(Array.isArray(events)).toBe(true);
+            expect(events.length).toBeGreaterThanOrEqual(2);
+
+            // All events should be at or after the starting block
+            events.forEach((event: any) => {
+                expect(event.blockNumber).toBeGreaterThanOrEqual(blockStart);
+            });
+        });
+
+        test('should return KeyRegistered events in searchKeyEvents', async () => {
+            const key1 = generateUniqueFingerprint();
+
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            const receipt = await web3pgp.register(key1, [], mockOpenPGPMsg);
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            // Search events within the block range of the registration
+            const events = await web3pgp.searchKeyEvents(blockBefore, blockAfter);
+
+            // Find the KeyRegistered event
+            const keyRegisteredEvent = events.find(e => isKeyRegisteredLog(e));
+
+            expect(keyRegisteredEvent).toBeDefined();
+            expect(isKeyRegisteredLog(keyRegisteredEvent!)).toBe(true);
+            
+            if (isKeyRegisteredLog(keyRegisteredEvent!)) {
+                const event = keyRegisteredEvent as KeyRegisteredLog;
+                expect(event.primaryKeyFingerprint).toBe(key1);
+                expect(event.subkeyFingerprints).toBeDefined();
+                expect(Array.isArray(event.subkeyFingerprints)).toBe(true);
+                expect(event.openPGPMsg).toBe(mockOpenPGPMsg);
+                expect(event.transactionHash).toBe(receipt.transactionHash);
+            }
+        });
+
+        test('should return SubkeyAdded events in searchKeyEvents', async () => {
+            const primaryKey = generateUniqueFingerprint();
+            const subkey1 = generateUniqueFingerprint();
+
+            await web3pgp.register(primaryKey, [], mockOpenPGPMsg);
+            
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            const receipt = await web3pgp.addSubkey(primaryKey, subkey1, mockOpenPGPMsg);
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            // Search events within the block range of the subkey addition
+            const events = await web3pgp.searchKeyEvents(blockBefore, blockAfter);
+
+            // Find the SubkeyAdded event
+            const subkeyAddedEvent = events.find(e => isSubkeyAddedLog(e));
+
+            expect(subkeyAddedEvent).toBeDefined();
+            expect(isSubkeyAddedLog(subkeyAddedEvent!)).toBe(true);
+
+            if (isSubkeyAddedLog(subkeyAddedEvent!)) {
+                const event = subkeyAddedEvent as SubkeyAddedLog;
+                expect(event.primaryKeyFingerprint).toBe(primaryKey);
+                expect(event.subkeyFingerprint).toBe(subkey1);
+                expect(event.openPGPMsg).toBe(mockOpenPGPMsg);
+                expect(event.transactionHash).toBe(receipt.transactionHash);
+            }
+        });
+
+        test('should return KeyRevoked events in searchKeyEvents', async () => {
+            const key1 = generateUniqueFingerprint();
+
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            const receipt = await web3pgp.revoke(key1, mockRevocationCert);
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            // Search events within the block range of the revocation
+            const events = await web3pgp.searchKeyEvents(blockBefore, blockAfter);
+
+            // Find the KeyRevoked event
+            const keyRevokedEvent = events.find(e => isKeyRevokedLog(e));
+
+            expect(keyRevokedEvent).toBeDefined();
+            expect(isKeyRevokedLog(keyRevokedEvent!)).toBe(true);
+
+            if (isKeyRevokedLog(keyRevokedEvent!)) {
+                const event = keyRevokedEvent as KeyRevokedLog;
+                expect(event.fingerprint).toBe(key1);
+                expect(event.revocationCertificate).toBe(mockRevocationCert);
+                expect(event.transactionHash).toBe(receipt.transactionHash);
+            }
+        });
+
+        test('should return mixed event types in correct order', async () => {
+            const primaryKey = generateUniqueFingerprint();
+            const subkey1 = generateUniqueFingerprint();
+            
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            
+            // Register primary key (KeyRegistered event)
+            await web3pgp.register(primaryKey, [], mockOpenPGPMsg);
+            
+            // Add subkey (SubkeyAdded event)
+            await web3pgp.addSubkey(primaryKey, subkey1, mockOpenPGPMsg);
+            
+            // Revoke key (KeyRevoked event)
+            await web3pgp.revoke(primaryKey, mockRevocationCert);
+            
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            // Search for all events in the block range
+            const events = await web3pgp.searchKeyEvents(blockBefore, blockAfter);
+
+            // Should have at least 3 events (register, add subkey, revoke)
+            expect(events.length).toBeGreaterThanOrEqual(3);
+
+            // Verify block numbers are in order (ascending)
+            for (let i = 1; i < events.length; i++) {
+                expect(events[i]!.blockNumber).toBeGreaterThanOrEqual(events[i - 1]!.blockNumber);
+            }
+
+            // Verify we have all three event types
+            const hasKeyRegistered = events.some(e => isKeyRegisteredLog(e));
+            const hasSubkeyAdded = events.some(e => isSubkeyAddedLog(e));
+            const hasKeyRevoked = events.some(e => isKeyRevokedLog(e));
+            
+            expect(hasKeyRegistered).toBe(true);
+            expect(hasSubkeyAdded).toBe(true);
+            expect(hasKeyRevoked).toBe(true);
+        });
+
+        test('should throw error when using pending block tag', async () => {
+            await expect(web3pgp.searchKeyEvents('pending' as any)).rejects.toThrow('pending');
+        });
+
+        test('should handle empty results gracefully', async () => {
+            // Search a far future block range that shouldn't have any events
+            const latestBlock = await anvil.getPublicClient().getBlockNumber();
+            const futureBlock = latestBlock + 1000n;
+
+            const events = await web3pgp.searchKeyEvents(latestBlock, futureBlock);
+
+            expect(Array.isArray(events)).toBe(true);
+            expect(events.length).toBe(0);
+        });
+
+        test('should include correct timestamps for all event types', async () => {
+            const key1 = generateUniqueFingerprint();
+            
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            const events = await web3pgp.searchKeyEvents(blockBefore, blockAfter);
+
+            expect(events.length).toBeGreaterThan(0);
+
+            events.forEach((event: any) => {
+                expect(event.blockTimestamp).toBeInstanceOf(Date);
+                expect(event.blockTimestamp.getTime()).toBeGreaterThan(0);
+            });
+        });
+
+        test('should find all events when using earliest and latest tags', async () => {
+            const key1 = generateUniqueFingerprint();
+            
+            const snapshotId = await anvil.snapshot();
+            
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            
+            // Search using block tags
+            const events = await web3pgp.searchKeyEvents('earliest', 'latest');
+
+            expect(Array.isArray(events)).toBe(true);
+            expect(events.length).toBeGreaterThan(0);
+
+            // Revert snapshot
+            await anvil.revert(snapshotId);
         });
     });
 });

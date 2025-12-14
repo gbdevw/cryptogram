@@ -436,14 +436,14 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     }
 
     /**
-     * Synchronize key-related (KeyRegistered, SubkeyAdded, KeyRevoked) events from the blockchain within the specified
+     * Searches for all key-related events (KeyRegistered, SubkeyAdded, KeyRevoked) within a specified
      * block range.
      * 
      * @param fromBlock Starting block number (inclusive). 'earliest' block is used if not provided. 'pending' is not allowed.
      * @param toBlock Ending block number (inclusive). 'latest' block is used if not provided. 'pending' is not allowed.
      * @return An array of key-related event logs (KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog).
      */
-    public async searchKeyEvents(fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog[]> {
+    public async searchKeyEvents(fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<(KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog)[]> {
         
         // Reject pending block tags for fromBlock/toBlock
         if (fromBlock === 'pending' || toBlock === 'pending') {
