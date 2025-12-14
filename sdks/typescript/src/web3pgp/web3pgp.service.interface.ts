@@ -1,4 +1,4 @@
-import { TransactionReceipt } from 'viem';
+import { BlockTag, TransactionReceipt } from 'viem';
 import * as openpgp from 'openpgp';
 import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog } from './types/types';
 
@@ -305,4 +305,42 @@ export interface IWeb3PGPService {
      * ```
      */
     extractFromKeyRevokedLog(log: KeyRevokedLog, skipCryptographicVerifications?: boolean): Promise<[openpgp.PublicKey | undefined, string | undefined]>;
+
+    /*****************************************************************************************************************/
+    /* EVENT LISTENING AND SYNCHRONIZATION                                                                          */
+    /*****************************************************************************************************************/
+
+    /**
+     * Search for all key-related events within a specified block range.
+     * 
+     * @description
+     * This high-level method searches for KeyRegistered, SubkeyAdded, and KeyRevoked events
+     * in a single operation, providing a unified interface for event synchronization.
+     * 
+     * @param fromBlock Starting block number (inclusive). Defaults to 'earliest' if not provided.
+     * @param toBlock Ending block number (inclusive). Defaults to 'latest' if not provided.
+     * @returns An array of key-related event logs with validated and parsed data
+     * 
+     * @throws Web3PGPServiceValidationError if the block range is invalid
+     * 
+     * @example
+     * ```typescript
+     * const events = await service.searchKeyEvents('earliest', 'latest');
+     * for (const event of events) {
+     *   if (event.type === 'KeyRegistered') {
+     *     const publicKey = await service.extractFromKeyRegisteredLog(event);
+     *   }
+     * }
+     * ```
+     */
+    searchKeyEvents(
+        fromBlock?: BlockTag | bigint,
+        toBlock?: BlockTag | bigint,
+    ): Promise<(KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog)[]>;
+    
+    /**
+     * Get the current block number of the connected blockchain.
+     * @return The current block number as a bigint.
+     */
+    getBlockNumber(): Promise<bigint>;
 }

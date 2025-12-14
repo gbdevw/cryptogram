@@ -1,4 +1,4 @@
-import { TransactionReceipt, toHex, toBytes } from 'viem';
+import { TransactionReceipt, toHex, toBytes, BlockTag } from 'viem';
 import * as openpgp from 'openpgp';
 import { IWeb3PGPService } from './web3pgp.service.interface';
 import { IWeb3PGP } from './web3pgp.interface';
@@ -826,6 +826,48 @@ export class Web3PGPService implements IWeb3PGPService {
         } while (true);
 
         return results;
+    }
+
+    /*****************************************************************************************************************/
+    /* EVENT LISTENING AND SYNCHRONIZATION                                                                          */
+    /*****************************************************************************************************************/
+
+    /**
+     * Search for all key-related events within a specified block range.
+     * 
+     * @description
+     * This high-level method searches for KeyRegistered, SubkeyAdded, and KeyRevoked events
+     * in a single operation, providing a unified interface for event synchronization.
+     * 
+     * @param fromBlock Starting block number (inclusive). Defaults to 'earliest' if not provided.
+     * @param toBlock Ending block number (inclusive). Defaults to 'latest' if not provided.
+     * @returns An array of key-related event logs with validated and parsed data
+     * 
+     * @throws Web3PGPServiceValidationError if the block range is invalid
+     * 
+     * @example
+     * ```typescript
+     * const events = await service.searchKeyEvents('earliest', 'latest');
+     * for (const event of events) {
+     *   if (event.type === 'KeyRegistered') {
+     *     const publicKey = await service.extractFromKeyRegisteredLog(event);
+     *   }
+     * }
+     * ```
+     */
+    public searchKeyEvents(
+        fromBlock?: BlockTag | bigint,
+        toBlock?: BlockTag | bigint,
+    ): Promise<(KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog)[]>{
+        return this.web3pgp.searchKeyEvents(fromBlock, toBlock);
+    }
+    
+    /**
+     * Get the current block number of the connected blockchain.
+     * @return The current block number as a bigint.
+     */
+    public getBlockNumber(): Promise<bigint> {
+        return this.web3pgp.getBlockNumber();
     }
 }
 
