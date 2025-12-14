@@ -1,6 +1,6 @@
 import { Web3PGP as Web3PGPABI }  from '../abis/Web3PGP';
 import { toBytes32 } from '../utils/0xstr';
-import { Address, PublicClient, TransactionReceipt, WalletClient, parseEventLogs } from 'viem';
+import { Address, BlockTag, PublicClient, TransactionReceipt, WalletClient, parseEventLogs } from 'viem';
 import { IWeb3PGP } from './web3pgp.interface';
 import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog } from './types/types';
 import { FlatFee } from '../flatfee/flatefee';
@@ -18,6 +18,8 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     constructor(address: `0x${string}`, client: PublicClient, walletClient?: WalletClient) {
         super(address, client, walletClient);
     }
+
+
 
     /*****************************************************************************************************************/
     /* READ FUNCTIONS                                                                                                */
@@ -248,14 +250,20 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      * Search for KeyRegistered event logs.
      *
      * @param primaryKeyFingerprint The fingerprint(s) of the primary key to search logs for. Default to all keys.
-     * @param fromBlock The starting block number of the search range. 0 is used by default.
-     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
      * @return An array of KeyRegisteredLog objects matching the search criteria.
      */
-    public async searchKeyRegisteredLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRegisteredLog[]> {
+    public async searchKeyRegisteredLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRegisteredLog[]> {
+        
+        // Reject pending block tags for fromBlock/toBlock
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
         // Use default values: fromBlock = 0n, toBlock = latest block
-        const from = fromBlock ?? 0n;
-        const to = toBlock ?? await this.client.getBlockNumber();
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
 
         // Build args only if primaryKeyFingerprint is provided
         const args = primaryKeyFingerprint !== undefined ? {
@@ -263,6 +271,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         } : undefined;
 
         const logs = await this.client.getLogs({
+            strict: true,
             address: this.address,
             event: Web3PGP.KEY_REGISTERED_EVENT,
             fromBlock: from,
@@ -308,14 +317,20 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      * Search for SubkeyAdded event logs.
      * @param primaryKeyFingerprint The fingerprint(s) of the primary key to search logs for. Default to all keys.
      * @param subkeyFingerprint The fingerprint(s) of the subkey to search logs for. Default to all subkeys.
-     * @param fromBlock The starting block number of the search range. 0 is used by default.
-     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
      * @return An array of SubkeyAddedLog objects matching the search criteria.
      */
-    public async searchSubkeyAddedLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], subkeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<SubkeyAddedLog[]> {
+    public async searchSubkeyAddedLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], subkeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<SubkeyAddedLog[]> {
+        
+        /// Reject pending block tags for fromBlock/toBlock
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
         // Use default values: fromBlock = 0n, toBlock = latest block
-        const from = fromBlock ?? 0n;
-        const to = toBlock ?? await this.client.getBlockNumber();
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
 
         // Build args object, including only defined properties
         let args: any = undefined;
@@ -330,6 +345,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         }
 
         const logs = await this.client.getLogs({
+            strict: true,
             address: this.address,
             event: Web3PGP.SUBKEY_ADDED_EVENT,
             fromBlock: from,
@@ -373,14 +389,19 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     /**
      * Search for KeyRevoked event logs.
      * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
-     * @param fromBlock The starting block number of the search range. 0 is used by default.
-     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
      * @return An array of KeyRevokedLog objects matching the search criteria.
      */
-    public async searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRevokedLog[]> {
-        // Use default values: fromBlock = 0n, toBlock = latest block
-        const from = fromBlock ?? 0n;
-        const to = toBlock ?? await this.client.getBlockNumber();
+    public async searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRevokedLog[]> {
+        /// Reject pending block tags for fromBlock/toBlock
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        // Use default values: fromBlock = earliest, toBlock = latest 
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
 
         // Build args only if fingerprint is provided
         const args = fingerprint !== undefined ? {
@@ -388,6 +409,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         } : undefined;
 
         const logs = await this.client.getLogs({
+            strict: true,
             address: this.address,
             event: Web3PGP.KEY_REVOKED_EVENT,
             fromBlock: from,
@@ -411,6 +433,78 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             fingerprint: log.args.fingerprint,
             revocationCertificate: log.args.revocationCertificate
         }));
+    }
+
+    /**
+     * Synchronize key-related (KeyRegistered, SubkeyAdded, KeyRevoked) events from the blockchain within the specified
+     * block range.
+     * 
+     * @param fromBlock Starting block number (inclusive). 'earliest' block is used if not provided. 'pending' is not allowed.
+     * @param toBlock Ending block number (inclusive). 'latest' block is used if not provided. 'pending' is not allowed.
+     * @return An array of key-related event logs (KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog).
+     */
+    public async searchKeyEvents(fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog[]> {
+        
+        // Reject pending block tags for fromBlock/toBlock
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+        
+        // Use default values: fromBlock = earliest, toBlock = latest
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
+
+        const logs = await this.client.getLogs({
+            address: this.address,
+            fromBlock: from,
+            toBlock: to,
+            events: [
+                Web3PGP.KEY_REGISTERED_EVENT,
+                Web3PGP.SUBKEY_ADDED_EVENT,
+                Web3PGP.KEY_REVOKED_EVENT
+            ],
+            strict: true
+        })
+
+        // Batch fetch timestamps for unique block numbers
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => {
+            const baseLog = {
+                blockNumber: log.blockNumber,
+                blockHash: log.blockHash,
+                blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+                transactionHash: log.transactionHash
+            };
+
+            switch (log.eventName) {
+                case 'KeyRegistered':
+                    return {
+                        ...baseLog,
+                        primaryKeyFingerprint: log.args.primaryKeyFingerprint,
+                        subkeyFingerprints: log.args.subkeyFingerprints,
+                        openPGPMsg: log.args.openPGPMsg
+                    } as KeyRegisteredLog;
+                case 'SubkeyAdded':
+                    return {
+                        ...baseLog,
+                        primaryKeyFingerprint: log.args.primaryKeyFingerprint,
+                        subkeyFingerprint: log.args.subkeyFingerprint,
+                        openPGPMsg: log.args.openPGPMsg
+                    } as SubkeyAddedLog;
+                case 'KeyRevoked':
+                    return {
+                        ...baseLog,
+                        fingerprint: log.args.fingerprint,
+                        revocationCertificate: log.args.revocationCertificate
+                    } as KeyRevokedLog;
+            }
+        });
     }
 
     /**
@@ -479,5 +573,17 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             fingerprint: log.args.fingerprint,
             revocationCertificate: log.args.revocationCertificate
         })));
+    }
+
+    /*****************************************************************************************************************/
+    /* UTILITY FUNCTIONS                                                                                             */
+    /*****************************************************************************************************************/
+
+    /**
+     * Get the current block number of the connected blockchain.
+     * @return The current block number as a bigint.
+     */
+    getBlockNumber(): Promise<bigint> {
+        return this.client.getBlockNumber();
     }
 }
