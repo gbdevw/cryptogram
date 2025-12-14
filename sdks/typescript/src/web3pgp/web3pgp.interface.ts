@@ -1,4 +1,4 @@
-import { Address, TransactionReceipt } from 'viem';
+import { BlockTag, TransactionReceipt } from 'viem';
 import { KeyRegisteredLog, KeyRevokedLog, SubkeyAddedLog } from './types/types';
 import { IFlatFee } from '../flatfee/flatefee.interface';
 
@@ -121,11 +121,11 @@ export interface IWeb3PGP extends IFlatFee {
      * Search for KeyRegistered event logs.
      *
      * @param primaryKeyFingerprint The fingerprint(s) of the primary key to search logs for. Default to all keys.
-     * @param fromBlock The starting block number of the search range. 0 is used by default.
-     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
      * @return An array of KeyRegisteredLog objects matching the search criteria.
      */
-    searchKeyRegisteredLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRegisteredLog[]>;
+    searchKeyRegisteredLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRegisteredLog[]>;
 
     /**
      * Get the log of a subkey addition event using the provided primary key fingerprint, subkey fingerprint, and block number.
@@ -141,11 +141,11 @@ export interface IWeb3PGP extends IFlatFee {
      * Search for SubkeyAdded event logs.
      * @param primaryKeyFingerprint The fingerprint(s) of the primary key to search logs for. Default to all keys.
      * @param subkeyFingerprint The fingerprint(s) of the subkey to search logs for. Default to all subkeys.
-     * @param fromBlock The starting block number of the search range. 0 is used by default.
-     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
      * @return An array of SubkeyAddedLog objects matching the search criteria.
      */
-    searchSubkeyAddedLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], subkeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<SubkeyAddedLog[]>;
+    searchSubkeyAddedLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], subkeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<SubkeyAddedLog[]>;
 
     /**
      * Get the log of a key revocation event using the provided fingerprint and block number.
@@ -159,21 +159,21 @@ export interface IWeb3PGP extends IFlatFee {
     /**
      * Search for KeyRevoked event logs.
      * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
-     * @param fromBlock The starting block number of the search range. 0 is used by default.
-     * @param toBlock The ending block number of the search range. The latest block is used by default.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
      * @return An array of KeyRevokedLog objects matching the search criteria.
      */
-    searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: bigint, toBlock?: bigint): Promise<KeyRevokedLog[]>;
+    searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRevokedLog[]>;
 
     /**
-     * Synchronize key-related (KeyRegistered, SubkeyAdded, KeyRevoked) events from the blockchain within the specified
+     * Search key-related (KeyRegistered, SubkeyAdded, KeyRevoked) events from the blockchain within the specified
      * block range.
      * 
-     * @param fromBlock Starting block number (inclusive). Defaults to 0 if not provided.
-     * @param toBlock Ending block number (inclusive). Defaults to the latest block if not provided.
+     * @param fromBlock Starting block number (inclusive). Defaults to 'earliest' if not provided. 'pending' is not allowed.
+     * @param toBlock Ending block number (inclusive). Defaults to 'latest' if not provided. 'pending' is not allowed.
      * @return An array of key-related event logs (KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog).
      */
-    synchronizeKeyEvents(fromBlock?: bigint, toBlock?: bigint): Promise<KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog[]>;
+    searchKeyEvents(fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog[]>;
 
     /**
      * Extracts KeyRegisteredLog entries from a transaction receipt.
