@@ -3,13 +3,15 @@ import { Command } from 'commander';
 import { Logger } from 'pino';
 
 /**
- * Generate a template configuration file with comments
+ * Generate a template configuration file for test environment
  */
-export function generateConfigTemplate(): string {
-  return `# Web3PGP CLI Configuration
+export function generateConfigTemplate(environment: 'test' | 'prod' = 'test'): string {
+  if (environment === 'test') {
+    return `# Web3PGP CLI Configuration - TEST Environment
 # Location: ~/.web3pgp/config.yaml
 # 
-# This file configures the Web3PGP CLI. You can override any value using:
+# This file configures the Web3PGP CLI for the TEST environment.
+# You can override any value using:
 # - Environment variables (DEXES_* prefix)
 # - Command-line flags
 #
@@ -18,20 +20,9 @@ export function generateConfigTemplate(): string {
 
 ethereum:
   # Blockchain network configuration
-  # Use a well-known chain name (mainnet, sepolia, anvil, ink-sepolia)
-  # or a custom numeric chain ID
+  # Using Ink Sepolia testnet
   chain: ink-sepolia  # or use numeric ID: 763373
-  
-  rpc:
-    # RPC endpoints to use (in priority order)
-    # The CLI will use the first endpoint; if it fails, it falls back to the next
-    # For well-known chains, this is optional if default endpoints are available
-    endpoints:
-      - url: https://rpc-gel-sepolia.inkonchain.com
-        priority: 1
-      - url: https://rpc-qnd-sepolia.inkonchain.com
-        priority: 2
-  
+
   # wallet: (OPTIONAL - required only for signing transactions)
   #   # Wallet configuration (currently only 'private-key' is supported)
   #   type: private-key
@@ -42,8 +33,8 @@ ethereum:
   #   # privateKey: "<YOUR_PRIVATE_KEY>"
 
 web3pgp:
-  # Web3PGP smart contract address
-  contract: "<CONTRACT_ADDRESS>"
+  # Web3PGP smart contract address (test deployment)
+  contract: "0x5FbDB2315678afccb333f8a9c60582f6e1a3fe4c"
 
 monitoring:
   logging:
@@ -56,12 +47,57 @@ monitoring:
 # You can override any configuration value using environment variables:
 #
 # DEXES_CHAIN_ID=763373
-# DEXES_RPC_URL=https://rpc-gel-sepolia.inkonchain.com
-# DEXES_RPC_ENDPOINTS='[{"url":"https://rpc-gel-sepolia.inkonchain.com","priority":1}]'
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
 # DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_LOG_LEVEL=debug
 `;
+  } else {
+    return `# Web3PGP CLI Configuration - PRODUCTION Environment
+# Location: ~/.web3pgp/config.yaml
+# 
+# This file configures the Web3PGP CLI for the PRODUCTION environment.
+# You can override any value using:
+# - Environment variables (DEXES_* prefix)
+# - Command-line flags
+#
+# Environment variables take precedence over this file.
+# CLI flags take precedence over environment variables.
+
+ethereum:
+  # Blockchain network configuration
+  # Using Ink mainnet
+  chain: ink
+
+  # wallet: (OPTIONAL - required only for signing transactions)
+  #   # Wallet configuration (currently only 'private-key' is supported)
+  #   type: private-key
+  #   
+  #   # Private key for signing transactions
+  #   # WARNING: Store this securely! Better to use the DEXES_WALLET_PRIVATE_KEY env var.
+  #   # Support for \${VAR_NAME} syntax: privateKey: "\${DEXES_WALLET_PRIVATE_KEY}"
+  #   # privateKey: "<YOUR_PRIVATE_KEY>"
+
+web3pgp:
+  # Web3PGP smart contract address (production deployment)
+  # TODO: Update with actual contract address once deployed
+  contract: "UNDEFINED"
+
+monitoring:
+  logging:
+    # Log level: debug, info, warn, error
+    level: info
+
+# ============================================================================
+# ENVIRONMENT VARIABLES
+# ============================================================================
+# You can override any configuration value using environment variables:
+#
+# DEXES_CHAIN_ID=<CHAIN_ID>
+# DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
+# DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
+# DEXES_LOG_LEVEL=info
+`;
+  }
 }
 
 export interface ConfigGenerateCommandDeps {
@@ -77,16 +113,22 @@ export function createConfigGenerateCommand(deps: ConfigGenerateCommandDeps): Co
 
   return new Command('generate')
     .description('Generate a template configuration file')
+    .argument('[environment]', 'Environment: test or prod (default: test)', 'test')
     .option('-o, --output <path>', 'Output file path (default: stdout)')
-    .action(async (options: { output?: string }) => {
+    .action(async (environment: string, options: { output?: string }) => {
       try {
-        cmdLogger.info('Generating config template');
-        const template = generateConfigTemplate();
+        // Validate environment argument
+        if (!['test', 'prod'].includes(environment)) {
+          throw new Error(`Invalid environment: ${environment}. Must be 'test' or 'prod'.`);
+        }
+
+        cmdLogger.info({ environment }, 'Generating config template');
+        const template = generateConfigTemplate(environment as 'test' | 'prod');
 
         if (options.output) {
           fs.writeFileSync(options.output, template);
-          cmdLogger.info({ path: options.output }, 'Config template written');
-          console.log(`Configuration template written to ${options.output}`);
+          cmdLogger.info({ path: options.output, environment }, 'Config template written');
+          console.log(`Configuration template written to ${options.output} (${environment} environment)`);
         } else {
           console.log(template);
         }
