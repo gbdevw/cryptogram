@@ -6,6 +6,7 @@ import { createRegisterCommand } from './register';
 import { createAddSubkeyCommand } from './addSubkey';
 import { createRevokeCommand } from './revoke';
 import { createSyncCommand } from './sync';
+import { createGenerateKeyCommand } from './generateKey';
 
 export interface BlockchainCommandsDeps {
   logger: Logger;
@@ -22,5 +23,6 @@ export function createBlockchainCommands(deps: BlockchainCommandsDeps): Command[
     createAddSubkeyCommand(deps),
     createRevokeCommand(deps),
     createSyncCommand(deps),
+    createGenerateKeyCommand({ logger: deps.logger }),
   ];
 }
