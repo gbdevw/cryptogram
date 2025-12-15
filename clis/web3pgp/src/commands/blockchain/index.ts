@@ -5,7 +5,7 @@ import { createGetPublicKeyCommand } from './getPublicKey';
 import { createRegisterCommand } from './register';
 import { createAddSubkeyCommand } from './addSubkey';
 import { createRevokeCommand } from './revoke';
-import { createListenCommand } from './listen';
+import { createSyncCommand } from './sync';
 
 export interface BlockchainCommandsDeps {
   logger: Logger;
@@ -14,7 +14,6 @@ export interface BlockchainCommandsDeps {
 
 /**
  * Create all blockchain commands as direct subcommands
- * Excludes listen command (to be added later)
  */
 export function createBlockchainCommands(deps: BlockchainCommandsDeps): Command[] {
   return [
@@ -22,6 +21,6 @@ export function createBlockchainCommands(deps: BlockchainCommandsDeps): Command[
     createRegisterCommand(deps),
     createAddSubkeyCommand(deps),
     createRevokeCommand(deps),
-    // createListenCommand(deps), // TODO: Add listen command later
+    createSyncCommand(deps),
   ];
 }
