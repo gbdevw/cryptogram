@@ -46,13 +46,13 @@ type BaseLog = {
  */
 export type DocumentLog = BaseLog & {
 
-    id: bigint | undefined;
-    emitter: `0x${string}` | undefined;
-    dochash: `0x${string}` | undefined;
-    signature: `0x${string}` | undefined;
-    document: `0x${string}` | undefined;
-    uri: string | undefined;
-    mimeType: string | undefined;
+    id: bigint;
+    emitter: `0x${string}`;
+    dochash: `0x${string}`;
+    signature: `0x${string}`;
+    document: `0x${string}`;
+    uri: string;
+    mimeType: string;
 };
 
 /**
@@ -65,11 +65,11 @@ export type DocumentLog = BaseLog & {
  * @property uri The URI which can be used to download the binary OpenPGP message containing the document from an off-chain storage.
  */
 export type CopyLog = BaseLog & {
-    copy?: bigint | undefined;
-    original?: bigint | undefined;
-    emitter?: `0x${string}` | undefined;
-    document?: `0x${string}` | undefined;
-    uri?: string | undefined;
+    copy: bigint;
+    original: bigint;
+    emitter: `0x${string}`;
+    document: `0x${string}`;
+    uri: string;
 };
 
 /**
@@ -82,11 +82,11 @@ export type CopyLog = BaseLog & {
  * @property signatureRequested If true, the recipient is prompted by the emitter to sign the document.
  */
 export type NotificationLog = BaseLog & {
-    id: bigint | undefined;
-    emitter: `0x${string}` | undefined;
-    recipient: `0x${string}` | undefined;
-    source: EventType | undefined;
-    signatureRequested: boolean | undefined;
+    id: bigint;
+    emitter: `0x${string}`;
+    recipient: `0x${string}`;
+    source: EventType;
+    signatureRequested: boolean;
 };
 
 /**
@@ -97,9 +97,9 @@ export type NotificationLog = BaseLog & {
  * @property signature The binary OpenPGP message which contains the detached signature over the document.
  */
 export type SignatureLog = BaseLog & {
-    id: bigint | undefined;
-    emitter: `0x${string}` | undefined;
-    signature: `0x${string}` | undefined;
+    id: bigint;
+    emitter: `0x${string}`;
+    signature: `0x${string}`;
 };
 
 /**
@@ -111,8 +111,8 @@ export type SignatureLog = BaseLog & {
  * @property signature A detached binary OpenPGP signature created over the keccak256 hash of the document.
  */
 export type TimestampLog = BaseLog & {
-    id: bigint | undefined;
-    emitter: `0x${string}` | undefined;
-    dochash: `0x${string}` | undefined;
-    signature: `0x${string}` | undefined;
+    id: bigint;
+    emitter: `0x${string}`;
+    dochash: `0x${string}` ;
+    signature: `0x${string}`;
 };

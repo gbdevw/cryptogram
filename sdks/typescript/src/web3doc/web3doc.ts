@@ -394,6 +394,7 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         }
 
         const logs = await this.client.getLogs({
+            strict: true,
             address: this.address,
             event: Web3Doc.DOCUMENT_EVENT,
             fromBlock: from,
@@ -483,6 +484,7 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         }
 
         const logs = await this.client.getLogs({
+            strict: true,
             address: this.address,
             event: Web3Doc.COPY_EVENT,
             fromBlock: from,
@@ -570,6 +572,7 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         }
 
         const logs = await this.client.getLogs({
+            strict: true,
             address: this.address,
             event: Web3Doc.NOTIFICATION_EVENT,
             fromBlock: from,
@@ -654,6 +657,7 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         }
 
         const logs = await this.client.getLogs({
+            strict: true,
             address: this.address,
             event: Web3Doc.SIGNATURE_EVENT,
             fromBlock: from,
@@ -718,6 +722,7 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         }
 
         const logs = await this.client.getLogs({
+            strict: true,
             address: this.address,
             event: Web3Doc.TIMESTAMP_EVENT,
             fromBlock: from,
@@ -879,6 +884,7 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
      */
     public async extractNotificationLog(receipt: TransactionReceipt): Promise<NotificationLog[]> {
         const parsedLogs = parseEventLogs({
+            strict: true,
             abi: Web3DocABI,
             eventName: 'Notification',
             logs: receipt.logs
