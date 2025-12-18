@@ -80,12 +80,26 @@ export class AnvilHelper {
             });
 
             this.anvilProcess.stderr.on('data', (data: Buffer) => {
-                // Ignore stderr
+                const output = data.toString();
+                // Handle port already in use - assume existing Anvil instance is OK
+                if (!resolved && output.includes('Address already in use')) {
+                    this.ready = true;
+                    resolved = true;
+                    // Give it a moment to be fully ready
+                    setTimeout(() => resolve(), 500);
+                }
             });
 
-            this.anvilProcess.on('error', (error) => {
+            this.anvilProcess.on('error', (error: any) => {
                 if (!resolved) {
-                    reject(new Error(`Failed to start Anvil: ${error.message}`));
+                    // Handle EADDRINUSE - port already in use (Anvil instance already running)
+                    if (error.code === 'EADDRINUSE') {
+                        this.ready = true;
+                        resolved = true;
+                        resolve();
+                    } else {
+                        reject(new Error(`Failed to start Anvil: ${error.message}`));
+                    }
                 }
             });
 
@@ -313,6 +327,73 @@ export class AnvilHelper {
             web3pgp: web3pgpProxy,
             implementation: web3pgpImplementation,
             proxy: web3pgpProxy,
+            accessManager: accessManagerProxy,
+        };
+    }
+
+    /**
+     * Deploy Web3Doc using Foundry deployment scripts
+     * This ensures test environment matches production deployment exactly
+     * Uses DeployTestEnvironment.s.sol which deploys AccessManager + Web3PGP + Web3Doc with role configuration
+     * Uses Anvil's first provisioned account for deployment
+     */
+    async deployWeb3Doc(initialFee: bigint = 0n): Promise<{
+        web3doc: Address;
+        web3pgp: Address;
+        implementation: Address;
+        proxy: Address;
+        accessManager: Address;
+    }> {
+        console.log('\n========================================');
+        console.log('Deploying Test Environment via Foundry');
+        console.log('========================================');
+        
+        const envVars: Record<string, string> = {};
+        if (initialFee > 0n) {
+            envVars.FEE_IN_WEIS = initialFee.toString();
+        }
+
+        // Execute DeployTestEnvironment.s.sol using Anvil's account
+        await this.runForgeScript('scripts/DeployTestEnvironment.s.sol', envVars);
+
+        // Extract addresses from broadcast
+        const deployment = this.extractDeploymentAddresses('DeployTestEnvironment.s.sol');
+
+        // The deployment order in DeployTestEnvironment.s.sol is:
+        // 1. AccessManagerUpgradeable (implementation)
+        // 2. ERC1967Proxy (AccessManager proxy)
+        // 3. Web3PGP (implementation)
+        // 4. ERC1967Proxy (Web3PGP proxy)
+        // 5. Web3Doc (implementation)
+        // 6. ERC1967Proxy (Web3Doc proxy)
+        
+        if (deployment.contracts.length < 6) {
+            throw new Error(`Deployment did not create expected number of contracts (got ${deployment.contracts.length}, expected 6)`);
+        }
+
+        const accessManagerProxy = deployment.contracts[1]?.address;
+        const web3pgpImplementation = deployment.contracts[2]?.address;
+        const web3pgpProxy = deployment.contracts[3]?.address;
+        const web3docImplementation = deployment.contracts[4]?.address;
+        const web3docProxy = deployment.contracts[5]?.address;
+
+        if (!accessManagerProxy || !web3pgpProxy || !web3pgpImplementation || !web3docProxy || !web3docImplementation) {
+            throw new Error('Failed to extract all required addresses from deployment');
+        }
+
+        console.log('\n✓ Deployment complete:');
+        console.log('  AccessManager:', accessManagerProxy);
+        console.log('  Web3PGP Implementation:', web3pgpImplementation);
+        console.log('  Web3PGP Proxy:', web3pgpProxy);
+        console.log('  Web3Doc Implementation:', web3docImplementation);
+        console.log('  Web3Doc Proxy:', web3docProxy);
+        console.log('========================================\n');
+
+        return {
+            web3doc: web3docProxy,
+            web3pgp: web3pgpProxy,
+            implementation: web3docImplementation,
+            proxy: web3docProxy,
             accessManager: accessManagerProxy,
         };
     }

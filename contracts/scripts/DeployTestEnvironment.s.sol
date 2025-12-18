@@ -6,26 +6,23 @@ import {console2} from "forge-std/console2.sol";
 import {AccessManagerUpgradeable} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagerUpgradeable.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
-import {FlatFee} from "src/FlatFee.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Web3Doc} from "src/Web3Doc.sol";
 
 /**
  * @title DeployTestEnvironment
- * @notice Deploy complete test environment: AccessManager + Web3PGP
+ * @notice Deploy complete test environment: AccessManager + Web3PGP + Web3Doc
  * @dev This script deploys all contracts needed for integration tests in one go
  *      It follows the same deployment pattern as production scripts
  */
 contract DeployTestEnvironment is Script {
-    /// @notice Role IDs
-    uint64 public constant UPGRADE_MANAGER_ROLE = 1;
-    uint64 public constant TREASURER_ROLE = 2;
-
     /// @notice Deployed contract addresses
     struct DeploymentAddresses {
         address accessManagerProxy;
         address accessManagerImplementation;
         address web3pgpProxy;
         address web3pgpImplementation;
+        address web3docProxy;
+        address web3docImplementation;
     }
 
     /// @notice Deployment results
@@ -96,32 +93,33 @@ contract DeployTestEnvironment is Script {
         addresses.web3pgpProxy = address(web3pgpProxy);
         addresses.web3pgpImplementation = web3pgpImpl;
 
-        // ===== 3. Configure Roles in AccessManager =====
+        // ===== 3. Deploy Web3Doc =====
         console2.log("");
-        console2.log("3. Configuring roles in AccessManager...");
+        console2.log("3. Deploying Web3Doc...");
         
-        AccessManagerUpgradeable manager = AccessManagerUpgradeable(address(accessManagerProxy));
+        // Deploy implementation
+        address web3docImpl = address(new Web3Doc());
+        console2.log("   Implementation:", web3docImpl);
+
+        // Prepare initialization data - Web3Doc depends on Web3PGP
+        bytes memory web3docInitData = abi.encodeWithSelector(
+            Web3Doc.initialize.selector,
+            feeInWeis,
+            address(accessManagerProxy),
+            address(web3pgpProxy)
+        );
         
-        // Configure UPGRADE_MANAGER_ROLE
-        console2.log("   - UPGRADE_MANAGER_ROLE (1)");
-        manager.labelRole(UPGRADE_MANAGER_ROLE, "UPGRADE_MANAGER");
-        manager.grantRole(UPGRADE_MANAGER_ROLE, deployer, 0);
+        // Deploy proxy with initialization
+        ERC1967Proxy web3docProxy = new ERC1967Proxy(web3docImpl, web3docInitData);
+        console2.log("   Proxy:", address(web3docProxy));
         
-        bytes4[] memory upgradeSelectors = new bytes4[](1);
-        upgradeSelectors[0] = UUPSUpgradeable.upgradeToAndCall.selector;
-        manager.setTargetFunctionRole(address(web3pgpProxy), upgradeSelectors, UPGRADE_MANAGER_ROLE);
-        console2.log("     Granted to deployer, assigned to upgradeToAndCall()");
-        
-        // Configure TREASURER_ROLE
-        console2.log("   - TREASURER_ROLE (2)");
-        manager.labelRole(TREASURER_ROLE, "TREASURER");
-        manager.grantRole(TREASURER_ROLE, deployer, 0);
-        
-        bytes4[] memory treasurerSelectors = new bytes4[](2);
-        treasurerSelectors[0] = FlatFee.updateRequestedFee.selector;
-        treasurerSelectors[1] = FlatFee.withdrawFees.selector;
-        manager.setTargetFunctionRole(address(web3pgpProxy), treasurerSelectors, TREASURER_ROLE);
-        console2.log("     Granted to deployer, assigned to fee management functions");
+        addresses.web3docProxy = address(web3docProxy);
+        addresses.web3docImplementation = web3docImpl;
+
+        // ===== 4. Configure Roles in AccessManager =====
+        console2.log("");
+        console2.log("4. AccessManager deployed without role configuration");
+        console2.log("   (Roles can be configured separately if needed)");
 
         vm.stopBroadcast();
 
@@ -132,7 +130,8 @@ contract DeployTestEnvironment is Script {
         console2.log("========================================");
         console2.log("AccessManager:", addresses.accessManagerProxy);
         console2.log("Web3PGP:", addresses.web3pgpProxy);
-        console2.log("Deployer has ADMIN_ROLE(0), UPGRADE_MANAGER_ROLE(1), TREASURER_ROLE(2)");
+        console2.log("Web3Doc:", addresses.web3docProxy);
+        console2.log("All contracts initialized and ready for use");
         console2.log("========================================");
 
         return addresses.accessManagerProxy;
