@@ -190,10 +190,10 @@ function createPublicClientWithFallback(config: MergedConfig, logger: Logger): P
           gas: args.gas ?? config.ethereum.gasLimit,
         }) as any;
       },
-    })) as any;
+    })) as any as PublicClient;
   }
 
-  return publicClient;
+  return publicClient as PublicClient;
 }
 
 /**

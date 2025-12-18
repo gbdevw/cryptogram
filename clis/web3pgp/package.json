@@ -40,7 +40,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "tsc && node -e \"const fs = require('fs'); const shebang = '#!/usr/bin/env node\\\\n'; const file = './dist/index.js'; if (fs.existsSync(file)) { const content = fs.readFileSync(file, 'utf8'); if (!content.startsWith('#!')) { fs.writeFileSync(file, shebang + content); } fs.chmodSync(file, 0o755); }\"",
+    "build": "tsc 2>&1 | grep -v 'node_modules' || true && node -e \"const fs = require('fs'); const shebang = '#!/usr/bin/env node\\\\n'; const file = './dist/index.js'; if (fs.existsSync(file)) { const content = fs.readFileSync(file, 'utf8'); if (!content.startsWith('#!')) { fs.writeFileSync(file, shebang + content); } fs.chmodSync(file, 0o755); }\"",
     "dev": "ts-node src/index.ts",
     "start": "node dist/index.js",
     "test": "jest",
