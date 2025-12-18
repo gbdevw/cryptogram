@@ -1,4 +1,4 @@
-import { Address, TransactionReceipt, PublicClient, WalletClient, parseEventLogs } from 'viem';
+import { Address, TransactionReceipt, PublicClient, WalletClient, parseEventLogs, BlockTag } from 'viem';
 import { IWeb3Doc } from './web3doc.interface';
 import { IWeb3PGP } from '../web3pgp/web3pgp.interface';
 import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, NotificationLog } from './types/types';
@@ -371,12 +371,17 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         ids?: bigint[], 
         emitters?: `0x${string}`[], 
         dochashes?: `0x${string}`[], 
-        fromBlock?: bigint, 
-        toBlock?: bigint
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint
     ): Promise<DocumentLog[]> {
-        // Use default values: fromBlock = 0n, toBlock = latest block
-        const from = fromBlock ?? 0n;
-        const to = toBlock ?? await this.client.getBlockNumber();
+        // Reject pending block tags for fromBlock/toBlock
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        // Use default values: fromBlock = earliest block, toBlock = latest block
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
 
         // Build args only if a filter is provided
         let args: any = undefined;
@@ -461,12 +466,17 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         copies?: bigint[], 
         originals?: bigint[], 
         emitters?: `0x${string}`[], 
-        fromBlock?: bigint, 
-        toBlock?: bigint
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint
     ): Promise<CopyLog[]> {
-        // Use default values: fromBlock = 0n, toBlock = latest block
-        const from = fromBlock ?? 0n;
-        const to = toBlock ?? await this.client.getBlockNumber();
+        // Reject pending block tags for fromBlock/toBlock
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        // Use default values: fromBlock = earliest block, toBlock = latest block
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
         
         // Build args only if a filter is provided
         let args: any = undefined;
@@ -549,12 +559,17 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         ids?: bigint[],
         recipients?: `0x${string}`[],
         signatureRequested?: boolean,
-        fromBlock?: bigint, 
-        toBlock?: bigint
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint
     ): Promise<NotificationLog[]> {
-        // Use default values: fromBlock = 0n, toBlock = latest block
-        const from = fromBlock ?? 0n;
-        const to = toBlock ?? await this.client.getBlockNumber();
+        // Reject pending block tags for fromBlock/toBlock
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        // Use default values: fromBlock = earliest block, toBlock = latest block
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
         
         // Build args only if a filter is provided
         let args: any = undefined;
@@ -637,12 +652,17 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
     public async searchSignatureLogs(
         ids?: bigint[], 
         emitters?: `0x${string}`[], 
-        fromBlock?: bigint, 
-        toBlock?: bigint
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint
     ): Promise<SignatureLog[]> {
-        // Use default values: fromBlock = 0n, toBlock = latest block
-        const from = fromBlock ?? 0n;
-        const to = toBlock ?? await this.client.getBlockNumber();
+        // Reject pending block tags for fromBlock/toBlock
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        // Use default values: fromBlock = earliest block, toBlock = latest block
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
 
         // Build args only if a filter is provided
         let args: any = undefined;
@@ -699,12 +719,17 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         ids?: bigint[],
         emitters?: `0x${string}`[], 
         dochashes?: `0x${string}`[], 
-        fromBlock?: bigint, 
-        toBlock?: bigint
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint
     ): Promise<TimestampLog[]> {
-        // Use default values: fromBlock = 0n, toBlock = latest block
-        const from = fromBlock ?? 0n;
-        const to = toBlock ?? await this.client.getBlockNumber();
+        // Reject pending block tags for fromBlock/toBlock
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        // Use default values: fromBlock = earliest block, toBlock = latest block
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
 
         // Build args only if a filter is provided
         let args: any = undefined;
@@ -748,6 +773,20 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             dochash: log.args.dochash,
             signature: log.args.signature,
         }));
+    }
+
+    /**
+     * Retrieves a Timestamp event by its unique ID.
+     * @param id The unique ID of the timestamp.
+     * @param blockNumber The block number where to search for the timestamp.
+     * @returns The TimestampLog if found, otherwise undefined.
+     */
+    public async getTimestampLogByID(id: bigint, blockNumber: bigint): Promise<TimestampLog | undefined> {
+        const logs = await this.searchTimestampLogs([id], undefined, undefined, blockNumber, blockNumber);
+        if (logs.length === 1) return logs[0];
+        if (logs.length === 0) return undefined;
+        // This should never happen as timestamp IDs are unique but we guard against it anyway
+        throw new Web3DocCriticalError(`Multiple Timestamp logs found for timestamp ID ${id} at block ${blockNumber}`);
     }
 
     /**
