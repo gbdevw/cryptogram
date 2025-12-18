@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { Logger } from 'pino';
-import { KeyRegisteredLog, KeyRevokedLog, SubkeyAddedLog, IWeb3PGPService, Web3PGPServiceValidationError } from 'dexes';
+import { KeyRegisteredLog, KeyRevokedLog, SubkeyAddedLog, IWeb3PGPService, Web3PGPServiceValidationError } from '@cryptogram/dexes';
 
 import { exitWithError } from '../factory';
 

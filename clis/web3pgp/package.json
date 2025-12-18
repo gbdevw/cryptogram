@@ -1,11 +1,43 @@
 {
-  "name": "@web3pgp/cli",
+  "name": "@cryptogram/web3pgp-cli",
   "version": "0.1.0",
-  "description": "Web3PGP CLI - Decentralized OpenPGP key infrastructure on Ethereum",
+  "description": "Command-line interface for managing OpenPGP keys on Ethereum through Web3PGP smart contracts",
   "type": "commonjs",
   "main": "dist/index.js",
   "bin": {
     "web3pgp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cryptogram/web3pgp-cli.git"
+  },
+  "homepage": "https://github.com/cryptogram/web3pgp-cli",
+  "bugs": {
+    "url": "https://github.com/cryptogram/web3pgp-cli/issues"
+  },
+  "keywords": [
+    "ethereum",
+    "cli",
+    "openpgp",
+    "cryptography",
+    "blockchain",
+    "pki",
+    "edi",
+    "web3",
+    "viem",
+    "typescript",
+    "command-line"
+  ],
+  "author": "Cryptogram Contributors",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
   },
   "scripts": {
     "build": "tsc && node -e \"const fs = require('fs'); const shebang = '#!/usr/bin/env node\\\\n'; const file = './dist/index.js'; if (fs.existsSync(file)) { const content = fs.readFileSync(file, 'utf8'); if (!content.startsWith('#!')) { fs.writeFileSync(file, shebang + content); } fs.chmodSync(file, 0o755); }\"",
@@ -26,7 +58,7 @@
     "yaml": "^2.3.0",
     "viem": "^2.21.0",
     "openpgp": "^6.1.0",
-    "dexes": "file:../../sdks/typescript"
+    "@cryptogram/dexes": "file:../../sdks/typescript"
   },
   "devDependencies": {
     "typescript": "^5.3.0",

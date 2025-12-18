@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { Logger } from 'pino';
-import { IWeb3PGPService, to0x } from 'dexes';
+import { IWeb3PGPService, to0x } from '@cryptogram/dexes';
 import { outputJson, exitWithError } from '../factory';
 import { readInputFromFile, readInputFromStdin } from '../../utils/input';
 import * as openpgp from 'openpgp';

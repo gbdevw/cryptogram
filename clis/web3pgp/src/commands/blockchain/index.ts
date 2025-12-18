@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { Logger } from 'pino';
-import { IWeb3PGPService } from 'dexes';
+import { IWeb3PGPService } from '@cryptogram/dexes';
 import { createGetPublicKeyCommand } from './getPublicKey';
 import { createRegisterCommand } from './register';
 import { createAddSubkeyCommand } from './addSubkey';

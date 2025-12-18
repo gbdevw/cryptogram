@@ -13,7 +13,7 @@ import { mainnet, sepolia, foundry, ink, inkSepolia } from 'viem/chains';
 import { ChainConfig, MergedConfig } from '../config/types';
 import { ConfigError } from '../errors';
 import { createRootLogger, Logger } from '../utils/logger';
-import { IWeb3PGPService, Web3PGP, Web3PGPService } from 'dexes';
+import { IWeb3PGPService, Web3PGP, Web3PGPService } from '@cryptogram/dexes';
 
 /**
  * Map of well-known Viem chain names to chain objects.

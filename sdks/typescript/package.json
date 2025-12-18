@@ -1,8 +1,39 @@
 {
-  "name": "dexes",
+  "name": "@cryptogram/dexes",
   "version": "1.0.0",
-  "main": "src/index.js",
-  "types": "src/index.d.ts",
+  "description": "TypeScript SDK for managing OpenPGP keys on Ethereum through Web3PGP smart contracts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cryptogram/dexes.git"
+  },
+  "homepage": "https://github.com/cryptogram/dexes",
+  "bugs": {
+    "url": "https://github.com/cryptogram/dexes/issues"
+  },
+  "keywords": [
+    "ethereum",
+    "web3",
+    "openpgp",
+    "cryptography",
+    "blockchain",
+    "pki",
+    "edi",
+    "viem",
+    "typescript"
+  ],
+  "author": "Cryptogram Contributors",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "tsc -p .",
     "build:contracts": "cd ../../contracts && forge build",
@@ -14,9 +45,6 @@
     "test:integration": "npm run build:contracts && jest --config jest.integration.config.js",
     "test:all": "npm run test:unit && npm run test:integration"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^24.8.1",
@@ -30,6 +58,6 @@
     "openpgp": "^6.1.0",
     "p-limit": "^3.1.0",
     "viem": "^2.21.0"
-  },
-  "description": ""
+  }
 }
+
