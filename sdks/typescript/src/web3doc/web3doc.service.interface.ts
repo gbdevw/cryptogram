@@ -24,12 +24,12 @@ export interface IWeb3DocService {
      * The service is expected to be configured with a Web3PGP service instance to enable automatic public key retrieval based
      * on their fingerprint.
      * 
-     * @param hash The keccak256 hash of the document to be timestamped, provided as a Uint8Array or a ReadableStream of Uint8Array chunks.
+     * @param hash The keccak256 hash of the document to be timestamped, provided as a Uint8Array.
      * @param signature The detached OpenPGP signature over the document hash.
      * @param emitter The fingerprint of the public key used to create the signature. Will be used to download the public key from Web3PGP.
      * @return A promise that resolves to the ID assigned to the new timestamp and the transaction receipt.
      */
-    timestamp(hash: Uint8Array | ReadableStream<Uint8Array>, signature: openpgp.Signature, emitter: `0x${string}`): Promise<[bigint, TransactionReceipt]>;
+    timestamp(hash: Uint8Array, signature: openpgp.Signature, emitter: `0x${string}`): Promise<[bigint, TransactionReceipt]>;
 
     /**
      * Verifies a timestamp entry on the blockchain by its ID. The function retrieves the timestamp data from the
