@@ -106,4 +106,33 @@ export interface IWeb3DocService {
      * @return A promise that resolves to the ID assigned to the new timestamp and the transaction receipt.
      */
     timestamp(document: Uint8Array | ReadableStream<Uint8Array>, signature: openpgp.Signature, emitter: `0x${string}`): Promise<[bigint, TransactionReceipt]>;
+
+    /**
+     * Verifies a timestamp entry on the blockchain by its ID. The function retrieves the timestamp data from the
+     * Web3Doc smart contract and verifies the detached signature over the document hash using the emitter's public key.
+     * 
+     * The function returns the document hash, the signature, and the public key used for verification.
+     * 
+     * The user can then compare the hash received from this function with the keccak256 hash they compute from their 
+     * document to ensure integrity.
+     * 
+     * @param id The ID of the timestamp entry to verify.
+     * @returns A promise that resolves to an object containing the document hash, signature, the public key, the transaction hash and the date of the timestamp. 
+     */
+    verifyTimestamp(id: bigint): Promise<{
+        documentHash: Uint8Array; 
+        signature: openpgp.Signature; 
+        publicKey: openpgp.PublicKey;
+        tx: `0x${string}`,
+        date: Date,
+    }>;
+
+    /**
+     * Finds all timestamp IDs associated with a given document hash. Timestamp IDs can be used to retrieve and verify
+     * timestamp entries on the blockchain.
+     * 
+     * @param hash The keccak256 hash of the document to search for.
+     * @returns A promise that resolves to an array of timestamp IDs associated with the provided document hash.
+     */
+    findTimestampsByHash(hash: Uint8Array): Promise<bigint[]>;
 }
