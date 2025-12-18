@@ -8,7 +8,7 @@ import { createMockLogger } from '../../jest.setup';
 /**
  * Mock Web3PGP service
  */
-jest.mock('dexes', () => ({
+jest.mock('@cryptogram/dexes', () => ({
   Web3PGP: jest.fn(function (address, publicClient, walletClient) {
     this.address = address;
     this.publicClient = publicClient;
