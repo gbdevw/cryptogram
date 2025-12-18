@@ -1,4 +1,4 @@
-import { Address, TransactionReceipt } from 'viem';
+import { Address, BlockTag, TransactionReceipt } from 'viem';
 import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, NotificationLog } from './types/types'
 import { IFlatFee } from '../flatfee/flatefee.interface';
 
@@ -163,8 +163,8 @@ export interface IWeb3Doc extends IFlatFee {
         ids?: bigint[], 
         emitters?: `0x${string}`[], 
         dochashes?: `0x${string}`[], 
-        fromBlock?: bigint, 
-        toBlock?: bigint): Promise<DocumentLog[]>;
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint): Promise<DocumentLog[]>;
 
     /**
      * Retrieves a Document event by its unique ID.
@@ -196,8 +196,8 @@ export interface IWeb3Doc extends IFlatFee {
         copies?: bigint[], 
         originals?: bigint[], 
         emitters?: `0x${string}`[], 
-        fromBlock?: bigint, 
-        toBlock?: bigint): Promise<CopyLog[]>;
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint): Promise<CopyLog[]>;
 
     /**
      * Retrieves a Copy event by its unique ID.
@@ -229,8 +229,8 @@ export interface IWeb3Doc extends IFlatFee {
         ids?: bigint[],
         recipients?: `0x${string}`[],
         signatureRequested?: boolean,
-        fromBlock?: bigint, 
-        toBlock?: bigint): Promise<NotificationLog[]>;
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint): Promise<NotificationLog[]>;
 
     /**
      * Retrieves a Notification event by its document ID and recipient.
@@ -261,8 +261,8 @@ export interface IWeb3Doc extends IFlatFee {
     searchSignatureLogs(
         ids?: bigint[], 
         emitters?: `0x${string}`[], 
-        fromBlock?: bigint, 
-        toBlock?: bigint): Promise<SignatureLog[]>;
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint): Promise<SignatureLog[]>;
 
     
     /**
@@ -280,8 +280,16 @@ export interface IWeb3Doc extends IFlatFee {
         ids?: bigint[],
         emitters?: `0x${string}`[], 
         dochashes?: `0x${string}`[], 
-        fromBlock?: bigint, 
-        toBlock?: bigint): Promise<TimestampLog[]>;
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint): Promise<TimestampLog[]>;
+
+    /**
+     * Retrieves a Timestamp event by its unique ID.
+     * @param id The unique ID of the timestamp.
+     * @param blockNumber The block number where to search for the timestamp.
+     * @returns The TimestampLog if found, otherwise undefined.
+     */
+    getTimestampLogByID(id: bigint, blockNumber: bigint): Promise<TimestampLog | undefined>;
 
     /*****************************************************************************************************************/
     /* LOGS PARSING FUNCTIONS                                                                                        */
