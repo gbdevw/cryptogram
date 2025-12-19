@@ -30,6 +30,9 @@ export function validateYamlStructure(data: unknown): void {
   if (!config.ethereum) {
     throw new ConfigError('Missing required field: ethereum');
   }
+  if (!config.web3pgp) {
+    throw new ConfigError('Missing required field: web3pgp');
+  }
   if (!config.web3doc) {
     throw new ConfigError('Missing required field: web3doc');
   }
@@ -90,6 +93,15 @@ export function validateYamlStructure(data: unknown): void {
         `ethereum.wallet.type must be '${WalletType.PrivateKey}', got '${walletType}'`
       );
     }
+  }
+
+  // Validate web3pgp section
+  const web3pgp = config.web3pgp;
+  if (typeof web3pgp !== 'object' || web3pgp === null) {
+    throw new ConfigError('web3pgp must be an object');
+  }
+  if (!('contract' in web3pgp)) {
+    throw new ConfigError('Missing required field: web3pgp.contract');
   }
 
   // Validate web3doc section

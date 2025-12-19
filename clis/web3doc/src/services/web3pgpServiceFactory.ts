@@ -9,12 +9,11 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet, sepolia, foundry, ink, inkSepolia } from 'viem/chains';
-import { Logger } from 'pino';
 
 import { ChainConfig, MergedConfig } from '../config/types';
 import { ConfigError } from '../errors';
-import { IWeb3DocService, Web3Doc, Web3DocService } from '@cryptogram/dexes';
-import { IWeb3PGPService } from '@cryptogram/dexes';
+import { createRootLogger, Logger } from '../utils/logger';
+import { IWeb3PGPService, Web3PGP, Web3PGPService } from '@cryptogram/dexes';
 
 /**
  * Map of well-known Viem chain names to chain objects.
@@ -57,6 +56,8 @@ function validatePrivateKeyFormat(privateKey: string): void {
 
 /**
  * Get Viem chain object for the given chain config.
+ * If a well-known chain name is provided, use Viem's default.
+ * If a numeric chainId is provided, look it up in CHAIN_ID_MAP or create a generic chain.
  */
 function getChainForConfig(chainConfig: ChainConfig): Chain {
   if (typeof chainConfig === 'string') {
@@ -67,11 +68,14 @@ function getChainForConfig(chainConfig: ChainConfig): Chain {
     throw new ConfigError(`Unsupported chain name: ${chainConfig}`);
   }
 
+  // chainConfig is a number
   const chain = CHAIN_ID_MAP[chainConfig];
   if (chain) {
     return chain;
   }
 
+  // For unsupported chain IDs, create a generic chain object
+  // The RPC endpoints from config will be used for actual connections
   return {
     id: chainConfig,
     name: `Chain ${chainConfig}`,
@@ -90,6 +94,11 @@ function getChainForConfig(chainConfig: ChainConfig): Chain {
  * 1. User-provided config.ethereum.rpc.endpoints (explicit)
  * 2. Predefined endpoints from the well-known chain
  * 3. Error if chain is unknown and no RPC endpoints provided
+ *
+ * @param config - Merged configuration
+ * @param logger - Logger instance to use for logging
+ * @returns Sorted RPC endpoints by priority
+ * @throws ConfigError if no endpoints can be resolved
  */
 function resolveRpcEndpoints(config: MergedConfig, logger: Logger): Array<{ url: string; priority: number }> {
   const { chain, rpc } = config.ethereum;
@@ -127,52 +136,73 @@ function resolveRpcEndpoints(config: MergedConfig, logger: Logger): Array<{ url:
       }));
       logger.debug(
         { count: predefinedEndpoints.length, endpoints: predefinedEndpoints.map(e => e.url) },
-        'Using predefined RPC endpoints for chain ID',
+        'Using predefined RPC endpoints for known chain ID',
       );
       return predefinedEndpoints;
     }
   }
 
+  // No RPC endpoints available
+  const chainName = typeof chain === 'string' ? chain : `chain ${chain}`;
   throw new ConfigError(
-    `No RPC endpoints available for chain ${chain}. ` +
-      `Please provide RPC endpoints in config or use a well-known chain.`
+    `No RPC endpoints available for ${chainName}. ` +
+    `Provide endpoints in ethereum.rpc.endpoints or use a well-known chain with predefined RPC endpoints.`,
   );
 }
 
 /**
- * Create PublicClient with intelligent RPC fallback
+ * Create Viem PublicClient with RPC endpoint fallback chain.
+ * Automatically retries failed RPC calls across all configured endpoints.
+ * If gasLimit is configured, injects it into simulateContract to skip gas estimation.
  */
 function createPublicClientWithFallback(config: MergedConfig, logger: Logger): PublicClient {
-  const chain = getChainForConfig(config.ethereum.chain);
-  const endpoints = resolveRpcEndpoints(config, logger);
+  const { chain: chainConfig } = config.ethereum;
+  const chainObj = getChainForConfig(chainConfig);
 
-  const httpTransports = endpoints.map((ep) => http(ep.url));
+  // Resolve RPC endpoints (user config > predefined defaults > error)
+  const rpcEndpoints = resolveRpcEndpoints(config, logger);
 
-  if (httpTransports.length === 1) {
-    logger.debug({ endpoint: endpoints[0].url }, 'Creating PublicClient with single RPC');
-    return createPublicClient({
-      chain,
-      transport: httpTransports[0],
-    }) as any;
-  }
+  // Sort endpoints by priority (lower priority value = higher priority)
+  const sortedEndpoints = [...rpcEndpoints].sort((a, b) => a.priority - b.priority);
 
   logger.debug(
-    { count: httpTransports.length, endpoints: endpoints.map(e => e.url) },
-    'Creating PublicClient with fallback RPC'
+    { endpoints: sortedEndpoints.map(e => e.url) },
+    'Creating PublicClient with RPC fallback chain',
   );
 
-  return createPublicClient({
-    chain,
-    transport: fallback(httpTransports),
-  }) as any;
+  // Create fallback transport with all endpoints
+  const fallbackTransport = fallback(sortedEndpoints.map(ep => http(ep.url)));
+
+  const publicClient = createPublicClient({
+    chain: chainObj,
+    transport: fallbackTransport,
+  });
+
+  // If gasLimit is configured, extend the client to inject it into simulateContract
+  if (config.ethereum.gasLimit) {
+    logger.debug({ gasLimit: config.ethereum.gasLimit.toString() }, 'Extending PublicClient to inject gas limit into simulateContract');
+    return publicClient.extend((client) => ({
+      async simulateContract(args: any) {
+        // Inject gas limit into simulation to skip gas estimation
+        logger.debug('Injecting configured gasLimit into simulateContract');
+        return client.simulateContract({
+          ...args,
+          gas: args.gas ?? config.ethereum.gasLimit,
+        }) as any;
+      },
+    })) as any as PublicClient;
+  }
+
+  return publicClient as PublicClient;
 }
 
 /**
- * Create WalletClient if private key is configured
+ * Create Viem WalletClient for write operations.
+ * Only created if wallet.type is set and privateKey is configured.
  */
 function createWalletClientIfConfigured(
   config: MergedConfig,
-  logger: Logger
+  logger: Logger,
 ): WalletClient | undefined {
   const { wallet, chain: chainConfig } = config.ethereum;
 
@@ -212,38 +242,50 @@ function createWalletClientIfConfigured(
     account,
     chain: chainObj,
     transport: primaryTransport,
-  }) as any;
+  });
 
   // If gasLimit is configured, extend the client to use it
   if (config.ethereum.gasLimit) {
     logger.debug({ gasLimit: config.ethereum.gasLimit.toString() }, 'Using explicit gas limit for transactions');
-    return walletClient.extend((client: any) => ({
-      sendTransaction: async (params: any) =>
-        client.sendTransaction({
-          ...params,
-          gas: config.ethereum.gasLimit,
-        }),
-    }));
+    return walletClient.extend((client) => ({
+      async estimateGas(args: any) {
+        // Skip gas estimation and return the configured limit
+        logger.debug('Skipping gas estimation - using configured gasLimit');
+        return config.ethereum.gasLimit!;
+      },
+      async sendTransaction(args: any) {
+        return client.sendTransaction({
+          ...args,
+          gas: args.gas ?? config.ethereum.gasLimit,
+        });
+      },
+    })) as any;
   }
 
   return walletClient;
 }
 
 /**
- * Initialize Web3Doc service with Web3PGP service dependency
+ * Create the Web3PGP service from configuration.
+ * Orchestrates Viem client setup, contract initialization, and service creation.
+ *
+ * @param config - Merged configuration with Ethereum and Web3PGP settings
+ * @param logger - Logger instance to use for logging
+ * @returns Promise resolving to IWeb3PGPService instance
+ * @throws ConfigError if configuration is invalid
  */
-export async function createWeb3DocService(
-  config: MergedConfig,
-  web3pgpService: IWeb3PGPService,
-  logger: Logger,
-): Promise<IWeb3DocService> {
-  const serviceLogger = logger.child({ component: 'web3docService' });
+export async function createWeb3PGPService(config: MergedConfig, logger: Logger): Promise<IWeb3PGPService> {
+  logger.debug({ chain: config.ethereum.chain }, 'Initializing Web3PGP service');
 
   try {
+    // Step 1: Create PublicClient with RPC fallback
     const publicClient = createPublicClientWithFallback(config, logger);
+
+    // Step 2: Create WalletClient if private key configured
     const walletClient = createWalletClientIfConfigured(config, logger);
 
-    const contractAddress = config.web3doc.contract as `0x${string}`;
+    // Step 3: Initialize low-level Web3PGP contract wrapper
+    const contractAddress = config.web3pgp.contract as `0x${string}`;
 
     // Validate contract address format
     if (!contractAddress.startsWith('0x') || contractAddress.length !== 42) {
@@ -252,33 +294,32 @@ export async function createWeb3DocService(
       );
     }
 
-    serviceLogger.debug({ contractAddress }, 'Creating Web3Doc contract wrapper');
+    logger.debug({ contractAddress }, 'Creating Web3PGP contract wrapper');
 
-    // Create contract instance
-    const web3docContract = new Web3Doc(contractAddress, publicClient as any, walletClient as any);
-
-    // Create high-level Web3Doc service with Web3PGP service dependency
+    // Create contract instance - pass publicClient, walletClient, and contract address
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const service = new Web3DocService(web3docContract as any, web3pgpService as any);
+    const web3pgpContract = new Web3PGP(contractAddress, publicClient as any, walletClient as any);
 
-    serviceLogger.debug(
+    // Step 4: Create high-level Web3PGP service
+    const service = new Web3PGPService(web3pgpContract);
+
+    logger.debug(
       {
         chain: config.ethereum.chain,
         contractAddress,
         hasWallet: !!walletClient,
       },
-      'Web3Doc service initialized successfully',
+      'Web3PGP service initialized successfully',
     );
 
     return service;
   } catch (error) {
     if (error instanceof ConfigError) {
-      throw error;
+      throw error; // Re-throw ConfigError as-is
     }
 
-    serviceLogger.error({ error }, 'Failed to initialize Web3Doc service');
-    throw new ConfigError(
-      `Failed to initialize Web3Doc service: ${error instanceof Error ? error.message : String(error)}`
-    );
+    // Wrap unexpected errors
+    logger.error({ error }, 'Failed to initialize Web3PGP service');
+    throw new ConfigError(`Failed to initialize Web3PGP service: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

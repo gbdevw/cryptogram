@@ -15,6 +15,7 @@ export const DEFAULT_CONFIG: MergedConfig = {
     },
     wallet: { type: WalletType.PrivateKey },
   },
-  web3doc: { contract: '0x9fE46736679d2D348b2D5c56172e27A29dFc5b59' as const },
+  web3pgp: { contract: '0x72d02B94317ac899B34459a4e6685eFe12Ac17a8' as const },
+  web3doc: { contract: '0x5C09E831276ADCec4D5C94645F34500D3deA8E8A' as const },
   monitoring: { logging: { level: 'info' } },
 };

@@ -32,6 +32,10 @@ export interface EthereumConfig {
   gasLimit?: bigint; // Optional: explicitly set gas limit (for testing). If undefined, Viem estimates automatically.
 }
 
+export interface Web3PGPConfig {
+  contract: Address;
+}
+
 export interface Web3DocConfig {
   contract: Address;
 }
@@ -44,6 +48,7 @@ export interface MonitoringConfig {
 
 export interface MergedConfig {
   ethereum: EthereumConfig;
+  web3pgp: Web3PGPConfig;
   web3doc: Web3DocConfig;
   monitoring: MonitoringConfig;
 }

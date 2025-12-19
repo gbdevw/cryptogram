@@ -127,6 +127,13 @@ function loadEnvVarsConfig(env: Record<string, string | undefined>): Partial<Mer
       env.DEXES_WALLET_PRIVATE_KEY;
   }
 
+  // DEXES_WEB3PGP_CONTRACT
+  if (env.DEXES_WEB3PGP_CONTRACT) {
+    if (!config.web3pgp) config.web3pgp = {};
+    (config.web3pgp as Record<string, unknown>).contract =
+      env.DEXES_WEB3PGP_CONTRACT;
+  }
+
   // DEXES_WEB3DOC_CONTRACT
   if (env.DEXES_WEB3DOC_CONTRACT) {
     if (!config.web3doc) config.web3doc = {};
@@ -172,6 +179,11 @@ function mergeConfigs(...configs: Partial<MergedConfig>[]): MergedConfig {
           privateKey: config.ethereum.wallet.privateKey,
         };
       }
+    }
+
+    // Merge web3pgp config
+    if (config.web3pgp?.contract) {
+      result.web3pgp.contract = config.web3pgp.contract;
     }
 
     // Merge web3doc config

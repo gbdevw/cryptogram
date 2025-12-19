@@ -2,6 +2,8 @@ import { Command } from 'commander';
 import { initializeConsolePatch } from './setup';
 import { createRootLogger } from './utils/logger';
 import { loadConfig } from './config/loader';
+import { createWeb3PGPService } from './services/web3pgpServiceFactory';
+import { createWeb3DocService } from './services/web3docServiceFactory';
 import { createBlockchainCommands } from './commands/blockchain';
 import { createConfigurationCommands } from './commands/configuration';
 import { ConfigError } from './errors';
@@ -26,6 +28,12 @@ async function main(): Promise<void> {
     rootLogger.debug('Web3Doc CLI starting');
 
     rootLogger.debug('Configuration loaded');
+
+    const web3pgpService = await createWeb3PGPService(config, logger);
+    rootLogger.debug('Web3PGP service initialized');
+
+    const web3docService = await createWeb3DocService(config, web3pgpService, logger);
+    rootLogger.debug('Web3Doc service initialized');
 
     const program = new Command()
       .name('web3doc')

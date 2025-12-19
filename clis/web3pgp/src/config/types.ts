@@ -1,8 +1,8 @@
 /**
  * Configuration type definitions
  */
-
-import { Address, LogLevel } from '../types';
+import { Address } from 'viem';
+import { LogLevel } from '../types';
 
 export enum WalletType {
   PrivateKey = 'private-key', // pragma: allowlist secret

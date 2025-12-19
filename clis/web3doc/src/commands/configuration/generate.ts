@@ -32,9 +32,13 @@ ethereum:
   #   # Support for \${VAR_NAME} syntax: privateKey: "\${DEXES_WALLET_PRIVATE_KEY}"
   #   # privateKey: "<YOUR_PRIVATE_KEY>"
 
+web3pgp:
+  # Web3PGP smart contract address (test deployment)
+  contract: "0x72d02B94317ac899B34459a4e6685eFe12Ac17a8"
+
 web3doc:
   # Web3Doc smart contract address (test deployment)
-  contract: "0x9fE46736679d2D348b2D5c56172e27A29dFc5b59"
+  contract: "0x5C09E831276ADCec4D5C94645F34500D3deA8E8A"
 
 monitoring:
   logging:
@@ -48,6 +52,7 @@ monitoring:
 #
 # DEXES_CHAIN_ID=763373
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
+# DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_WEB3DOC_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_LOG_LEVEL=debug
 `;
@@ -77,6 +82,11 @@ ethereum:
   #   # Support for \${VAR_NAME} syntax: privateKey: "\${DEXES_WALLET_PRIVATE_KEY}"
   #   # privateKey: "<YOUR_PRIVATE_KEY>"
 
+web3pgp:
+  # Web3PGP smart contract address (production deployment)
+  # TODO: Update with actual contract address once deployed
+  contract: "UNDEFINED"
+
 web3doc:
   # Web3Doc smart contract address (production deployment)
   # TODO: Update with actual contract address once deployed
@@ -94,6 +104,7 @@ monitoring:
 #
 # DEXES_CHAIN_ID=<CHAIN_ID>
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
+# DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_WEB3DOC_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_LOG_LEVEL=info
 `;
