@@ -1,5 +1,5 @@
 /**
- * Global type definitions for Web3PGP CLI
+ * Global type definitions for Web3Doc CLI
  */
 
 import { Address } from 'viem';
