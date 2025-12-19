@@ -207,24 +207,12 @@ function createWalletClientIfConfigured(
   const primaryEndpoint = sortedEndpoints[0];
   const primaryTransport = http(primaryEndpoint.url);
 
-  // Create wallet client with optional gas limit override
+  // Create wallet client
   const walletClient = createWalletClient({
     account,
     chain: chainObj,
     transport: primaryTransport,
   }) as any;
-
-  // If gasLimit is configured, extend the client to use it
-  if (config.ethereum.gasLimit) {
-    logger.debug({ gasLimit: config.ethereum.gasLimit.toString() }, 'Using explicit gas limit for transactions');
-    return walletClient.extend((client: any) => ({
-      sendTransaction: async (params: any) =>
-        client.sendTransaction({
-          ...params,
-          gas: config.ethereum.gasLimit,
-        }),
-    }));
-  }
 
   return walletClient;
 }

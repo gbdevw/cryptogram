@@ -178,21 +178,6 @@ function createPublicClientWithFallback(config: MergedConfig, logger: Logger): P
     transport: fallbackTransport,
   });
 
-  // If gasLimit is configured, extend the client to inject it into simulateContract
-  if (config.ethereum.gasLimit) {
-    logger.debug({ gasLimit: config.ethereum.gasLimit.toString() }, 'Extending PublicClient to inject gas limit into simulateContract');
-    return publicClient.extend((client) => ({
-      async simulateContract(args: any) {
-        // Inject gas limit into simulation to skip gas estimation
-        logger.debug('Injecting configured gasLimit into simulateContract');
-        return client.simulateContract({
-          ...args,
-          gas: args.gas ?? config.ethereum.gasLimit,
-        }) as any;
-      },
-    })) as any as PublicClient;
-  }
-
   return publicClient as PublicClient;
 }
 
@@ -237,30 +222,12 @@ function createWalletClientIfConfigured(
   const primaryEndpoint = sortedEndpoints[0];
   const primaryTransport = http(primaryEndpoint.url);
 
-  // Create wallet client with optional gas limit override
+  // Create wallet client
   const walletClient = createWalletClient({
     account,
     chain: chainObj,
     transport: primaryTransport,
   });
-
-  // If gasLimit is configured, extend the client to use it
-  if (config.ethereum.gasLimit) {
-    logger.debug({ gasLimit: config.ethereum.gasLimit.toString() }, 'Using explicit gas limit for transactions');
-    return walletClient.extend((client) => ({
-      async estimateGas(args: any) {
-        // Skip gas estimation and return the configured limit
-        logger.debug('Skipping gas estimation - using configured gasLimit');
-        return config.ethereum.gasLimit!;
-      },
-      async sendTransaction(args: any) {
-        return client.sendTransaction({
-          ...args,
-          gas: args.gas ?? config.ethereum.gasLimit,
-        });
-      },
-    })) as any;
-  }
 
   return walletClient;
 }

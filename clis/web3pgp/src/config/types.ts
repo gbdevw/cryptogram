@@ -29,7 +29,6 @@ export interface EthereumConfig {
     type: WalletType;
     privateKey?: `0x${string}`; // pragma: allowlist secret
   };
-  gasLimit?: bigint; // Optional: explicitly set gas limit (for testing). If undefined, Viem estimates automatically.
 }
 
 export interface Web3PGPConfig {
