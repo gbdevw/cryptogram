@@ -242,8 +242,14 @@ export async function createWeb3DocService(
 
     serviceLogger.debug({ contractAddress }, 'Creating Web3Doc contract wrapper');
 
-    // Create contract instance
-    const web3docContract = new Web3Doc(contractAddress, publicClient as any, walletClient as any);
+    // Create contract instance with correct parameter order: address, web3pgp, publicClient, walletClient
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const web3docContract = new Web3Doc(
+      contractAddress,
+      (web3pgpService as any).contract,
+      publicClient as any,
+      walletClient as any
+    );
 
     // Create high-level Web3Doc service with Web3PGP service dependency
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

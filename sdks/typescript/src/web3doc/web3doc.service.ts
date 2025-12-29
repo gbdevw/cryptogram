@@ -175,9 +175,10 @@ export class Web3DocService implements IWeb3DocService {
             // arg might point to a subkey - It is preferable to always use the primary key fingerprint for emitter identification
             console.debug(`[Web3Doc Service] Submitting timestamp to Web3Doc smart contract for emitter fingerprint: ${emitter}`);
             const receipt = await this.web3doc.timestamp(toBytes32(to0x(pk.getFingerprint())), toHex(hash), toHex(signature.write()));
-
-            // Extract the timestamp log from the transaction receipt
-            const logs = await this.web3doc.extractTimestampLog(receipt);
+            console.debug(`[Web3Doc Service] Timestamp transaction submitted successfully`);
+            // Extract the timestamp log from the transaction receipt - Use current date as timestamp as the receipt is 
+            // from a just submitted transaction and experience showed that the block timestamp may not be available yet
+            const logs = await this.web3doc.extractTimestampLog(receipt, new Date());
             if (logs.length !== 1) {
                 throw new Web3DocServiceCriticalError(`Unexpected number of timestamp logs in transaction receipt: ${logs.length}`);
             }
@@ -188,6 +189,7 @@ export class Web3DocService implements IWeb3DocService {
                 // Wrap and rethrow validation errors from Web3PGP service
                 throw new Web3DocServiceValidationError(`Emitter public key not valid for fingerprint: ${emitter}`, error);
             }
+            console.error(error);
             throw new Web3DocServiceCriticalError('Failed to retrieve or verify emitter public key', error instanceof Error ? error : undefined);
         }
     }

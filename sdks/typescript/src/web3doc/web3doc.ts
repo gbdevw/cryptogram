@@ -792,15 +792,34 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
     /**
      * Extracts Document logs from a transaction receipt.
      * @param receipt The transaction receipt to extract logs from.
+     * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
      * @returns A promise that resolves to an array of DocumentLog objects.
      */
-    public async extractDocumentLog(receipt: TransactionReceipt): Promise<DocumentLog[]> {
+    public async extractDocumentLog(receipt: TransactionReceipt, timestamp?: Date): Promise<DocumentLog[]> {
         const parsedLogs = parseEventLogs({
             abi: Web3DocABI,
             eventName: 'Document',
             logs: receipt.logs
         });
 
+        if (timestamp) {
+            // Use the provided timestamp for all logs
+            return parsedLogs.map(log => ({
+                blockNumber: log.blockNumber,
+                blockHash: log.blockHash,
+                blockTimestamp: timestamp,
+                transactionHash: log.transactionHash,
+                id: log.args.id,
+                emitter: log.args.emitter,
+                dochash: log.args.dochash,
+                signature: log.args.signature,
+                document: log.args.document,
+                uri: log.args.uri,
+                mimeType: log.args.mimeType,
+            }));
+        }
+
+        // Get block timestamps from the chain
         const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
         const blockTimestamps = new Map(
             await Promise.all(uniqueBlocks.map(async bn => 
@@ -827,14 +846,31 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
      * Extracts Copy logs from a transaction receipt.
      * @param receipt The transaction receipt to extract logs from.
      * @returns A promise that resolves to an array of CopyLog objects.
+     * @returns A promise that resolves to an array of CopyLog objects.
      */
-    public async extractCopyLog(receipt: TransactionReceipt): Promise<CopyLog[]> {
+    public async extractCopyLog(receipt: TransactionReceipt, timestamp?: Date): Promise<CopyLog[]> {
         const parsedLogs = parseEventLogs({
             abi: Web3DocABI,
             eventName: 'Copy',
             logs: receipt.logs
         });
 
+        if (timestamp) {
+            // Use the provided timestamp for all logs
+            return parsedLogs.map(log => ({
+                blockNumber: log.blockNumber,
+                blockHash: log.blockHash,
+                blockTimestamp: timestamp,
+                transactionHash: log.transactionHash,
+                copy: log.args.copy,
+                original: log.args.original,
+                emitter: log.args.emitter,
+                document: log.args.document,
+                uri: log.args.uri,
+            }));
+        }
+
+        // Get block timestamps from the chain
         const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
         const blockTimestamps = new Map(
             await Promise.all(uniqueBlocks.map(async bn => 
@@ -858,15 +894,30 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
     /**
      * Extracts Signature logs from a transaction receipt.
      * @param receipt The transaction receipt to extract logs from.
+     * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
      * @returns A promise that resolves to an array of SignatureLog objects.
      */
-    public async extractSignatureLog(receipt: TransactionReceipt): Promise<SignatureLog[]> {
+    public async extractSignatureLog(receipt: TransactionReceipt, timestamp?: Date): Promise<SignatureLog[]> {
         const parsedLogs = parseEventLogs({
             abi: Web3DocABI,
             eventName: 'Signature',
             logs: receipt.logs
         });
 
+        if (timestamp) {
+            // Use the provided timestamp for all logs
+            return parsedLogs.map(log => ({
+                blockNumber: log.blockNumber,
+                blockHash: log.blockHash,
+                blockTimestamp: timestamp,
+                transactionHash: log.transactionHash,
+                id: log.args.id,
+                emitter: log.args.emitter,
+                signature: log.args.signature,
+            }));
+        }
+
+        // Get block timestamps from the chain
         const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
         const blockTimestamps = new Map(
             await Promise.all(uniqueBlocks.map(async bn => 
@@ -888,15 +939,31 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
     /**
      * Extracts Timestamp logs from a transaction receipt.
      * @param receipt The transaction receipt to extract logs from.
+     * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
      * @returns A promise that resolves to an array of TimestampLog objects.
      */
-    public async extractTimestampLog(receipt: TransactionReceipt): Promise<TimestampLog[]> {
+    public async extractTimestampLog(receipt: TransactionReceipt, timestamp?: Date): Promise<TimestampLog[]> {
         const parsedLogs = parseEventLogs({
             abi: Web3DocABI,
             eventName: 'Timestamp',
             logs: receipt.logs
         });
 
+        if (timestamp) {
+            // Use the provided timestamp for all logs
+            return parsedLogs.map(log => ({
+                blockNumber: log.blockNumber,
+                blockHash: log.blockHash,
+                blockTimestamp: timestamp,
+                transactionHash: log.transactionHash,
+                id: log.args.id,
+                emitter: log.args.emitter,
+                dochash: log.args.dochash,
+                signature: log.args.signature,
+            }));
+        }
+
+        // Get block timestamps from the chain
         const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
         const blockTimestamps = new Map(
             await Promise.all(uniqueBlocks.map(async bn => 
@@ -919,9 +986,10 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
     /**
      * Extracts Notification logs from a transaction receipt.
      * @param receipt The transaction receipt to extract logs from.
+     * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
      * @returns A promise that resolves to an array of NotificationLog objects.
      */
-    public async extractNotificationLog(receipt: TransactionReceipt): Promise<NotificationLog[]> {
+    public async extractNotificationLog(receipt: TransactionReceipt, timestamp?: Date): Promise<NotificationLog[]> {
         const parsedLogs = parseEventLogs({
             strict: true,
             abi: Web3DocABI,
@@ -929,6 +997,22 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             logs: receipt.logs
         });
 
+        if (timestamp) {
+            // Use the provided timestamp for all logs
+            return parsedLogs.map(log => ({
+                blockNumber: log.blockNumber,
+                blockHash: log.blockHash,
+                blockTimestamp: timestamp,
+                transactionHash: log.transactionHash,
+                id: log.args.id,
+                recipient: log.args.recipient,
+                emitter: log.args.emitter,
+                source: log.args.source,
+                signatureRequested: log.args.signatureRequested,
+            }));
+        }
+
+        // Get block timestamps from the chain
         const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
         const blockTimestamps = new Map(
             await Promise.all(uniqueBlocks.map(async bn => 

@@ -41,7 +41,7 @@ async function main(): Promise<void> {
       .description('Web3Doc CLI - Decentralized document management on Ethereum')
       .helpOption('-h, --help', 'Show help');
 
-    const blockchainCommands = createBlockchainCommands({ logger });
+    const blockchainCommands = createBlockchainCommands({ logger, web3docService });
     const configurationCommands = createConfigurationCommands();
 
     // Add blockchain commands as direct subcommands

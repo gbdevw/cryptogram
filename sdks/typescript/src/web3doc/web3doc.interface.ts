@@ -299,39 +299,44 @@ export interface IWeb3Doc extends IFlatFee {
      * Extracts DocumentLog entries from a given transaction receipt.
      * 
      * @param receipt The transaction receipt containing the logs to be parsed.
+     * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
      * @returns A promise that resolves to an array of DocumentLog entries extracted from the transaction receipt.
      */
-    extractDocumentLog(receipt: TransactionReceipt): Promise<DocumentLog[]>;
+    extractDocumentLog(receipt: TransactionReceipt, timestamp?: Date): Promise<DocumentLog[]>;
 
     /**
      * Extracts CopyLog entries from a given transaction receipt.
      * 
      * @param receipt The transaction receipt containing the logs to be parsed.
+     * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
      * @returns A promise that resolves to an array of CopyLog entries extracted from the transaction receipt.
      */
-    extractCopyLog(receipt: TransactionReceipt): Promise<CopyLog[]>;
+    extractCopyLog(receipt: TransactionReceipt, timestamp?: Date): Promise<CopyLog[]>;
 
     /**
      * Extracts SignatureLog entries from a given transaction receipt.
      * 
      * @param receipt The transaction receipt containing the logs to be parsed.
+     * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
      * @returns A promise that resolves to an array of SignatureLog entries extracted from the transaction receipt.
      */
-    extractSignatureLog(receipt: TransactionReceipt): Promise<SignatureLog[]>;
+    extractSignatureLog(receipt: TransactionReceipt, timestamp?: Date): Promise<SignatureLog[]>;
 
     /**
      * Extracts TimestampLog entries from a given transaction receipt.
      * 
      * @param receipt The transaction receipt containing the logs to be parsed.
+     * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
      * @returns A promise that resolves to an array of TimestampLog entries extracted from the transaction receipt.
      */
-    extractTimestampLog(receipt: TransactionReceipt): Promise<TimestampLog[]>;
+    extractTimestampLog(receipt: TransactionReceipt, timestamp?: Date): Promise<TimestampLog[]>;
 
     /**
      * Extracts NotificationLog entries from a given transaction receipt.
      * 
      * @param receipt The transaction receipt containing the logs to be parsed.
+     * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
      * @returns A promise that resolves to an array of NotificationLog entries extracted from the transaction receipt.
      */
-    extractNotificationLog(receipt: TransactionReceipt): Promise<NotificationLog[]>;
+    extractNotificationLog(receipt: TransactionReceipt, timestamp?: Date): Promise<NotificationLog[]>;
 }
