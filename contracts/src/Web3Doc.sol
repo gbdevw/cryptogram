@@ -36,7 +36,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
  * @custom:gas-efficiency Event logs provide 90%+ cost savings vs contract storage for document data.
  */
 contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
-
     /*****************************************************************************************************************/
     /* STORAGE                                                                                                       */
     /*****************************************************************************************************************/
@@ -46,6 +45,8 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
 
         /**
          * Monotically increasing counter to generate unique IDs for the published documents and timestamps.
+         *
+         * Should start at 1 so that the zero value can be used to indicate non-existing documents.
          */
         uint256 docId;
 
@@ -68,13 +69,32 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
          * @notice Lists the block numbers when were published the signatures associated with the given document.
          */
         mapping(uint256 => uint256[]) docIdToSignatures;
+
+        /**
+         * @notice Maps a document hash to the list of document IDs (documents or timestamps) linked to documents or timestamps with that hash were published.
+         */
+        mapping(bytes32 => uint256[]) docHashToDocIds;
+
+        /**
+         * @notice Maps a signature hash to the block number where the signature was published.
+         */
+        mapping(bytes32 => uint256) signatureHashToBlock;
+
+        /**
+         * @notice Lists the block numbers when were published the revocations associated with the signature identified by the given signature hash.
+         */
+        mapping(bytes32 => uint256[]) signatureHashToRevocationBlocks;
     }
 
     /// @dev keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Web3Doc")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant WEB3DOC_STORAGE_LOCATION =
         0x126b4ad6791ca5ab4e9a2b6bda753a1b72d59cc8959232491e0a27e873933a00;
 
-    function _getWeb3DocStorage() private pure returns (Web3DocStorage storage $) {
+    function _getWeb3DocStorage()
+        private
+        pure
+        returns (Web3DocStorage storage $)
+    {
         assembly {
             $.slot := WEB3DOC_STORAGE_LOCATION
         }
@@ -97,7 +117,11 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
      * @param manager The address of the AccessManager contract used to manage access control.
      * @param web3pgp The address of the proxy for the Web3PGP contract used by this contract to verify the key existence.
      */
-    function initialize(uint256 fee, address manager, address web3pgp) external initializer {
+    function initialize(
+        uint256 fee,
+        address manager,
+        address web3pgp
+    ) external initializer {
         // Check that the W3PGP address is not the zero address
         require(web3pgp != address(0), "Web3PGP address cannot be zero");
         // Check that the AccessManager address is not the zero address
@@ -138,20 +162,34 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
         // Validate emitter and recipients
         _checkEmitter(emitter);
         _checkRecipients(recipients);
-        
+
         Web3DocStorage storage $ = _getWeb3DocStorage();
         uint256 currentDocId = $.docId;
         uint256 currentBlock = block.number;
-        
+
         // Store block number for new document
         $.docIdToBlockNumber[currentDocId] = currentBlock;
-        
+        $.docHashToDocIds[dochash].push(currentDocId);
+
         // Emit Document event
-        emit Document(currentDocId, emitter, dochash, signature, document, "", mimeType);
-        
+        emit Document(
+            currentDocId,
+            emitter,
+            dochash,
+            signature,
+            document,
+            "",
+            mimeType
+        );
+
         // Notify recipients
-        _notifyRecipients(currentDocId, emitter, recipients, EventType.DOCUMENT);
-        
+        _notifyRecipients(
+            currentDocId,
+            emitter,
+            recipients,
+            EventType.DOCUMENT
+        );
+
         // Increment document ID
         $.docId = currentDocId + 1;
     }
@@ -170,13 +208,14 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
         // Validate emitter and recipients
         _checkEmitter(emitter);
         _checkRecipients(recipients);
-        
+
         Web3DocStorage storage $ = _getWeb3DocStorage();
         uint256 currentDocId = $.docId;
         uint256 currentBlock = block.number;
 
         // Store block number for new document
         $.docIdToBlockNumber[currentDocId] = currentBlock;
+        $.docHashToDocIds[dochash].push(currentDocId);
 
         // Emit a Document event
         emit Document(
@@ -190,7 +229,12 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
         );
 
         // Emit a Notification event for each recipient
-        _notifyRecipients(currentDocId, emitter, recipients, EventType.DOCUMENT);
+        _notifyRecipients(
+            currentDocId,
+            emitter,
+            recipients,
+            EventType.DOCUMENT
+        );
 
         // Increase the document ID counter
         $.docId = currentDocId + 1;
@@ -199,13 +243,12 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function copyOnChain(uint256 original, bytes32 emitter, Recipient[] calldata recipients, bytes calldata document)
-        external
-        payable
-        override
-        nonReentrant
-        collectFee
-    {
+    function copyOnChain(
+        uint256 original,
+        bytes32 emitter,
+        Recipient[] calldata recipients,
+        bytes calldata document
+    ) external payable override nonReentrant collectFee {
         // Validate emitter and recipients
         _checkEmitter(emitter);
         _checkRecipients(recipients);
@@ -219,9 +262,10 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
 
         // Update the copy to original mapping
         $.copyToOriginal[currentDocId] = original;
-        
+
         // Store the block number for the new document
         $.docIdToBlockNumber[currentDocId] = currentBlock;
+        // No hash is stored for copies - refer to the original document for hash
 
         // Emit a Copy event
         emit Copy(currentDocId, original, emitter, document, "");
@@ -235,13 +279,12 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function copyOffChain(uint256 original, bytes32 emitter, Recipient[] calldata recipients, string calldata uri)
-        external
-        payable
-        override
-        nonReentrant
-        collectFee
-    {
+    function copyOffChain(
+        uint256 original,
+        bytes32 emitter,
+        Recipient[] calldata recipients,
+        string calldata uri
+    ) external payable override nonReentrant collectFee {
         // Validate emitter and recipients
         _checkEmitter(emitter);
         _checkRecipients(recipients);
@@ -255,7 +298,8 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
 
         // Update the copy to original mapping
         $.copyToOriginal[currentDocId] = original;
-        
+        // No hash is stored for copies - refer to the original document for hash
+
         // Store the block number for the new document
         $.docIdToBlockNumber[currentDocId] = currentBlock;
 
@@ -278,47 +322,73 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function sign(uint256 id, bytes32 emitter, bytes calldata signature)
-        external
-        payable
-        override
-        nonReentrant
-        collectFee
-    {
+    function sign(
+        uint256 id,
+        bytes32 emitter,
+        bytes calldata signature
+    ) external payable override nonReentrant collectFee {
         // Check if the ID of the document exists
         _checkDocumentExists(id);
 
         // Check if the emitter exists in W3PGP contract
         _checkEmitter(emitter);
-        
+
+        // Keccak256 hash of the signature
+        bytes32 signatureHash = keccak256(signature);
+
         // Store the signature
         Web3DocStorage storage $ = _getWeb3DocStorage();
         $.docIdToSignatures[id].push(block.number);
+        $.signatureHashToBlock[signatureHash] = block.number;
 
         // Emit a Signature event
-        emit Signature(id, emitter, signature);
+        emit Signature(id, emitter, signatureHash, signature);
     }
 
     /**
      * @inheritdoc IWeb3Doc
      */
-    function timestamp(bytes32 emitter, bytes32 dochash, bytes calldata signature)
-        external
-        payable
-        override
-        nonReentrant
-        collectFee
-    {
+    function revokeSignature(
+        uint256 id,
+        bytes32 emitter,
+        bytes32 signatureHash,
+        bytes calldata signature
+    ) external payable override {
+        // Check if the ID of the document exists
+        _checkDocumentExists(id);
+
         // Check if the emitter exists in W3PGP contract
         _checkEmitter(emitter);
 
-        
+        // Check if the signature to be revoked exists
+        _checkSignatureExists(signatureHash);
+
+        // Store the revocation
+        Web3DocStorage storage $ = _getWeb3DocStorage();
+        $.signatureHashToRevocationBlocks[signatureHash].push(block.number);
+
+        // Emit a SignatureRevocation event
+        emit SignatureRevocation(id, emitter, signatureHash, signature);
+    }
+
+    /**
+     * @inheritdoc IWeb3Doc
+     */
+    function timestamp(
+        bytes32 emitter,
+        bytes32 dochash,
+        bytes calldata signature
+    ) external payable override nonReentrant collectFee {
+        // Check if the emitter exists in W3PGP contract
+        _checkEmitter(emitter);
+
         Web3DocStorage storage $ = _getWeb3DocStorage();
         uint256 currentDocId = $.docId;
         uint256 currentBlock = block.number;
 
         // Store current block number for the new document
         $.docIdToBlockNumber[currentDocId] = currentBlock;
+        $.docHashToDocIds[dochash].push(currentDocId);
 
         // Emit a Timestamp event
         emit Timestamp(currentDocId, emitter, dochash, signature);
@@ -354,7 +424,9 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function getDocumentBlockNumberByID(uint256 id) external view override returns (uint256) {
+    function getDocumentBlockNumberByID(
+        uint256 id
+    ) external view override returns (uint256) {
         Web3DocStorage storage $ = _getWeb3DocStorage();
         return $.docIdToBlockNumber[id];
     }
@@ -362,7 +434,9 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function getDocumentBlockNumberByIDBatch(uint256[] calldata ids) external view override returns (uint256[] memory) {
+    function getDocumentBlockNumberByIDBatch(
+        uint256[] calldata ids
+    ) external view override returns (uint256[] memory) {
         Web3DocStorage storage $ = _getWeb3DocStorage();
         uint256 length = ids.length;
         uint256[] memory blockNumbers = new uint256[](length);
@@ -375,12 +449,11 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @inheritdoc IWeb3Doc
      */
-    function listSignatures(uint256 id, uint256 start, uint256 limit)
-        external
-        view
-        override
-        returns (uint256[] memory)
-    {
+    function listSignatures(
+        uint256 id,
+        uint256 start,
+        uint256 limit
+    ) external view override returns (uint256[] memory) {
         // Get a pointer to the storage of the contract
         Web3DocStorage storage $ = _getWeb3DocStorage();
         // Check the document exists
@@ -408,13 +481,105 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
         return signatures;
     }
 
+    /**
+     * @inheritdoc IWeb3Doc
+     */
+    function getSignatureBlockNumberByHash(
+        bytes32 signatureHash
+    ) external view override returns (uint256) {
+        Web3DocStorage storage $ = _getWeb3DocStorage();
+        return $.signatureHashToBlock[signatureHash];
+    }
+
+    /**
+     * @inheritdoc IWeb3Doc
+     */
+    function getSignatureBlockNumberByHashBatch(
+        bytes32[] calldata signatureHashes
+    ) external view override returns (uint256[] memory) {
+        Web3DocStorage storage $ = _getWeb3DocStorage();
+        uint256 length = signatureHashes.length;
+        uint256[] memory blockNumbers = new uint256[](length);
+        for (uint256 i = 0; i < length; ++i) {
+            blockNumbers[i] = $.signatureHashToBlock[signatureHashes[i]];
+        }
+        return blockNumbers;
+    }
+
+    /**
+     * @inheritdoc IWeb3Doc
+     */
+    function listSignatureRevocationsBlockNumbers(
+        bytes32 signatureHash,
+        uint256 start,
+        uint256 limit
+    ) external view override returns (uint256[] memory) {
+        Web3DocStorage storage $ = _getWeb3DocStorage();
+        uint256[] storage revocationBlocks = $.signatureHashToRevocationBlocks[
+            signatureHash
+        ];
+        uint256 revocationsCount = revocationBlocks.length;
+
+        if (start >= revocationsCount || limit == 0 || revocationsCount == 0) {
+            return new uint256[](0);
+        }
+
+        uint256 end = start + limit;
+        if (end > revocationsCount) {
+            end = revocationsCount;
+        }
+
+        uint256 resultLength = end - start;
+        uint256[] memory blocks = new uint256[](resultLength);
+        for (uint256 i = 0; i < resultLength; ++i) {
+            blocks[i] = revocationBlocks[start + i];
+        }
+
+        return blocks;
+    }
+
+    /**
+     * @inheritdoc IWeb3Doc
+     */
+    function listDocumentIdsByHash(
+        bytes32 dochash,
+        uint256 start,
+        uint256 limit
+    ) external view override returns (uint256[] memory) {
+        Web3DocStorage storage $ = _getWeb3DocStorage();
+        uint256[] storage docIds = $.docHashToDocIds[dochash];
+        uint256 docIdsCount = docIds.length;
+
+        if (start >= docIdsCount || limit == 0 || docIdsCount == 0) {
+            return new uint256[](0);
+        }
+
+        uint256 end = start + limit;
+        if (end > docIdsCount) {
+            end = docIdsCount;
+        }
+
+        uint256 resultLength = end - start;
+        uint256[] memory ids = new uint256[](resultLength);
+        for (uint256 i = 0; i < resultLength; ++i) {
+            ids[i] = docIds[start + i];
+        }
+
+        return ids;
+    }
+
     /*****************************************************************************************************************/
     /* UUPS PROXY FUNCTIONS                                                                                          */
     /*****************************************************************************************************************/
 
-    function _authorizeUpgrade(address newImplementation) internal virtual override restricted {
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal virtual override restricted {
         // Ensure the new implementation is not the zero address
-        require(newImplementation != address(0), "New implementation cannot be the zero address");
+        require(
+            newImplementation != address(0),
+            "New implementation cannot be the zero address"
+        );
     }
 
     /*****************************************************************************************************************/
@@ -485,18 +650,40 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     }
 
     /**
+     * @notice Check if the signature with the given hash exists.
+     * @param signatureHash The keccak256 hash of the signature to check.
+     * @dev Reverts with SignatureNotFound error if the signature does not exist.
+     */
+    function _checkSignatureExists(bytes32 signatureHash) internal view {
+        Web3DocStorage storage $ = _getWeb3DocStorage();
+        if ($.signatureHashToBlock[signatureHash] == 0) {
+            revert SignatureNotFound(signatureHash);
+        }
+    }
+
+    /**
      * @notice Internal function to notify recipients about an event (Publication, Copy or Response).
      * @param docId The ID of the document related to the event.
      * @param emitter The emitter of the event.
      * @param recipients The array of recipients to notify.
      * @param eventType The type of the event.
      */
-    function _notifyRecipients(uint256 docId, bytes32 emitter, Recipient[] calldata recipients, EventType eventType) internal
-    {
+    function _notifyRecipients(
+        uint256 docId,
+        bytes32 emitter,
+        Recipient[] calldata recipients,
+        EventType eventType
+    ) internal {
         // Emit a Notification event for each recipient
         uint256 length = recipients.length;
         for (uint256 i = 0; i < length; ++i) {
-            emit Notification(docId, emitter, recipients[i].fingerprint, eventType, recipients[i].signatureRequested);
+            emit Notification(
+                docId,
+                emitter,
+                recipients[i].fingerprint,
+                eventType,
+                recipients[i].signatureRequested
+            );
         }
     }
 }
