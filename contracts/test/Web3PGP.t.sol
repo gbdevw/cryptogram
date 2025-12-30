@@ -55,6 +55,10 @@ contract Web3PGPTest is Test {
     event KeyRegistered(bytes32 indexed primaryKeyFingerprint, bytes32[] subkeyFingerprints, bytes openPGPMsg);
     event SubkeyAdded(bytes32 indexed parentKeyFingerprint, bytes32 indexed subkeyFingerprint, bytes openPGPMsg);
     event KeyRevoked(bytes32 indexed fingerprint, bytes revocationCertificate);
+    event OwnershipChallenged(bytes32 indexed fingerprint, bytes32 challenge);
+    event OwnershipProved(bytes32 indexed fingerprint, bytes32 indexed challenge, bytes signature);
+    event KeyCertified(bytes32 indexed fingerprint, bytes32 indexed issuer, bytes keyCertificate);
+    event KeyCertificationRevoked(bytes32 indexed fingerprint, bytes32 indexed issuer, bytes revocationSignature);
 
     function setUp() public {
         // Deploy AccessManager with admin as initial admin
@@ -528,5 +532,442 @@ contract Web3PGPTest is Test {
         assertEq(revs[0], 100);
         assertEq(revs[1], 200);
         assertEq(revs[2], 300);
+    }
+
+    /*****************************************************************************************************************/
+    /* OWNERSHIP CHALLENGE TESTS                                                                                    */
+    /*****************************************************************************************************************/
+
+    function testChallengeOwnershipEmitsEvent() public {
+        bytes32 fp = keccak256("challenge-test");
+        bytes32 challenge = keccak256(abi.encodePacked("nonce123"));
+        
+        // Register key first
+        pgp.register(fp, new bytes32[](0), "challenge-key");
+        
+        // Expect OwnershipChallenged event
+        vm.expectEmit(true, false, false, true, address(pgp));
+        emit OwnershipChallenged(fp, challenge);
+        
+        pgp.challengeOwnership(fp, challenge);
+    }
+
+    function testChallengeOwnershipNotRegisteredReverts() public {
+        bytes32 fp = keccak256("challenge-not-reg");
+        bytes32 challenge = keccak256(abi.encodePacked("nonce"));
+        
+        vm.expectRevert();
+        pgp.challengeOwnership(fp, challenge);
+    }
+
+    function testMultipleChallengesForSameKey() public {
+        bytes32 fp = keccak256("multi-challenge");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Issue multiple challenges
+        bytes32 challenge1 = keccak256(abi.encodePacked("nonce1"));
+        bytes32 challenge2 = keccak256(abi.encodePacked("nonce2"));
+        bytes32 challenge3 = keccak256(abi.encodePacked("nonce3"));
+        
+        vm.expectEmit(true, false, false, true, address(pgp));
+        emit OwnershipChallenged(fp, challenge1);
+        pgp.challengeOwnership(fp, challenge1);
+        
+        vm.expectEmit(true, false, false, true, address(pgp));
+        emit OwnershipChallenged(fp, challenge2);
+        pgp.challengeOwnership(fp, challenge2);
+        
+        vm.expectEmit(true, false, false, true, address(pgp));
+        emit OwnershipChallenged(fp, challenge3);
+        pgp.challengeOwnership(fp, challenge3);
+    }
+
+    /*****************************************************************************************************************/
+    /* OWNERSHIP PROOF TESTS                                                                                        */
+    /*****************************************************************************************************************/
+
+    function testProveOwnershipEmitsEvent() public {
+        bytes32 fp = keccak256("prove-test");
+        bytes32 challenge = keccak256(abi.encodePacked("nonce456"));
+        bytes memory signature = "signature-data";
+        
+        // Register key first
+        pgp.register(fp, new bytes32[](0), "prove-key");
+        
+        // Expect OwnershipProved event
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit OwnershipProved(fp, challenge, signature);
+        
+        pgp.proveOwnership(fp, challenge, signature);
+    }
+
+    function testProveOwnershipNotRegisteredReverts() public {
+        bytes32 fp = keccak256("prove-not-reg");
+        bytes32 challenge = keccak256(abi.encodePacked("nonce"));
+        bytes memory signature = "sig";
+        
+        vm.expectRevert();
+        pgp.proveOwnership(fp, challenge, signature);
+    }
+
+    function testProveOwnershipAfterChallenge() public {
+        bytes32 fp = keccak256("prove-after-challenge");
+        bytes32 challenge = keccak256(abi.encodePacked("nonce789"));
+        bytes memory signature = "openpgp-signature";
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Issue challenge first
+        pgp.challengeOwnership(fp, challenge);
+        
+        // Then prove ownership
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit OwnershipProved(fp, challenge, signature);
+        pgp.proveOwnership(fp, challenge, signature);
+    }
+
+    function testMultipleProofsForSameChallenge() public {
+        bytes32 fp = keccak256("multi-proof");
+        bytes32 challenge = keccak256(abi.encodePacked("nonce-multi"));
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.challengeOwnership(fp, challenge);
+        
+        // Multiple different signatures for the same challenge
+        bytes memory sig1 = "sig1";
+        bytes memory sig2 = "sig2";
+        
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit OwnershipProved(fp, challenge, sig1);
+        pgp.proveOwnership(fp, challenge, sig1);
+        
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit OwnershipProved(fp, challenge, sig2);
+        pgp.proveOwnership(fp, challenge, sig2);
+    }
+
+    /*****************************************************************************************************************/
+    /* KEY CERTIFICATION TESTS                                                                                      */
+    /*****************************************************************************************************************/
+
+    function testCertifyKeyEmitsEvent() public {
+        bytes32 fp = keccak256("key-to-certify");
+        bytes32 issuer = keccak256("issuer-key");
+        bytes memory cert = "certification-data";
+        
+        // Register both keys
+        pgp.register(fp, new bytes32[](0), "key-to-certify");
+        pgp.register(issuer, new bytes32[](0), "issuer-key");
+        
+        // Expect KeyCertified event
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit KeyCertified(fp, issuer, cert);
+        
+        pgp.certifyKey(fp, issuer, cert);
+    }
+
+    function testCertifyKeyTargetNotRegisteredReverts() public {
+        bytes32 fp = keccak256("unregistered-target");
+        bytes32 issuer = keccak256("issuer-reg");
+        bytes memory cert = "cert";
+        
+        // Register issuer but not target
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        vm.expectRevert();
+        pgp.certifyKey(fp, issuer, cert);
+    }
+
+    function testCertifyKeyIssuerNotRegisteredReverts() public {
+        bytes32 fp = keccak256("target-reg");
+        bytes32 issuer = keccak256("unregistered-issuer");
+        bytes memory cert = "cert";
+        
+        // Register target but not issuer
+        pgp.register(fp, new bytes32[](0), "target");
+        
+        vm.expectRevert();
+        pgp.certifyKey(fp, issuer, cert);
+    }
+
+    function testSelfCertification() public {
+        bytes32 fp = keccak256("self-cert");
+        bytes memory cert = "self-certification";
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Self-certification: both fingerprints are the same
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit KeyCertified(fp, fp, cert);
+        
+        pgp.certifyKey(fp, fp, cert);
+    }
+
+    function testMultipleCertificationsFromDifferentIssuers() public {
+        bytes32 target = keccak256("multi-cert-target");
+        bytes32 issuer1 = keccak256("issuer1");
+        bytes32 issuer2 = keccak256("issuer2");
+        
+        pgp.register(target, new bytes32[](0), "target");
+        pgp.register(issuer1, new bytes32[](0), "issuer1");
+        pgp.register(issuer2, new bytes32[](0), "issuer2");
+        
+        // Certifications from two different issuers
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit KeyCertified(target, issuer1, "cert1");
+        pgp.certifyKey(target, issuer1, "cert1");
+        
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit KeyCertified(target, issuer2, "cert2");
+        pgp.certifyKey(target, issuer2, "cert2");
+    }
+
+    /*****************************************************************************************************************/
+    /* KEY CERTIFICATION REVOCATION TESTS                                                                           */
+    /*****************************************************************************************************************/
+
+    function testRevokeCertificationEmitsEvent() public {
+        bytes32 fp = keccak256("key-revoke-cert");
+        bytes32 issuer = keccak256("issuer-revoke");
+        bytes memory revocation = "revocation-sig";
+        
+        // Register both keys and certify first
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        pgp.certifyKey(fp, issuer, "cert");
+        
+        // Expect KeyCertificationRevoked event
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit KeyCertificationRevoked(fp, issuer, revocation);
+        
+        pgp.revokeCertification(fp, issuer, revocation);
+    }
+
+    function testRevokeCertificationTargetNotRegisteredReverts() public {
+        bytes32 fp = keccak256("unregistered-rev-target");
+        bytes32 issuer = keccak256("issuer-rev");
+        bytes memory revocation = "rev";
+        
+        // Register issuer but not target
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        vm.expectRevert();
+        pgp.revokeCertification(fp, issuer, revocation);
+    }
+
+    function testRevokeCertificationIssuerNotRegisteredReverts() public {
+        bytes32 fp = keccak256("target-rev");
+        bytes32 issuer = keccak256("unregistered-rev-issuer");
+        bytes memory revocation = "rev";
+        
+        // Register target but not issuer
+        pgp.register(fp, new bytes32[](0), "target");
+        
+        vm.expectRevert();
+        pgp.revokeCertification(fp, issuer, revocation);
+    }
+
+    function testMultipleCertificationRevocations() public {
+        bytes32 fp = keccak256("multi-cert-rev");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Certify and revoke multiple times at different blocks
+        bytes32 issuer = keccak256("issuer-multi");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        vm.roll(100);
+        pgp.certifyKey(fp, issuer, "cert1");
+        vm.roll(101);
+        pgp.revokeCertification(fp, issuer, "rev1");
+        
+        vm.roll(200);
+        pgp.certifyKey(fp, issuer, "cert2");
+        vm.roll(201);
+        pgp.revokeCertification(fp, issuer, "rev2");
+    }
+
+    /*****************************************************************************************************************/
+    /* LIST CERTIFICATIONS TESTS                                                                                    */
+    /*****************************************************************************************************************/
+
+    function testListCertificationsEmpty() public {
+        bytes32 fp = keccak256("empty-cert-list");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // No certifications yet
+        uint256[] memory certs = pgp.listCertifications(fp, 0, 10);
+        assertEq(certs.length, 0);
+    }
+
+    function testListCertificationsBasic() public {
+        bytes32 fp = keccak256("cert-list-basic");
+        bytes32 issuer = keccak256("issuer-list");
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        // Create certifications at specific blocks
+        vm.roll(50);
+        pgp.certifyKey(fp, issuer, "cert1");
+        vm.roll(100);
+        pgp.certifyKey(fp, issuer, "cert2");
+        vm.roll(150);
+        pgp.certifyKey(fp, issuer, "cert3");
+        
+        // List all certifications
+        uint256[] memory certs = pgp.listCertifications(fp, 0, 10);
+        assertEq(certs.length, 3);
+        assertEq(certs[0], 50);
+        assertEq(certs[1], 100);
+        assertEq(certs[2], 150);
+    }
+
+    function testListCertificationsPagination() public {
+        bytes32 fp = keccak256("cert-pagination");
+        bytes32 issuer = keccak256("issuer-pag");
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        // Create 5 certifications
+        for (uint256 i = 0; i < 5; i++) {
+            vm.roll(10 + i);
+            pgp.certifyKey(fp, issuer, abi.encodePacked("cert", i));
+        }
+        
+        // Test pagination with limit 2
+        uint256[] memory page1 = pgp.listCertifications(fp, 0, 2);
+        assertEq(page1.length, 2);
+        assertEq(page1[0], 10);
+        assertEq(page1[1], 11);
+        
+        // Second page
+        uint256[] memory page2 = pgp.listCertifications(fp, 2, 2);
+        assertEq(page2.length, 2);
+        assertEq(page2[0], 12);
+        assertEq(page2[1], 13);
+        
+        // Last item
+        uint256[] memory page3 = pgp.listCertifications(fp, 4, 2);
+        assertEq(page3.length, 1);
+        assertEq(page3[0], 14);
+    }
+
+    function testListCertificationsStartOutOfBounds() public {
+        bytes32 fp = keccak256("cert-out-bounds");
+        bytes32 issuer = keccak256("issuer-bounds");
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        pgp.certifyKey(fp, issuer, "cert");
+        
+        // Start index beyond the list
+        uint256[] memory certs = pgp.listCertifications(fp, 10, 10);
+        assertEq(certs.length, 0);
+    }
+
+    function testListCertificationsWithZeroLimit() public {
+        bytes32 fp = keccak256("cert-zero-limit");
+        bytes32 issuer = keccak256("issuer-zero");
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        pgp.certifyKey(fp, issuer, "cert");
+        
+        // Zero limit returns empty
+        uint256[] memory certs = pgp.listCertifications(fp, 0, 0);
+        assertEq(certs.length, 0);
+    }
+
+    /*****************************************************************************************************************/
+    /* LIST CERTIFICATION REVOCATIONS TESTS                                                                         */
+    /*****************************************************************************************************************/
+
+    function testListCertificationRevocationsEmpty() public {
+        bytes32 fp = keccak256("empty-rev-cert-list");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // No revocations yet
+        uint256[] memory revs = pgp.listCertificationRevocations(fp, 0, 10);
+        assertEq(revs.length, 0);
+    }
+
+    function testListCertificationRevocationsBasic() public {
+        bytes32 fp = keccak256("rev-cert-list-basic");
+        bytes32 issuer = keccak256("issuer-rev-list");
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        // Create certification revocations at specific blocks
+        vm.roll(60);
+        pgp.certifyKey(fp, issuer, "cert1");
+        pgp.revokeCertification(fp, issuer, "rev1");
+        
+        vm.roll(120);
+        pgp.certifyKey(fp, issuer, "cert2");
+        pgp.revokeCertification(fp, issuer, "rev2");
+        
+        vm.roll(180);
+        pgp.certifyKey(fp, issuer, "cert3");
+        pgp.revokeCertification(fp, issuer, "rev3");
+        
+        // List all revocations
+        uint256[] memory revs = pgp.listCertificationRevocations(fp, 0, 10);
+        assertEq(revs.length, 3);
+        assertEq(revs[0], 60);
+        assertEq(revs[1], 120);
+        assertEq(revs[2], 180);
+    }
+
+    function testListCertificationRevocationsPagination() public {
+        bytes32 fp = keccak256("cert-rev-pagination");
+        bytes32 issuer = keccak256("issuer-cert-rev-pag");
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        // Create 4 certification revocations
+        for (uint256 i = 0; i < 4; i++) {
+            pgp.certifyKey(fp, issuer, abi.encodePacked("cert", i));
+            vm.roll(100 + i);
+            pgp.revokeCertification(fp, issuer, abi.encodePacked("rev", i));
+        }
+        
+        // Test pagination with limit 2
+        uint256[] memory page1 = pgp.listCertificationRevocations(fp, 0, 2);
+        assertEq(page1.length, 2);
+        
+        // Second page
+        uint256[] memory page2 = pgp.listCertificationRevocations(fp, 2, 2);
+        assertEq(page2.length, 2);
+    }
+
+    function testListCertificationRevocationsStartOutOfBounds() public {
+        bytes32 fp = keccak256("cert-rev-out-bounds");
+        bytes32 issuer = keccak256("issuer-cert-rev-bounds");
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        pgp.certifyKey(fp, issuer, "cert");
+        pgp.revokeCertification(fp, issuer, "rev");
+        
+        // Start index beyond the list
+        uint256[] memory revs = pgp.listCertificationRevocations(fp, 10, 10);
+        assertEq(revs.length, 0);
+    }
+
+    function testListCertificationRevocationsWithZeroLimit() public {
+        bytes32 fp = keccak256("cert-rev-zero-limit");
+        bytes32 issuer = keccak256("issuer-cert-rev-zero");
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        pgp.certifyKey(fp, issuer, "cert");
+        pgp.revokeCertification(fp, issuer, "rev");
+        
+        // Zero limit returns empty
+        uint256[] memory revs = pgp.listCertificationRevocations(fp, 0, 0);
+        assertEq(revs.length, 0);
     }
 }
