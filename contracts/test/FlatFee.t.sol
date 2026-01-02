@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "../src/FlatFee.sol";
-import "@openzeppelin/contracts/access/manager/AccessManager.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Test} from "forge-std/Test.sol";
+import {FlatFee} from "src/FlatFee.sol";
+import {IFlatFee} from "src/IFlatFee.sol";
+import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract FlatFeeImpl is FlatFee, UUPSUpgradeable {

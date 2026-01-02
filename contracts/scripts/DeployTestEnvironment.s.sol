@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Script} from "forge-std/Script.sol";
-import {console2} from "forge-std/console2.sol";
-import {AccessManagerUpgradeable} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagerUpgradeable.sol";
+import {Script} from "contracts/lib/forge-std/src/Script.sol";
+import {console2} from "contracts/lib/forge-std/src/console2.sol";
+import {AccessManagerUpgradeable} from "contracts/lib/openzeppelin/contracts-upgradeable/access/manager/AccessManagerUpgradeable.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
 import {Web3Doc} from "src/Web3Doc.sol";

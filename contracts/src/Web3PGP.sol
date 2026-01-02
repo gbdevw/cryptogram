@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Business Source License 1.1
 pragma solidity ^0.8.24;
 
-import "./FlatFee.sol";
-import "./IWeb3PGP.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {FlatFee} from "src/FlatFee.sol";
+import {IWeb3PGP} from "src/IWeb3PGP.sol";
+import {UUPSUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 /**
  * @title Web3PGP

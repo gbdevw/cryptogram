@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "../src/Web3Doc.sol";
-import "../src/Web3PGP.sol";
-import "../src/IWeb3Doc.sol";
-import "../src/IFlatFee.sol";
-import "@openzeppelin/contracts/access/manager/AccessManager.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Test} from "forge-std/Test.sol";
+import {Web3Doc} from "src/Web3Doc.sol";
+import {Web3PGP} from "src/Web3PGP.sol";
+import {IWeb3Doc} from "src/IWeb3Doc.sol";
+import {IFlatFee} from "src/IFlatFee.sol";
+import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract Web3DocTest is Test {
     AccessManager pgpAccessManager;
