@@ -8,6 +8,8 @@ import { FlatFee } from '../flatfee/flatefee';
 import { getBlockTimestamp } from '../utils/viemutils';
 import { Web3DocCriticalError, Web3DocError } from './types/errors';
 
+    // TODO: Add log types and functions for new event (SignatureRevoked) + refactor to support hash
+
 /**
  * Implementation of the Web3Doc contract interface.
  * 
@@ -263,6 +265,43 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             args: [
                 toBytes32(to0x(emitter)),
                 dochash,
+                signature
+            ],
+            value: fee, // Include fee in the transaction value
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
+    }
+
+    /**
+     * Revokes a signature previously published on-chain.
+     *
+     * @param id The ID of the document associated with the signature.
+     * @param emitter The fingerprint of the key that made the signature.
+     * @param signatureHash The hash of the signature to revoke.
+     * @param signature A detached binary OpenPGP signature made over the raw bytes of the signature hash.
+     */
+    public async revokeSignature(
+        id: bigint,
+        emitter: `0x${string}`,
+        signatureHash: `0x${string}`,
+        signature: `0x${string}`
+    ): Promise<TransactionReceipt> {
+        this.ensureWalletClient();
+        // Get the requested fee
+        const fee = await this.requestedFee();
+        // Simulate client call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3DocABI,
+            functionName: 'revokeSignature',
+            args: [
+                id,
+                toBytes32(to0x(emitter)),
+                signatureHash,
                 signature
             ],
             value: fee, // Include fee in the transaction value
@@ -787,6 +826,70 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         if (logs.length === 0) return undefined;
         // This should never happen as timestamp IDs are unique but we guard against it anyway
         throw new Web3DocCriticalError(`Multiple Timestamp logs found for timestamp ID ${id} at block ${blockNumber}`);
+    }
+
+    /**
+     * Returns the block number in which the signature with the given hash was created or 0 if the signature does not exist.
+     *
+     * @param signatureHash The hash of the signature.
+     * @return The block number in which the signature was created, or 0 if the signature does not exist.
+     */
+    public async getSignatureBlockNumberByHash(signatureHash: `0x${string}`): Promise<bigint> {
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'getSignatureBlockNumberByHash',
+            args: [signatureHash],
+        });
+    }
+
+    /**
+     * Returns the block numbers in which the signatures with the given hashes were created.
+     *
+     * @param signatureHashes The hashes of the signatures.
+     * @return The block numbers in which the signatures were created.
+     */
+    public async getSignatureBlockNumberByHashBatch(signatureHashes: `0x${string}`[]): Promise<bigint[]> {
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'getSignatureBlockNumberByHashBatch',
+            args: [signatureHashes],
+        }) as Promise<bigint[]>;
+    }
+
+    /**
+     * Lists the document IDs by the given document hash.
+     *
+     * @param dochash The hash of the document.
+     * @param start The starting index from which to list documents (0-based).
+     * @param limit The maximum number of documents to list.
+     * @return An array of document IDs with the given hash.
+     */
+    public async listDocumentIdsByHash(dochash: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'listDocumentIdsByHash',
+            args: [dochash, start, limit],
+        }) as Promise<bigint[]>;
+    }
+
+    /**
+     * Lists the block numbers of signature revocations for the given signature hash.
+     *
+     * @param signatureHash The hash of the signature.
+     * @param start The starting index from which to list revocations (0-based).
+     * @param limit The maximum number of revocations to list.
+     * @return An array of block numbers where the signature was revoked.
+     */
+    public async listSignatureRevocationsBlockNumbers(signatureHash: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'listSignatureRevocationsBlockNumbers',
+            args: [signatureHash, start, limit],
+        }) as Promise<bigint[]>;
     }
 
     /**

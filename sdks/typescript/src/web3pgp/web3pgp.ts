@@ -127,6 +127,38 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         }) as Promise<`0x${string}`[]>;
     }
 
+    /**
+     * List the block numbers when key certifications were issued for a given key.
+     * @param fingerprint The fingerprint of the key.
+     * @param start The starting index in the list of certifications.
+     * @param limit The maximum number of results to return.
+     * @return An array of block numbers when certifications were issued.
+     */
+    public listCertifications(fingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3PGPABI,
+            functionName: 'listCertifications',
+            args: [toBytes32(fingerprint), start, limit],
+        }) as Promise<bigint[]>;
+    }
+
+    /**
+     * List the block numbers when key certification revocations were issued for a given key.
+     * @param fingerprint The fingerprint of the key.
+     * @param start The starting index in the list of revocations.
+     * @param limit The maximum number of results to return.
+     * @return An array of block numbers when certification revocations were issued.
+     */
+    public listCertificationRevocations(fingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3PGPABI,
+            functionName: 'listCertificationRevocations',
+            args: [toBytes32(fingerprint), start, limit],
+        }) as Promise<bigint[]>;
+    }
+
     /*****************************************************************************************************************/
     /* WRITE FUNCTIONS (PAYABLE)                                                                                     */
     /*****************************************************************************************************************/
@@ -227,9 +259,144 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         return this.client.waitForTransactionReceipt({ hash: txhash });
     }
 
+    /**
+     * Certify a key by issuing a key certification signature.
+     * @param fingerprint The fingerprint of the key being certified.
+     * @param issuerFingerprint The fingerprint of the key issuing the certification.
+     * @param keyCertificate A binary OpenPGP signature constituting the key certification.
+     * @return Transaction receipt after publishing the certification.
+     */
+    public async certifyKey(
+        fingerprint: `0x${string}`,
+        issuerFingerprint: `0x${string}`,
+        keyCertificate: `0x${string}`
+    ): Promise<TransactionReceipt> {
+        this.ensureWalletClient();
+        // Get the required fee for certification
+        const fee = await this.requestedFee();
+        // Simulate the contract call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3PGPABI,
+            functionName: 'certifyKey',
+            args: [
+                toBytes32(fingerprint),
+                toBytes32(issuerFingerprint),
+                keyCertificate
+            ],
+            value: fee
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
+    }
+
+    /**
+     * Revoke a key certification.
+     * @param fingerprint The fingerprint of the key whose certification is being revoked.
+     * @param issuerFingerprint The fingerprint of the issuer of the certification to revoke.
+     * @param revocationSignature A signature constituting the revocation of the certification.
+     * @return Transaction receipt after publishing the revocation.
+     */
+    public async revokeCertification(
+        fingerprint: `0x${string}`,
+        issuerFingerprint: `0x${string}`,
+        revocationSignature: `0x${string}`
+    ): Promise<TransactionReceipt> {
+        this.ensureWalletClient();
+        // Get the required fee for revocation
+        const fee = await this.requestedFee();
+        // Simulate the contract call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3PGPABI,
+            functionName: 'revokeCertification',
+            args: [
+                toBytes32(fingerprint),
+                toBytes32(issuerFingerprint),
+                revocationSignature
+            ],
+            value: fee
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
+    }
+
+    /**
+     * Challenge ownership of a public key.
+     * @param fingerprint The fingerprint of the key to challenge.
+     * @param challenge The challenge data sent to the user for signing.
+     * @return Transaction receipt after issuing the challenge.
+     */
+    public async challengeOwnership(
+        fingerprint: `0x${string}`,
+        challenge: `0x${string}`
+    ): Promise<TransactionReceipt> {
+        this.ensureWalletClient();
+        // Get the required fee for challenge
+        const fee = await this.requestedFee();
+        // Simulate the contract call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3PGPABI,
+            functionName: 'challengeOwnership',
+            args: [
+                toBytes32(fingerprint),
+                toBytes32(challenge)
+            ],
+            value: fee
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
+    }
+
+    /**
+     * Prove ownership of a public key by responding to a challenge.
+     * @param fingerprint The fingerprint of the key.
+     * @param challenge The original challenge data.
+     * @param signature A signature made over the challenge data.
+     * @return Transaction receipt after proving ownership.
+     */
+    public async proveOwnership(
+        fingerprint: `0x${string}`,
+        challenge: `0x${string}`,
+        signature: `0x${string}`
+    ): Promise<TransactionReceipt> {
+        this.ensureWalletClient();
+        // Get the required fee for proof
+        const fee = await this.requestedFee();
+        // Simulate the contract call
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3PGPABI,
+            functionName: 'proveOwnership',
+            args: [
+                toBytes32(fingerprint),
+                toBytes32(challenge),
+                signature
+            ],
+            value: fee
+        });
+        // Use the wallet client to send the actual transaction
+        const txhash = await this.walletClient!.writeContract(request);
+        // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
+    }
+
     /*****************************************************************************************************************/
     /* LOGS FUNCTIONS                                                                                                */
     /*****************************************************************************************************************/
+
+    // TODO: Add log types and functions for new events (KeyCertified and CertificationRevoked)
 
     /**
      * Get the log of a key registration event using the provided primary key fingerprint and block number.

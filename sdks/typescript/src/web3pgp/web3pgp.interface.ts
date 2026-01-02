@@ -65,6 +65,24 @@ export interface IWeb3PGP extends IFlatFee {
      */
     listSubkeys(parentKeyFingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<`0x${string}`[]>;
 
+    /**
+     * List the block numbers when certifications were published for a given key.
+     * @param fingerprint The fingerprint of the key to check.
+     * @param start The starting index in the list of certifications.
+     * @param limit The maximum number of results to return.
+     * @return An array of block numbers when certifications were published.
+     */
+    listCertifications(fingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]>;
+
+    /**
+     * List the block numbers when certification revocations were published for a given key.
+     * @param fingerprint The fingerprint of the key to check.
+     * @param start The starting index in the list of certification revocations.
+     * @param limit The maximum number of results to return.
+     * @return An array of block numbers when certification revocations were published.
+     */
+    listCertificationRevocations(fingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]>;
+
     /*****************************************************************************************************************/
     /* WRITE FUNCTIONS (PAYABLE)                                                                                     */
     /*****************************************************************************************************************/
@@ -102,6 +120,60 @@ export interface IWeb3PGP extends IFlatFee {
      * @return Transaction receipt after publishing the revocation.
      */
     revoke(fingerprint: `0x${string}`, revocationCertificate: `0x${string}`): Promise<TransactionReceipt>;
+
+    /**
+     * Certifies a key by issuing a key certification.
+     *
+     * @param fingerprint The fingerprint of the key being certified.
+     * @param issuerFingerprint The fingerprint of the issuer key.
+     * @param keyCertificate The OpenPGP key certification.
+     * @returns A transaction receipt.
+     */
+    certifyKey(
+        fingerprint: `0x${string}`,
+        issuerFingerprint: `0x${string}`,
+        keyCertificate: `0x${string}`
+    ): Promise<TransactionReceipt>;
+
+    /**
+     * Issues a revocation for a previously issued key certification.
+     *
+     * @param fingerprint The fingerprint of the key whose certification is being revoked.
+     * @param issuerFingerprint The fingerprint of the issuer who issued the certification.
+     * @param revocationSignature The OpenPGP revocation signature.
+     * @returns A transaction receipt.
+     */
+    revokeCertification(
+        fingerprint: `0x${string}`,
+        issuerFingerprint: `0x${string}`,
+        revocationSignature: `0x${string}`
+    ): Promise<TransactionReceipt>;
+
+    /**
+     * Challenges ownership of a key.
+     *
+     * @param fingerprint The fingerprint of the key.
+     * @param challenge A challenge value.
+     * @returns A transaction receipt.
+     */
+    challengeOwnership(
+        fingerprint: `0x${string}`,
+        challenge: `0x${string}`
+    ): Promise<TransactionReceipt>;
+
+    /**
+     * Proves ownership of a key by responding to a challenge.
+     *
+     * @param fingerprint The fingerprint of the key.
+     * @param challenge The challenge that was issued.
+     * @param signature A signature proving ownership.
+     * @returns A transaction receipt.
+     */
+    proveOwnership(
+        fingerprint: `0x${string}`,
+        challenge: `0x${string}`,
+        signature: `0x${string}`
+    ): Promise<TransactionReceipt>;
 
     /*****************************************************************************************************************/
     /* LOGS FUNCTIONS                                                                                                */

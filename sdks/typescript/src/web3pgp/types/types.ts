@@ -45,3 +45,56 @@ export type KeyRevokedLog =  BaseLog & {
     // Hex-encoded OpenPGP binary message published on-chain which should contain the revocation certificate
     revocationCertificate?: `0x${string}`;
 };
+/**
+ * Type representing a KeyCertified event log emitted by the Web3PGP smart contract.
+ * 
+ * This log contains technical details about the blockchain event as well as the data that were recorded on-chain.
+ */
+export type KeyCertifiedLog = BaseLog & {
+    // The fingerprint of the certified key as bytes32 hex string
+    fingerprint: `0x${string}`;
+    // The fingerprint of the issuer that certified the key as bytes32 hex string
+    issuerFingerprint: `0x${string}`;
+    // Hex-encoded OpenPGP signature that constitutes the key certification
+    keyCertificate: `0x${string}`;
+};
+
+/**
+ * Type representing a KeyCertificationRevoked event log emitted by the Web3PGP smart contract.
+ * 
+ * This log contains technical details about the blockchain event as well as the data that were recorded on-chain.
+ */
+export type KeyCertificationRevokedLog = BaseLog & {
+    // The fingerprint of the key whose certification was revoked as bytes32 hex string
+    fingerprint: `0x${string}`;
+    // The fingerprint of the issuer of the certification as bytes32 hex string
+    issuerFingerprint: `0x${string}`;
+    // Hex-encoded OpenPGP signature that constitutes the revocation
+    revocationSignature: `0x${string}`;
+};
+
+/**
+ * Type representing an OwnershipChallenged event log emitted by the Web3PGP smart contract.
+ * 
+ * This log contains technical details about the blockchain event as well as the data that were recorded on-chain.
+ */
+export type OwnershipChallengedLog = BaseLog & {
+    // The fingerprint of the challenged key as bytes32 hex string
+    fingerprint: `0x${string}`;
+    // The challenge data sent to the key owner for signing as bytes32 hex string
+    challenge: `0x${string}`;
+};
+
+/**
+ * Type representing an OwnershipProved event log emitted by the Web3PGP smart contract.
+ * 
+ * This log contains technical details about the blockchain event as well as the data that were recorded on-chain.
+ */
+export type OwnershipProvedLog = BaseLog & {
+    // The fingerprint of the key whose ownership was proved as bytes32 hex string
+    fingerprint: `0x${string}`;
+    // The original challenge data as bytes32 hex string
+    challenge: `0x${string}`;
+    // Hex-encoded OpenPGP signature made over the challenge data
+    signature: `0x${string}`;
+};

@@ -99,6 +99,22 @@ export interface IWeb3Doc extends IFlatFee {
      */
     timestamp(emitter: `0x${string}`, dochash: `0x${string}`, signature: `0x${string}`): Promise<TransactionReceipt>;
 
+    /**
+     * Revokes a previously published signature on a document.
+     *
+     * @param id The unique ID of the document for which the signature is being revoked.
+     * @param emitter The fingerprint of the key used to create the signature.
+     * @param signatureHash The keccak256 hash of the signature being revoked.
+     * @param signature The binary detached OpenPGP signature over the signatureHash.
+     * @returns A transaction receipt.
+     */
+    revokeSignature(
+        id: bigint,
+        emitter: `0x${string}`,
+        signatureHash: `0x${string}`,
+        signature: `0x${string}`
+    ): Promise<TransactionReceipt>;
+
     /*****************************************************************************************************************/
     /* READ FUNCTIONS                                                                                                */
     /*****************************************************************************************************************/
@@ -143,6 +159,42 @@ export interface IWeb3Doc extends IFlatFee {
      * @return An array of signature IDs associated with the document.
      */
     listSignatures(id: bigint, start: bigint, limit: bigint): Promise<bigint[]>;
+
+    /**
+     * Returns the block number in which the signature with the given hash was published.
+     *
+     * @param signatureHash The keccak256 hash of the signature.
+     * @returns The block number in which the signature was published. Returns 0 if not found.
+     */
+    getSignatureBlockNumberByHash(signatureHash: `0x${string}`): Promise<bigint>;
+
+    /**
+     * Returns the block numbers in which the signatures with the given hashes were published.
+     *
+     * @param signatureHashes The keccak256 hashes of the signatures.
+     * @returns The block numbers in which the signatures were published.
+     */
+    getSignatureBlockNumberByHashBatch(signatureHashes: `0x${string}`[]): Promise<bigint[]>;
+
+    /**
+     * Lists document IDs related to a document hash (with pagination).
+     *
+     * @param dochash The keccak256 hash of the document.
+     * @param start The starting index for pagination (0-based).
+     * @param limit The maximum number of results to return.
+     * @returns An array of document IDs associated with the document hash.
+     */
+    listDocumentIdsByHash(dochash: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]>;
+
+    /**
+     * Lists block numbers when revocations were published for a signature (with pagination).
+     *
+     * @param signatureHash The keccak256 hash of the signature.
+     * @param start The starting index for pagination (0-based).
+     * @param limit The maximum number of results to return.
+     * @returns An array of block numbers when revocations were published.
+     */
+    listSignatureRevocationsBlockNumbers(signatureHash: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]>;
 
     /*****************************************************************************************************************/
     /* LOGS SEARCH FUNCTIONS                                                                                         */

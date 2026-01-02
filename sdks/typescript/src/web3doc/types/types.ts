@@ -116,3 +116,17 @@ export type TimestampLog = BaseLog & {
     dochash: `0x${string}` ;
     signature: `0x${string}`;
 };
+/**
+ * Type representing a SignatureRevocation event emitted when a user revokes a previously published signature.
+ *
+ * @property id The unique ID of the document whose signature is being revoked.
+ * @property emitter The fingerprint of the key that created the signature being revoked.
+ * @property signatureHash The hash of the signature being revoked.
+ * @property signature A detached binary OpenPGP signature created over the signature hash.
+ */
+export type SignatureRevocationLog = BaseLog & {
+    id: bigint;
+    emitter: `0x${string}`;
+    signatureHash: `0x${string}`;
+    signature: `0x${string}`;
+};
