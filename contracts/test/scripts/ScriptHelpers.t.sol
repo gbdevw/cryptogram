@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "lib/forge-std/src/Test.sol";
-import {console2} from "lib/forge-std/src/console2.sol";
 import {ScriptHelpers} from "scripts/lib/ScriptHelpers.sol";
 
 /**

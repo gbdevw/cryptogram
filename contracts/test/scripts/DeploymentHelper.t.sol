@@ -2,10 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "lib/forge-std/src/Test.sol";
-import {console2} from "lib/forge-std/src/console2.sol";
 import {DeploymentHelper} from "scripts/lib/DeploymentHelper.sol";
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
-import {ERC1967Proxy} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
 import {Web3Doc} from "src/Web3Doc.sol";
 

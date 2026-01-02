@@ -96,55 +96,17 @@ library ScriptHelpers {
     /*****************************************************************************************************************/
 
     /**
-     * @notice Safely retrieve an address from environment variables
-     * @param varName The environment variable name
-     * @dev This function should be called from a Script contract that has access to vm cheatcodes
-     * @return The address value
-     */
-    function getAddressFromEnv(string memory varName) internal pure returns (address) {
-        // Note: This function signature is here for documentation. The actual implementation
-        // should be in the Script contracts, calling vm.envAddress(varName) directly
-        revert("Use vm.envAddress() directly from your Script contract");
-    }
-
-    /**
-     * @notice Safely retrieve a uint256 from environment variables
-     * @param varName The environment variable name
-     * @dev This function should be called from a Script contract that has access to vm cheatcodes
-     * @return The uint256 value
-     */
-    function getUint256FromEnv(string memory varName) internal pure returns (uint256) {
-        // Note: This function signature is here for documentation. The actual implementation
-        // should be in the Script contracts, calling vm.envUint(varName) directly
-        revert("Use vm.envUint() directly from your Script contract");
-    }
-
-    /**
      * @notice Safely retrieve an optional uint32 from environment variables with default
-     * @param varName The environment variable name
      * @param defaultValue The default value if not set
      * @dev This function should be called from a Script contract that has access to vm cheatcodes
      * @return The uint32 value
      */
     function getOptionalUint32(
-        string memory varName,
         uint32 defaultValue
     ) internal pure returns (uint32) {
         // Note: This function signature is here for documentation. The actual implementation
         // should be in the Script contracts, calling vm.envOr(varName, defaultValue) directly
         return defaultValue;
-    }
-
-    /**
-     * @notice Safely retrieve a bytes32 from environment variables
-     * @param varName The environment variable name
-     * @dev This function should be called from a Script contract that has access to vm cheatcodes
-     * @return The bytes32 value
-     */
-    function getBytes32FromEnv(string memory varName) internal pure returns (bytes32) {
-        // Note: This function signature is here for documentation. The actual implementation
-        // should be in the Script contracts, calling vm.envBytes32(varName) directly
-        revert("Use vm.envBytes32() directly from your Script contract");
     }
 
     /*****************************************************************************************************************/

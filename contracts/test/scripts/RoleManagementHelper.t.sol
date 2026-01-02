@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "lib/forge-std/src/Test.sol";
-import {console2} from "lib/forge-std/src/console2.sol";
 import {RoleManagementHelper} from "scripts/lib/RoleManagementHelper.sol";
 import {DeploymentHelper} from "scripts/lib/DeploymentHelper.sol";
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
@@ -227,7 +226,7 @@ contract RoleManagementHelperTest is Test {
         assertTrue(result, "User should have role");
     }
 
-    function test_hasRole_False() public {
+    function test_hasRole_False() view public {
         bool result = RoleManagementHelper.hasRole(
             address(accessManager),
             RoleManagementHelper.ADMIN_ROLE,

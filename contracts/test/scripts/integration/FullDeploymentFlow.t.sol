@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "lib/forge-std/src/Test.sol";
-import {console2} from "lib/forge-std/src/console2.sol";
 import {DeploymentHelper} from "scripts/lib/DeploymentHelper.sol";
 import {RoleManagementHelper} from "scripts/lib/RoleManagementHelper.sol";
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
@@ -40,7 +39,7 @@ contract FullDeploymentFlowTest is Test {
         // 1. Deploy AccessManager
         DeploymentHelper.DeploymentResult memory amResult = 
             DeploymentHelper.deployAccessManager(deployer);
-        AccessManagerUpgradeable am = AccessManagerUpgradeable(amResult.proxy);
+        AccessManagerUpgradeable(amResult.proxy);
 
         // 2. Deploy Web3PGP
         DeploymentHelper.DeploymentResult memory pgpResult = 
