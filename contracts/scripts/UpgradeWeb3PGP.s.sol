@@ -5,6 +5,7 @@ import {Script} from "lib/forge-std/src/Script.sol";
 import {console2} from "lib/forge-std/src/console2.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
 import {UUPSUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {ScriptHelpers} from "scripts/lib/ScriptHelpers.sol";
 
 /**
  * @title UpgradeWeb3PGP
@@ -13,11 +14,7 @@ import {UUPSUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/
  * @custom:usage forge script scripts/UpgradeWeb3PGP.s.sol --rpc-url <RPC_URL> --broadcast
  */
 contract UpgradeWeb3PGP is Script {
-    /// @notice The Web3PGP proxy address to upgrade
-    address public proxyAddress;
-
-    /// @notice The new implementation address
-    address public newImplementation;
+    using ScriptHelpers for *;
 
     /**
      * @notice Main upgrade function
@@ -25,29 +22,38 @@ contract UpgradeWeb3PGP is Script {
      * @return The new implementation address
      */
     function run() external returns (address) {
-        // Retrieve environment variables
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        proxyAddress = vm.envAddress("WEB3PGP_PROXY");
 
-        // Start broadcasting transactions
         vm.startBroadcast(deployerPrivateKey);
 
+        address newImplementation = upgradeWeb3PGP();
+
+        vm.stopBroadcast();
+
+        return newImplementation;
+    }
+
+    /**
+     * @notice Upgrade Web3PGP to a new implementation
+     * @dev This function contains the testable business logic
+     * @return The new implementation address
+     */
+    function upgradeWeb3PGP() public returns (address) {
+        address proxyAddress = vm.envAddress("WEB3PGP_PROXY");
+        ScriptHelpers.requireNonZero(proxyAddress, "WEB3PGP_PROXY");
+
         // Deploy new implementation
-        newImplementation = address(new Web3PGP());
-        console2.log("Web3PGP new implementation deployed at:", newImplementation);
+        Web3PGP newImplementation = new Web3PGP();
+        console2.log("Web3PGP new implementation deployed at:", address(newImplementation));
 
         // Upgrade the proxy to the new implementation
-        // No additional initialization data needed for this upgrade
-        UUPSUpgradeable(proxyAddress).upgradeToAndCall(newImplementation, "");
+        UUPSUpgradeable(proxyAddress).upgradeToAndCall(address(newImplementation), "");
         console2.log("Web3PGP proxy upgraded to new implementation");
-
-        // Stop broadcasting transactions
-        vm.stopBroadcast();
 
         console2.log("Upgrade completed successfully!");
         console2.log("Proxy address:", proxyAddress);
-        console2.log("New implementation address:", newImplementation);
+        console2.log("New implementation address:", address(newImplementation));
 
-        return newImplementation;
+        return address(newImplementation);
     }
 }

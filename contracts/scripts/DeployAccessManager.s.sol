@@ -4,7 +4,8 @@ pragma solidity ^0.8.24;
 import {Script} from "lib/forge-std/src/Script.sol";
 import {console2} from "lib/forge-std/src/console2.sol";
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
-import {ERC1967Proxy} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {DeploymentHelper} from "scripts/lib/DeploymentHelper.sol";
+import {ScriptHelpers} from "scripts/lib/ScriptHelpers.sol";
 
 /**
  * @title DeployAccessManager
@@ -12,12 +13,8 @@ import {ERC1967Proxy} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppe
  * @dev Deploys implementation and proxy, then initializes the AccessManager
  */
 contract DeployAccessManager is Script {
-
-    /// @notice The deployed AccessManager proxy address
-    AccessManagerUpgradeable public accessManager;
-    
-    /// @notice The deployed implementation address
-    address public implementation;
+    using DeploymentHelper for *;
+    using ScriptHelpers for *;
 
     /**
      * @notice Main deployment function
@@ -26,30 +23,32 @@ contract DeployAccessManager is Script {
      */
     function run() external returns (address) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address initialAdmin = vm.envAddress("INITIAL_ADMIN");
-
+        
         vm.startBroadcast(deployerPrivateKey);
-
-        // Deploy implementation
-        implementation = address(new AccessManagerUpgradeable());
-        console2.log("AccessManager implementation deployed at:", implementation);
-
-        // Prepare initialization data
-        bytes memory initData = abi.encodeWithSelector(
-            AccessManagerUpgradeable.initialize.selector,
-            initialAdmin
-        );
-
-        // Deploy proxy
-        ERC1967Proxy proxy = new ERC1967Proxy(implementation, initData);
-        console2.log("AccessManager proxy deployed at:", address(proxy));
-
-        accessManager = AccessManagerUpgradeable(address(proxy));
-
+        
+        address proxyAddress = deployAccessManager();
+        
         vm.stopBroadcast();
 
-        console2.log("Initial admin:", initialAdmin);
+        return proxyAddress;
+    }
+
+    /**
+     * @notice Deploy AccessManager with all configuration
+     * @dev This function contains the testable business logic
+     * @return The deployed proxy address
+     */
+    function deployAccessManager() public returns (address) {
+        address initialAdmin = vm.envAddress("INITIAL_ADMIN");
+        ScriptHelpers.requireNonZero(initialAdmin, "INITIAL_ADMIN");
         
-        return address(accessManager);
+        DeploymentHelper.DeploymentResult memory result = 
+            DeploymentHelper.deployAccessManager(initialAdmin);
+
+        console2.log("AccessManager implementation deployed at:", result.implementation);
+        console2.log("AccessManager proxy deployed at:", result.proxy);
+        console2.log("Initial admin:", initialAdmin);
+
+        return result.proxy;
     }
 }

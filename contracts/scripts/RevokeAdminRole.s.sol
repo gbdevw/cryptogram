@@ -3,7 +3,8 @@ pragma solidity ^0.8.24;
 
 import {Script} from "lib/forge-std/src/Script.sol";
 import {console2} from "lib/forge-std/src/console2.sol";
-import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
+import {RoleManagementHelper} from "scripts/lib/RoleManagementHelper.sol";
+import {ScriptHelpers} from "scripts/lib/ScriptHelpers.sol";
 
 /**
  * @title RevokeAdminRole
@@ -12,8 +13,8 @@ import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/c
  *      WARNING: Be careful not to revoke admin from all addresses, or the contract becomes unmanageable
  */
 contract RevokeAdminRole is Script {
-    /// @notice Role ID for ADMIN_ROLE (default admin role in AccessManager)
-    uint64 public constant ADMIN_ROLE = 0;
+    using RoleManagementHelper for *;
+    using ScriptHelpers for *;
 
     /**
      * @notice Revoke ADMIN_ROLE from a target address
@@ -23,23 +24,29 @@ contract RevokeAdminRole is Script {
      *      - TARGET_ADDRESS: Address to revoke the admin role from
      */
     function run() external {
-        // Retrieve environment variables
         uint256 adminPrivateKey = vm.envUint("PRIVATE_KEY");
+
+        vm.startBroadcast(adminPrivateKey);
+
+        revokeAdminRole();
+
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @notice Revoke ADMIN_ROLE from target address
+     * @dev This function contains the testable business logic
+     */
+    function revokeAdminRole() public {
         address accessManager = vm.envAddress("ACCESS_MANAGER");
         address targetAddress = vm.envAddress("TARGET_ADDRESS");
 
-        // Start broadcasting transactions
-        vm.startBroadcast(adminPrivateKey);
+        ScriptHelpers.requireNonZero(accessManager, "ACCESS_MANAGER");
+        ScriptHelpers.requireNonZero(targetAddress, "TARGET_ADDRESS");
 
-        AccessManagerUpgradeable manager = AccessManagerUpgradeable(accessManager);
-        
-        // Revoke the admin role
-        manager.revokeRole(ADMIN_ROLE, targetAddress);
-        
+        RoleManagementHelper.revokeAdminRole(accessManager, targetAddress);
+
         console2.log("ADMIN_ROLE revoked from:", targetAddress);
         console2.log("WARNING: Ensure at least one admin remains to manage AccessManager");
-
-        // Stop broadcasting transactions
-        vm.stopBroadcast();
     }
 }

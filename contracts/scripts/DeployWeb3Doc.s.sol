@@ -3,11 +3,10 @@ pragma solidity ^0.8.24;
 
 import {Script} from "lib/forge-std/src/Script.sol";
 import {console2} from "lib/forge-std/src/console2.sol";
-import {Web3Doc} from "src/Web3Doc.sol";
-import {FlatFee} from "src/FlatFee.sol";
-import {ERC1967Proxy} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
 import {UUPSUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {DeploymentHelper} from "scripts/lib/DeploymentHelper.sol";
+import {RoleManagementHelper} from "scripts/lib/RoleManagementHelper.sol";
+import {ScriptHelpers} from "scripts/lib/ScriptHelpers.sol";
 
 /**
  * @title DeployWeb3Doc
@@ -15,74 +14,67 @@ import {UUPSUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/
  * @dev Deploys implementation and proxy, then initializes the Web3Doc contract
  */
 contract DeployWeb3Doc is Script {
-    /// @notice Role IDs
-    uint64 public constant UPGRADE_MANAGER_ROLE = 1;
-    uint64 public constant TREASURER_ROLE = 2;
+    using DeploymentHelper for *;
+    using RoleManagementHelper for *;
+    using ScriptHelpers for *;
     
-    /// @notice The deployed implementation address
-    address public implementation;
-
-    /// @notice The deployed Web3Doc proxy address
-    Web3Doc public web3doc;
-
     /**
      * @notice Main deployment function
-     * @dev Uses environment variables to provide the private key, the access manager proxy contract address and the
-     * fee requested by the contract in weis.
-     * @return The deployed Web3PGP proxy address
+     * @dev Uses environment variables for private key, access manager, web3pgp, and fee
+     * @return The deployed Web3Doc proxy address
      */
     function run() external returns (address) {
-        // Retrieve environment variables
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+
+        vm.startBroadcast(deployerPrivateKey);
+
+        address proxyAddress = deployWeb3Doc();
+
+        vm.stopBroadcast();
+
+        return proxyAddress;
+    }
+
+    /**
+     * @notice Deploy Web3Doc with all configuration
+     * @dev This function contains the testable business logic
+     * @return The deployed proxy address
+     */
+    function deployWeb3Doc() public returns (address) {
+        // Retrieve environment variables
         address accessManager = vm.envAddress("ACCESS_MANAGER");
         address web3pgp = vm.envAddress("WEB3PGP");
         uint256 feeInWeis = vm.envUint("FEE_IN_WEIS");
+        
+        ScriptHelpers.requireNonZero(accessManager, "ACCESS_MANAGER");
+        ScriptHelpers.requireNonZero(web3pgp, "WEB3PGP");
+        ScriptHelpers.requireNonZeroUint256(feeInWeis, "FEE_IN_WEIS");
 
-        // Start broadcasting transactions
-        vm.startBroadcast(deployerPrivateKey);
+        // Deploy the contract
+        DeploymentHelper.DeploymentResult memory result = 
+            DeploymentHelper.deployWeb3Doc(feeInWeis, accessManager, web3pgp);
 
-        // Deploy implementation
-        implementation = address(new Web3Doc());
-        console2.log("Web3Doc implementation deployed at:", implementation);
+        console2.log("Web3Doc implementation deployed at:", result.implementation);
+        console2.log("Web3Doc proxy deployed at:", result.proxy);
 
-        // Prepare initialization data
-        bytes memory initData = abi.encodeWithSelector(
-            Web3Doc.initialize.selector,
-            feeInWeis,
-            accessManager,
-            web3pgp
-        );
-        
-        // Deploy proxy with initialization data
-        ERC1967Proxy proxy = new ERC1967Proxy(implementation, initData);
-        web3doc = Web3Doc(payable(address(proxy)));
-        console2.log("Web3Doc proxy deployed at:", address(proxy));
+        // Configure roles
+        _configureRoles(accessManager, result.proxy);
 
-        // Configure UPGRADE_MANAGER_ROLE in AccessManager
-        AccessManagerUpgradeable manager = AccessManagerUpgradeable(accessManager);
-        
-        // ========== UPGRADE_MANAGER_ROLE ==========
-        
-        // Assign the role to upgradeToAndCall function
-        bytes4[] memory upgradeSelectors = new bytes4[](1);
-        upgradeSelectors[0] = UUPSUpgradeable.upgradeToAndCall.selector;
-        
-        manager.setTargetFunctionRole(address(proxy), upgradeSelectors, UPGRADE_MANAGER_ROLE);
-        console2.log("UPGRADE_MANAGER_ROLE assigned to upgradeToAndCall function");
-        
-        // ========== TREASURER_ROLE ==========
-        
-        // Assign the role to fee management functions
-        bytes4[] memory treasurerSelectors = new bytes4[](2);
-        treasurerSelectors[0] = FlatFee.updateRequestedFee.selector;
-        treasurerSelectors[1] = FlatFee.withdrawFees.selector;
-        
-        manager.setTargetFunctionRole(address(proxy), treasurerSelectors, TREASURER_ROLE);
-        console2.log("TREASURER_ROLE assigned to updateRequestedFee and withdrawFees functions");
+        return result.proxy;
+    }
 
-        // Stop broadcasting transactions
-        vm.stopBroadcast();
+    /**
+     * @notice Configure roles for Web3Doc
+     * @param accessManager The address of the AccessManager contract
+     * @param proxyAddress The address of the Web3Doc proxy
+     */
+    function _configureRoles(address accessManager, address proxyAddress) internal {
+        // Configure UPGRADE_MANAGER_ROLE
+        RoleManagementHelper.configureUpgradeManagerRole(accessManager, proxyAddress);
+        console2.log("UPGRADE_MANAGER_ROLE configured");
 
-        return address(proxy);
+        // Configure TREASURER_ROLE
+        RoleManagementHelper.configureTreasurerRole(accessManager, proxyAddress);
+        console2.log("TREASURER_ROLE configured");
     }
 }
