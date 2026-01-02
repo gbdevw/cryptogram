@@ -138,9 +138,9 @@ contract Web3Doc is FlatFee, IWeb3Doc, UUPSUpgradeable {
     /**
      * @notice Reinitializes the contract to allow for upgrades.
      * @dev This function is used to reinitialize the contract after an upgrade.
-     * It is marked as reinitializer(3) to allow for a second initialization.
+     * It is marked as reinitializer(2) to allow for a second initialization.
      */
-    function initializeUpgrade() external reinitializer(3) {
+    function initializeUpgrade() external reinitializer(2) {
         // Add reinitialization logic here and increase the number of reinitializations
     }
 
