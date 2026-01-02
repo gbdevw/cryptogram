@@ -624,7 +624,7 @@ contract Web3DocTest is Test {
         doc.timestamp(nonExistent, keccak256("dh"), "sig");
     }
 
-    function testGetDocumentBlockNumberForNonExistentDoc() public {
+    function testGetDocumentBlockNumberForNonExistentDoc() view public {
         uint256 blockNum = doc.getDocumentBlockNumberByID(9999);
         assertEq(blockNum, 0);
     }
@@ -730,7 +730,7 @@ contract Web3DocTest is Test {
         assertEq(blockNum, 75);
     }
 
-    function testGetSignatureBlockNumberByHashReturnsZeroForNonExistent() public {
+    function testGetSignatureBlockNumberByHashReturnsZeroForNonExistent() view public {
         bytes32 nonExistentHash = keccak256("sig-does-not-exist");
         uint256 blockNum = doc.getSignatureBlockNumberByHash(nonExistentHash);
         assertEq(blockNum, 0);
@@ -831,7 +831,7 @@ contract Web3DocTest is Test {
         assertEq(blocks[3], 0);
     }
 
-    function testGetSignatureBlockNumberByHashBatchEmptyArray() public {
+    function testGetSignatureBlockNumberByHashBatchEmptyArray() view public {
         bytes32[] memory emptySigs = new bytes32[](0);
         uint256[] memory blocks = doc.getSignatureBlockNumberByHashBatch(emptySigs);
         assertEq(blocks.length, 0);
@@ -841,7 +841,7 @@ contract Web3DocTest is Test {
     /* LIST SIGNATURE REVOCATIONS BLOCK NUMBERS TESTS                                                               */
     /*****************************************************************************************************************/
 
-    function testListSignatureRevocationsBlockNumbersEmpty() public {
+    function testListSignatureRevocationsBlockNumbersEmpty() view public {
         bytes32 sigHash = keccak256("sig-no-revocations");
         uint256[] memory revs = doc.listSignatureRevocationsBlockNumbers(sigHash, 0, 10);
         assertEq(revs.length, 0);
@@ -945,7 +945,7 @@ contract Web3DocTest is Test {
     /* LIST DOCUMENT IDS BY HASH TESTS                                                                              */
     /*****************************************************************************************************************/
 
-    function testListDocumentIdsByHashEmpty() public {
+    function testListDocumentIdsByHashEmpty() view public {
         bytes32 dochash = keccak256("hash-no-docs");
         uint256[] memory ids = doc.listDocumentIdsByHash(dochash, 0, 10);
         assertEq(ids.length, 0);
