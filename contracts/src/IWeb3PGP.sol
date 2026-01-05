@@ -41,10 +41,18 @@ interface IWeb3PGP {
     error NotRegistered(bytes32 fingerprint);
 
     /**
-     * Error emitted when the user tries to register a subkey to a parent key that is already a subkey.
+     * Error emitted when the user tries to register a subkey to a parent key that is already a subkey or
+     * when the user tries to update the metadata of a key that is a subkey.
+     *
      * @param fingerprint The fingerprint of the parent key that is already a subkey.
      */
-    error ParentIsASubkey(bytes32 fingerprint);
+    error TargetIsASubkey(bytes32 fingerprint);
+
+    /**
+     * Error emitted when a user tries to certify its own key (self-certification) using the certifyKey function.
+     * Self-certifications must be done using the update function instead.
+     */
+    error SelfCertificationNotAllowed();
 
     /*****************************************************************************************************************/
     /* EVENTS                                                                                                        */
@@ -79,6 +87,40 @@ interface IWeb3PGP {
      * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
      */
     event KeyRegistered(bytes32 indexed primaryKeyFingerprint, bytes32[] subkeyFingerprints, bytes openPGPMsg);
+
+    /**
+     * Event emitted when an existing public key has been updated by publishing a new OpenPGP message using
+     * the update function.
+     *
+     * Key updates can be used to add or remove metadata (User ID packets), change preferences, change key
+     * capabilities or change the key expiration time using self-signatures. A valid certificate is expected
+     * to include at least the primary public key along with its binding signature, metadata and self-signatures.
+     *
+     * Subkeys cannot be added or removed using this function, use addSubkey instead.
+     *
+     * @param fingerprint The fingerprint of the public key being updated.
+     * @param openPGPMsg A binary OpenPGP message which contains the updated public key and its associated data.
+     *
+     * @notice This event is used to publish an updated version of an existing public key.
+     *
+     * @dev The OpenPGP message must be in binary format, can be compressed, must not be encrypted and must be a valid
+     * key certificate. It is the responsibility of the users to validate the OpenPGP message and the public keys
+     * contained within before using them. Please refer to the OpenPGP RFC 9580 for more information.
+     *
+     * @custom:fingerprints bytes32 is the type used for fingerprints as the length of the fingerprints ranges from 
+     * 20 bytes to 32 bytes dependending on the key version (v4 vs v6). If the fingerprint is less than 32 bytes, it
+     * is zero-padded on the left to match the length of 32 bytes.
+     *
+     * @custom:implnotes The event logs are used as a cost-effective storage to publish and persist public keys on the
+     * blockchain. For feasibility and gas-efficiency reasons, the smart contract itself does not validate the OpenPGP
+     * messages or the declared fingerprint. Future improvements may introduce off-chain validation mechanisms, for
+     * example through Chainlink Automation & Function to automatically verify published keys and maintain indexes of
+     * valid, revoked or otherwise annotated keys.
+     *
+     * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
+     * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
+     */
+    event KeyUpdated(bytes32 indexed fingerprint, bytes openPGPMsg);
 
     /**
      * Event emitted when a new public subkey has been registered and added to a primary key.
@@ -139,6 +181,34 @@ interface IWeb3PGP {
     event KeyRevoked(bytes32 indexed fingerprint, bytes revocationCertificate);
 
     /**
+     * Event emitted when a key certification is published, attesting that an issuer certifies the identity linked to
+     * a key (Web of Trust). A valid key certificate must include at least the public key, the user ID packet, the
+     * self-certification and the third-party certification signature from the issuer.
+     * 
+     * @param fingerprint The fingerprint of the public key being certified.
+     * @param issuer The fingerprint of the issuer's public key that is issuing the certification.
+     * @param keyCertificate The binary OpenPGP message which contains the key certification signature.
+     *
+     * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
+     * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
+     */
+    event KeyCertified(bytes32 indexed fingerprint, bytes32 indexed issuer, bytes keyCertificate);
+
+    /**
+     * Event emitted when a key certification previously published for a given public key by an issuer is revoked.
+     * A valid certificate is expected to include at least the public key, the user ID packet, the self-certification,
+     * the third-party certification signature from the issuer and the revocation signature form the issuer.
+     * 
+     * @param fingerprint The fingerprint of the public key whose certification is being revoked.
+     * @param issuer The fingerprint of the issuer's public key that issued the certification.
+     * @param revocationSignature The binary OpenPGP signature revoking the key certification.
+     *     
+     * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
+     * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
+     */
+    event KeyCertificationRevoked(bytes32 indexed fingerprint, bytes32 indexed issuer, bytes revocationSignature);
+
+    /**
      * Event emitted when a challenge is issued for a given public key fingerprint to prove ownership of the key.
      * The challenge should be the keccak256 hash of a random nonce generated by the challenger.
      * 
@@ -146,7 +216,7 @@ interface IWeb3PGP {
      * @param challenge The challenge to be signed to prove ownership of the key. 
      * the
      */ 
-    event OwnershipChallenged(bytes32 indexed fingerprint, bytes32 challenge);
+    event OwnershipChallenged(bytes32 indexed fingerprint, bytes32 indexed challenge);
 
     /**
      * Event emitted when the challengee submits its signed challenge to prove ownership of the key.
@@ -156,25 +226,6 @@ interface IWeb3PGP {
      * @param signature The signature of the challenge using the private key corresponding to the public key.
      */
     event OwnershipProved(bytes32 indexed fingerprint, bytes32 indexed challenge, bytes signature);
-
-    /**
-     * Event emitted when a key certification is published, attesting that an issuer certifies the identity linked to
-     * a key (Web of Trust).
-     * 
-     * @param fingerprint The fingerprint of the public key being certified.
-     * @param issuer The fingerprint of the issuer's public key that is issuing the certification.
-     * @param keyCertificate The binary OpenPGP message which contains the key certification signature.
-     */
-    event KeyCertified(bytes32 indexed fingerprint, bytes32 indexed issuer, bytes keyCertificate);
-
-    /**
-     * Event emitted when a key certification previously published for a given public key by an issuer is revoked.
-     * 
-     * @param fingerprint The fingerprint of the public key whose certification is being revoked.
-     * @param issuer The fingerprint of the issuer's public key that issued the certification.
-     * @param revocationSignature The binary OpenPGP signature revoking the key certification.
-     */
-    event KeyCertificationRevoked(bytes32 indexed fingerprint, bytes32 indexed issuer, bytes revocationSignature);
 
     /*****************************************************************************************************************/
     /* WRITE FUNCTIONS                                                                                               */
@@ -217,6 +268,40 @@ interface IWeb3PGP {
      * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
      */
     function register(bytes32 primaryKeyFingerprint, bytes32[] calldata subkeyFingerprints, bytes calldata openPGPMsg) external payable;
+
+    /**
+    * This function is used to update an existing public key by publishing a new OpenPGP message.
+    *
+    * @param fingerprint The fingerprint of the public key being updated.
+    * @param openPGPMsg A binary OpenPGP message which contains the updated public key and its associated data.
+    *
+    * @notice This function allows users and PGP servers to publish an updated version of an existing public key.
+    *
+    * The smart contract verifies the public key has been registered. It does not validate the OpenPGP message
+    * nor the validity of the public key contained within. Users are expected to validate the OpenPGP message
+    * and the public keys. Please refer to the OpenPGP RFC 9580 for more information about the validation process.
+    *
+    * Users must also verify the fingerprint provided as parameter matches the fingerprint of the keys computed from
+    * the data of the OpenPGP message. Users should not use public keys with a mismatch between these fingerprints.
+    *
+    * @dev The OpenPGP message must be in binary format, can be compressed, must not be encrypted and must be a valid
+    * key certificate. It is the responsibility of the users to validate the OpenPGP message and the public keys
+    * contained within before using them. Please refer to the OpenPGP RFC 9580 for more information.
+    *
+    * @custom:fingerprints bytes32 is the type used for fingerprints as the length of the fingerprints ranges from 
+    * 20 bytes to 32 bytes dependending on the key version (v4 vs v6). If the fingerprint is less than 32 bytes, it
+    * is zero-padded on the left to match the length of 32 bytes.
+    *
+    * @custom:implnotes The event logs are used as a cost-effective storage to publish and persist public keys on the
+    * blockchain. For feasibility and gas-efficiency reasons, the smart contract itself does not validate the OpenPGP
+    * messages or the declared fingerprint. Future improvements may introduce off-chain validation mechanisms, for
+    * example through Chainlink Automation & Function to automatically verify published keys and maintain indexes of
+    * valid, revoked or otherwise annotated keys.
+    *
+    * @custom:rfc Currently, RFC 9580 is the reference RFC but the upcoming "Post-Quantum Cryptography in OpenPGP" is
+    * already taken into account https://datatracker.ietf.org/doc/draft-ietf-openpgp-pqc/12/
+    */
+    function update(bytes32 fingerprint, bytes calldata openPGPMsg) external payable;
 
     /**
      * This function is used to publish a subkey attached to a primary public key that has already been registered.
@@ -291,7 +376,7 @@ interface IWeb3PGP {
     function revoke(bytes32 fingerprint, bytes calldata revocationCertificate) external payable;
 
     /**
-     * @notice Issues a challenge for the owner of the public key with the given fingerprint to prove ownership.
+     * @notice Challenge the owner of the public key with the given fingerprint to prove ownership.
      * @dev The challenge should be the keccak256 hash of a random nonce generated by the challenger.
      * @param fingerprint The fingerprint of the public key to challenge.
      * @param challenge The challenge to be signed to prove ownership of the key.

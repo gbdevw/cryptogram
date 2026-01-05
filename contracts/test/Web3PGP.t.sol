@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
+import {IWeb3PGP} from "src/IWeb3PGP.sol";
 import {IFlatFee} from "src/IFlatFee.sol";
 import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -56,7 +57,7 @@ contract Web3PGPTest is Test {
     event KeyRegistered(bytes32 indexed primaryKeyFingerprint, bytes32[] subkeyFingerprints, bytes openPGPMsg);
     event SubkeyAdded(bytes32 indexed parentKeyFingerprint, bytes32 indexed subkeyFingerprint, bytes openPGPMsg);
     event KeyRevoked(bytes32 indexed fingerprint, bytes revocationCertificate);
-    event OwnershipChallenged(bytes32 indexed fingerprint, bytes32 challenge);
+    event OwnershipChallenged(bytes32 indexed fingerprint, bytes32 indexed challenge);
     event OwnershipProved(bytes32 indexed fingerprint, bytes32 indexed challenge, bytes signature);
     event KeyCertified(bytes32 indexed fingerprint, bytes32 indexed issuer, bytes keyCertificate);
     event KeyCertificationRevoked(bytes32 indexed fingerprint, bytes32 indexed issuer, bytes revocationSignature);
@@ -547,7 +548,7 @@ contract Web3PGPTest is Test {
         pgp.register(fp, new bytes32[](0), "challenge-key");
         
         // Expect OwnershipChallenged event
-        vm.expectEmit(true, false, false, true, address(pgp));
+        vm.expectEmit(true, true, false, false, address(pgp));
         emit OwnershipChallenged(fp, challenge);
         
         pgp.challengeOwnership(fp, challenge);
@@ -570,15 +571,15 @@ contract Web3PGPTest is Test {
         bytes32 challenge2 = keccak256(abi.encodePacked("nonce2"));
         bytes32 challenge3 = keccak256(abi.encodePacked("nonce3"));
         
-        vm.expectEmit(true, false, false, true, address(pgp));
+        vm.expectEmit(true, true, false, false, address(pgp));
         emit OwnershipChallenged(fp, challenge1);
         pgp.challengeOwnership(fp, challenge1);
         
-        vm.expectEmit(true, false, false, true, address(pgp));
+        vm.expectEmit(true, true, false, false, address(pgp));
         emit OwnershipChallenged(fp, challenge2);
         pgp.challengeOwnership(fp, challenge2);
         
-        vm.expectEmit(true, false, false, true, address(pgp));
+        vm.expectEmit(true, true, false, false, address(pgp));
         emit OwnershipChallenged(fp, challenge3);
         pgp.challengeOwnership(fp, challenge3);
     }
@@ -691,16 +692,14 @@ contract Web3PGPTest is Test {
         pgp.certifyKey(fp, issuer, cert);
     }
 
-    function testSelfCertification() public {
+    function testSelfCertificationReverts() public {
         bytes32 fp = keccak256("self-cert");
         bytes memory cert = "self-certification";
         
         pgp.register(fp, new bytes32[](0), "key");
         
-        // Self-certification: both fingerprints are the same
-        vm.expectEmit(true, true, false, true, address(pgp));
-        emit KeyCertified(fp, fp, cert);
-        
+        // Self-certification should revert: issuer must be different from target
+        vm.expectRevert(IWeb3PGP.SelfCertificationNotAllowed.selector);
         pgp.certifyKey(fp, fp, cert);
     }
 
@@ -766,6 +765,17 @@ contract Web3PGPTest is Test {
         
         vm.expectRevert();
         pgp.revokeCertification(fp, issuer, revocation);
+    }
+
+    function testSelfCertificationRevocationReverts() public {
+        bytes32 fp = keccak256("self-cert-revoke");
+        bytes memory revocation = "self-revocation";
+        
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Self-certification revocation should revert: issuer must be different from target
+        vm.expectRevert(IWeb3PGP.SelfCertificationNotAllowed.selector);
+        pgp.revokeCertification(fp, fp, revocation);
     }
 
     function testMultipleCertificationRevocations() public {
