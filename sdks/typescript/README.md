@@ -128,6 +128,32 @@ npm run test:integration
 npm run test:all
 ```
 
+## Updating Contract ABIs
+
+The SDK includes contract ABIs that must stay synchronized with the deployed smart contracts. When the contracts in `/contracts` are modified, you need to refresh the ABIs:
+
+### Why Update ABIs?
+
+The ABIs define the smart contract function signatures, events, and error types. When contract changes are deployed, the ABIs must be updated to ensure:
+- ✓ Type safety matches current contract implementation
+- ✓ New functions/events are available to the SDK
+- ✓ Integration tests work with the latest contract code
+- ✓ No runtime errors from mismatched function signatures
+
+### How to Update ABIs
+
+```bash
+npm run update-abis
+```
+
+This command:
+1. Compiles smart contracts using Foundry (`forge build`)
+2. Extracts ABIs from compiled artifacts
+3. Generates TypeScript files in `src/abis/`
+4. Validates all contract artifacts are present
+
+**Note**: This task is automatically run before integration tests, but should be manually run whenever smart contracts are modified.
+
 ## License
 
 MIT License - see LICENSE file for details
