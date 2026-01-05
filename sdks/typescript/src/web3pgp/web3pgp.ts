@@ -2,7 +2,7 @@ import { Web3PGP as Web3PGPABI }  from '../abis/Web3PGP';
 import { toBytes32 } from '../utils/0xstr';
 import { Address, BlockTag, PublicClient, TransactionReceipt, WalletClient, parseEventLogs } from 'viem';
 import { IWeb3PGP } from './web3pgp.interface';
-import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog } from './types/types';
+import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog, KeyCertificationRevokedLog, KeyCertifiedLog, KeyUpdatedLog, OwnershipChallengedLog, OwnershipProvedLog } from './types/types';
 import { FlatFee } from '../flatfee/flatefee';
 import { getBlockTimestamp } from '../utils/viemutils';
 
@@ -14,12 +14,15 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     private static readonly KEY_REGISTERED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRegistered')!;
     private static readonly SUBKEY_ADDED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'SubkeyAdded')!;
     private static readonly KEY_REVOKED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyRevoked')!;
+    private static readonly KEY_UPDATED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyUpdated')!;
+    private static readonly OWNERSHIP_CHALLENGED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'OwnershipChallenged')!;
+    private static readonly OWNERSHIP_PROVED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'OwnershipProved')!;
+    private static readonly KEY_CERTIFIED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyCertified')!;
+    private static readonly KEY_CERTIFICATION_REVOKED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyCertificationRevoked')!;
 
     constructor(address: `0x${string}`, client: PublicClient, walletClient?: WalletClient) {
         super(address, client, walletClient);
     }
-
-
 
     /*****************************************************************************************************************/
     /* READ FUNCTIONS                                                                                                */
@@ -194,6 +197,27 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         // Use the wallet client to send the actual transaction
         const txhash = await this.walletClient!.writeContract(request);
         // Wait for transaction to be mined and return the receipt
+        return this.client.waitForTransactionReceipt({ hash: txhash });
+    }
+
+    /**
+     * Update an existing key with new OpenPGP metadata.
+     * @param fingerprint The fingerprint of the key to update.
+     * @param openPGPMsg A binary OpenPGP message containing updated key material and signatures.
+     * @return Transaction receipt after updating the key.
+     */
+    public async update(fingerprint: `0x${string}`, openPGPMsg: `0x${string}`): Promise<TransactionReceipt> {
+        this.ensureWalletClient();
+        const fee = await this.requestedFee();
+        const { request } = await this.client.simulateContract({
+            address: this.address,
+            account: this.walletClient!.account,
+            abi: Web3PGPABI,
+            functionName: 'update',
+            args: [toBytes32(fingerprint), openPGPMsg],
+            value: fee
+        });
+        const txhash = await this.walletClient!.writeContract(request);
         return this.client.waitForTransactionReceipt({ hash: txhash });
     }
 
@@ -465,6 +489,51 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         }));
     }
 
+        /**
+     * Search for KeyUpdated event logs.
+     * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default.
+     * @return An array of KeyUpdatedLog objects matching the search criteria.
+     */
+    public async searchKeyUpdatedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyUpdatedLog[]> {
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
+
+        const args = fingerprint !== undefined ? {
+            fingerprint: Array.isArray(fingerprint) ? fingerprint.map(toBytes32) : toBytes32(fingerprint)
+        } : undefined;
+
+        const logs = await this.client.getLogs({
+            strict: true,
+            address: this.address,
+            event: Web3PGP.KEY_UPDATED_EVENT,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            openPGPMsg: log.args.openPGPMsg
+        }));
+    }
+
     /**
      * Get the log of a subkey addition event using the provided primary key fingerprint, subkey fingerprint, and block number.
      * @param primaryKeyFingerprint The fingerprint of the primary key.
@@ -603,8 +672,225 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     }
 
     /**
-     * Searches for all key-related events (KeyRegistered, SubkeyAdded, KeyRevoked) within a specified
-     * block range.
+     * Search for OwnershipProved event logs.
+     * @param fingerprint The fingerprint(s) of the key whose ownership proofs to search for. Default to all keys.
+     * @param challenge The challenge(s) whose ownership proofs to search for. Default to all challenges.
+     * @param fromBlock Starting block number (inclusive). 'earliest' block is used if not provided. 'pending' is not allowed.
+     * @param toBlock Ending block number (inclusive). 'latest' block is used if not provided. 'pending' is not allowed.
+     * @returns An array of OwnershipProvedLog objects matching the search criteria.
+     */
+    public async searchOwnershipChallengedLogs(fingerprint?: `0x${string}` | `0x${string}`[], challenge?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<OwnershipChallengedLog[]> {
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
+
+        let args: any = undefined;
+        if (fingerprint !== undefined || challenge !== undefined) {
+            args = {};
+            if (fingerprint !== undefined) {
+                args.fingerprint = Array.isArray(fingerprint) ? fingerprint.map(toBytes32) : toBytes32(fingerprint);
+            }
+            if (challenge !== undefined) {
+                args.challenge = Array.isArray(challenge) ? challenge.map(toBytes32) : toBytes32(challenge);
+            }
+        }
+
+        const logs = await this.client.getLogs({
+            strict: true,
+            address: this.address,
+            event: Web3PGP.OWNERSHIP_CHALLENGED_EVENT,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            challenge: log.args.challenge
+        }));
+    }
+
+    /**
+     * Search for OwnershipProved event logs.
+     * @param fingerprint The fingerprint(s) of the key whose ownership proofs to search for. Default to all keys.
+     * @param challenge The challenge(s) associated with the ownership proofs. Default to all challenges.
+     * @param fromBlock Starting block number (inclusive). 'earliest' block is used if not provided. 'pending' is not allowed.
+     * @param toBlock Ending block number (inclusive). 'latest' block is used if not provided. 'pending' is not allowed.
+     * @returns An array of OwnershipProvedLog objects matching the search criteria.
+     */
+    public async searchOwnershipProvedLogs(fingerprint?: `0x${string}` | `0x${string}`[], challenge?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<OwnershipProvedLog[]> {
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
+
+        let args: any = undefined;
+        if (fingerprint !== undefined || challenge !== undefined) {
+            args = {};
+            if (fingerprint !== undefined) {
+                args.fingerprint = Array.isArray(fingerprint) ? fingerprint.map(toBytes32) : toBytes32(fingerprint);
+            }
+            if (challenge !== undefined) {
+                args.challenge = Array.isArray(challenge) ? challenge.map(toBytes32) : toBytes32(challenge);
+            }
+        }
+
+        const logs = await this.client.getLogs({
+            strict: true,
+            address: this.address,
+            event: Web3PGP.OWNERSHIP_PROVED_EVENT,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            challenge: log.args.challenge,
+            signature: log.args.signature
+        }));
+    }
+
+    /**
+     * Search for KeyCertified event logs.
+     * 
+     * @param fingerprint The fingerprint(s) of the key being certified. Default to all keys.
+     * @param issuerFingerprint The fingerprint(s) of the issuer of the certification. Default to all issuers.
+     * @param fromBlock Starting block number (inclusive). 'earliest' block is used if not provided. 'pending' is not allowed.
+     * @param toBlock Ending block number (inclusive). 'latest' block is used if not provided. 'pending' is not allowed.
+     * @returns An array of KeyCertifiedLog objects matching the search criteria.
+     */
+    public async searchKeyCertifiedLogs(fingerprint?: `0x${string}` | `0x${string}`[], issuerFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyCertifiedLog[]> {
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
+
+        let args: any = undefined;
+        if (fingerprint !== undefined || issuerFingerprint !== undefined) {
+            args = {};
+            if (fingerprint !== undefined) {
+                args.fingerprint = Array.isArray(fingerprint) ? fingerprint.map(toBytes32) : toBytes32(fingerprint);
+            }
+            if (issuerFingerprint !== undefined) {
+                args.issuerFingerprint = Array.isArray(issuerFingerprint) ? issuerFingerprint.map(toBytes32) : toBytes32(issuerFingerprint);
+            }
+        }
+
+        const logs = await this.client.getLogs({
+            strict: true,
+            address: this.address,
+            event: Web3PGP.KEY_CERTIFIED_EVENT,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            issuerFingerprint: log.args.issuer,
+            keyCertificate: log.args.keyCertificate
+        }));
+    }
+
+    /**
+     * Search for KeyCertificationRevoked event logs.
+     * 
+     * @param fingerprint The fingerprint(s) of the key whose certification revocations to search for. Default to all keys.
+     * @param issuerFingerprint The fingerprint(s) of the issuers whose certification revocations to search for. Default to all issuers.
+     * @param fromBlock Starting block number (inclusive). 'earliest' block is used if not provided. 'pending' is not allowed.
+     * @param toBlock Ending block number (inclusive). 'latest' block is used if not provided. 'pending' is not allowed.
+     * @returns An array of KeyCertificationRevokedLog objects matching the search criteria.
+     */
+    public async searchKeyCertificationRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], issuerFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyCertificationRevokedLog[]> {
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
+
+        let args: any = undefined;
+        if (fingerprint !== undefined || issuerFingerprint !== undefined) {
+            args = {};
+            if (fingerprint !== undefined) {
+                args.fingerprint = Array.isArray(fingerprint) ? fingerprint.map(toBytes32) : toBytes32(fingerprint);
+            }
+            if (issuerFingerprint !== undefined) {
+                args.issuerFingerprint = Array.isArray(issuerFingerprint) ? issuerFingerprint.map(toBytes32) : toBytes32(issuerFingerprint);
+            }
+        }
+
+        const logs = await this.client.getLogs({
+            strict: true,
+            address: this.address,
+            event: Web3PGP.KEY_CERTIFICATION_REVOKED_EVENT,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            issuerFingerprint: log.args.issuer,
+            revocationSignature: log.args.revocationSignature
+        }));
+    }
+
+    /**
+     * Searches for all key-related events (KeyRegistered, SubkeyAdded, KeyRevoked, KeyUpdated, OwnershipChallenged, OwnershipProved,
+     * KeyCertified, KeyCertificationRevoked) within a specified block range.
      * 
      * @param fromBlock Starting block number (inclusive). 'earliest' block is used if not provided. 'pending' is not allowed.
      * @param toBlock Ending block number (inclusive). 'latest' block is used if not provided. 'pending' is not allowed.
@@ -628,7 +914,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             events: [
                 Web3PGP.KEY_REGISTERED_EVENT,
                 Web3PGP.SUBKEY_ADDED_EVENT,
-                Web3PGP.KEY_REVOKED_EVENT
+                Web3PGP.KEY_REVOKED_EVENT,
+                Web3PGP.KEY_UPDATED_EVENT,
+                Web3PGP.OWNERSHIP_CHALLENGED_EVENT,
+                Web3PGP.OWNERSHIP_PROVED_EVENT,
+                Web3PGP.KEY_CERTIFIED_EVENT,
+                Web3PGP.KEY_CERTIFICATION_REVOKED_EVENT
             ],
             strict: true
         })
@@ -670,6 +961,39 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
                         fingerprint: log.args.fingerprint,
                         revocationCertificate: log.args.revocationCertificate
                     } as KeyRevokedLog;
+                case 'KeyUpdated':
+                    return {
+                        ...baseLog,
+                        fingerprint: log.args.fingerprint,
+                        openPGPMsg: log.args.openPGPMsg
+                    } as KeyUpdatedLog;
+                case 'OwnershipChallenged':
+                    return {
+                        ...baseLog,
+                        fingerprint: log.args.fingerprint,
+                        challenge: log.args.challenge
+                    } as OwnershipChallengedLog;
+                case 'OwnershipProved':
+                    return {
+                        ...baseLog,
+                        fingerprint: log.args.fingerprint,
+                        challenge: log.args.challenge,
+                        signature: log.args.signature
+                    } as OwnershipProvedLog;
+                case 'KeyCertified':
+                    return {
+                        ...baseLog,
+                        fingerprint: log.args.fingerprint,
+                        issuerFingerprint: log.args.issuer,
+                        keyCertificate: log.args.keyCertificate
+                    } as KeyCertifiedLog;
+                case 'KeyCertificationRevoked':
+                    return {
+                        ...baseLog,
+                        fingerprint: log.args.fingerprint,
+                        issuerFingerprint: log.args.issuer,
+                        revocationSignature: log.args.revocationSignature
+                    } as KeyCertificationRevokedLog;
             }
         });
     }
@@ -739,6 +1063,123 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             revocationCertificate: log.args.revocationCertificate
+        })));
+    }
+
+    /**
+     * Extract KeyUpdated event logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of KeyUpdatedLog objects extracted from the receipt.
+     */
+    public async extractKeyUpdatedLog(receipt: TransactionReceipt): Promise<KeyUpdatedLog[]> {
+        let parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            eventName: 'KeyUpdated',
+            logs: receipt.logs
+        });
+
+        return Promise.all(parsedLogs.map(async log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            openPGPMsg: log.args.openPGPMsg
+        })));
+    }
+
+    /**
+     * Extract OwnershipChallenged event logs from a transaction receipt.
+     * 
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of OwnershipChallengedLog objects extracted from the receipt.
+     */
+    public async extractOwnershipChallengedLog(receipt: TransactionReceipt): Promise<OwnershipChallengedLog[]> {
+        let parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            eventName: 'OwnershipChallenged',
+            logs: receipt.logs
+        });
+
+        return Promise.all(parsedLogs.map(async log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            challenge: log.args.challenge
+        })));
+    }
+
+    /**
+     * Extract OwnershipProved event logs from a transaction receipt.
+     * 
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of OwnershipProvedLog objects extracted from the receipt.
+     */
+    public async extractOwnershipProvedLog(receipt: TransactionReceipt): Promise<OwnershipProvedLog[]> {
+        let parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            eventName: 'OwnershipProved',
+            logs: receipt.logs
+        });
+
+        return Promise.all(parsedLogs.map(async log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            challenge: log.args.challenge,
+            signature: log.args.signature
+        })));
+    }
+
+    /**
+     * Extract KeyCertified event logs from a transaction receipt.
+     * 
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of KeyCertifiedLog objects extracted from the receipt.
+     */
+    public async extractKeyCertifiedLog(receipt: TransactionReceipt): Promise<KeyCertifiedLog[]> {
+        let parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            eventName: 'KeyCertified',
+            logs: receipt.logs
+        });
+
+        return Promise.all(parsedLogs.map(async log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            issuerFingerprint: log.args.issuer,
+            keyCertificate: log.args.keyCertificate
+        })));
+    }
+
+    /**
+     * Extract KeyCertificationRevoked event logs from a transaction receipt.
+     * 
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of KeyCertificationRevokedLog objects extracted from the receipt.
+     */
+    public async extractKeyCertificationRevokedLog(receipt: TransactionReceipt): Promise<KeyCertificationRevokedLog[]> {
+        let parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            eventName: 'KeyCertificationRevoked',
+            logs: receipt.logs
+        });
+
+        return Promise.all(parsedLogs.map(async log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            issuerFingerprint: log.args.issuer,
+            revocationSignature: log.args.revocationSignature
         })));
     }
 

@@ -2,7 +2,7 @@ import { getBlockTimestamp } from '../src/utils/viemutils';
 import { Web3PGP } from '../src/web3pgp/web3pgp';
 import { AnvilHelper } from './helpers/anvil.helper';
 import { Address } from 'viem';
-import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog } from '../src/web3pgp/types/types';
+import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog, KeyUpdatedLog, OwnershipChallengedLog, OwnershipProvedLog, KeyCertifiedLog, KeyCertificationRevokedLog } from '../src/web3pgp/types/types';
 
 /**
  * Integration tests for Web3PGP contract using real blockchain (Anvil)
@@ -31,6 +31,26 @@ describe('Web3PGP Integration Tests', () => {
 
     const isKeyRevokedLog = (log: KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog): log is KeyRevokedLog => {
         return 'fingerprint' in log && 'revocationCertificate' in log;
+    };
+
+    const isKeyUpdatedLog = (log: any): log is KeyUpdatedLog => {
+        return 'fingerprint' in log && 'openPGPMsg' in log && !('subkeyFingerprints' in log) && !('subkeyFingerprint' in log);
+    };
+
+    const isOwnershipChallengedLog = (log: any): log is OwnershipChallengedLog => {
+        return 'fingerprint' in log && 'challenge' in log && !('signature' in log);
+    };
+
+    const isOwnershipProvedLog = (log: any): log is OwnershipProvedLog => {
+        return 'fingerprint' in log && 'challenge' in log && 'signature' in log;
+    };
+
+    const isKeyCertifiedLog = (log: any): log is KeyCertifiedLog => {
+        return 'fingerprint' in log && 'issuerFingerprint' in log && 'keyCertificate' in log;
+    };
+
+    const isKeyCertificationRevokedLog = (log: any): log is KeyCertificationRevokedLog => {
+        return 'fingerprint' in log && 'issuerFingerprint' in log && 'revocationSignature' in log;
     };
 
     // Helper to generate unique fingerprints for test isolation
@@ -952,4 +972,594 @@ describe('Web3PGP Integration Tests', () => {
             await anvil.revert(snapshotId);
         });
     });
-});
+
+    describe('Key Update', () => {
+        const keyToUpdate = '0x1111111111111111111111111111111111111111111111111111111111111112' as `0x${string}`;
+        const updatedOpenPGPMsg = '0xdeadbeef0102' as `0x${string}`;
+
+        beforeAll(async () => {
+            // Register key first
+            await web3pgp.register(keyToUpdate, [], mockOpenPGPMsg);
+        });
+
+        test('should update a key with new OpenPGP message', async () => {
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            
+            // Update the key
+            const receipt = await web3pgp.update(keyToUpdate, updatedOpenPGPMsg);
+            
+            expect(receipt.status).toBe('success');
+            expect(receipt.blockNumber).toBeGreaterThan(blockBefore);
+
+            // Verify key still exists
+            const exists = await web3pgp.exists(keyToUpdate);
+            expect(exists).toBe(true);
+        });
+
+        test('should search KeyUpdated event logs', async () => {
+            const key = generateUniqueFingerprint();
+            const newOpenPGPMsg = '0xcafebabe1234' as `0x${string}`;
+
+            // Register and then update
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            const receipt = await web3pgp.update(key, newOpenPGPMsg);
+
+            // Search for update logs
+            const logs = await web3pgp.searchKeyUpdatedLogs(key);
+
+            expect(logs.length).toBeGreaterThanOrEqual(1);
+            const updateLog = logs.find(l => l.transactionHash === receipt.transactionHash);
+            expect(updateLog).toBeDefined();
+            expect(updateLog!.fingerprint).toBe(key);
+            expect(updateLog!.openPGPMsg).toBe(newOpenPGPMsg);
+            expect(updateLog!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should search KeyUpdated logs for multiple keys', async () => {
+            const key1 = generateUniqueFingerprint();
+            const key2 = generateUniqueFingerprint();
+
+            // Register and update both keys
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            await web3pgp.register(key2, [], mockOpenPGPMsg);
+            await web3pgp.update(key1, '0xaaaa' as `0x${string}`);
+            await web3pgp.update(key2, '0xbbbb' as `0x${string}`);
+
+            // Search for updates for multiple keys
+            const logs = await web3pgp.searchKeyUpdatedLogs([key1, key2]);
+
+            expect(logs.length).toBeGreaterThanOrEqual(2);
+            const fingerprints = logs.map(l => l.fingerprint);
+            expect(fingerprints).toContain(key1);
+            expect(fingerprints).toContain(key2);
+        });
+
+        test('should extract KeyUpdated log from receipt', async () => {
+            const key = generateUniqueFingerprint();
+            const msgForExtraction = '0xfeedfeed' as `0x${string}`;
+
+            // Register and update
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            const receipt = await web3pgp.update(key, msgForExtraction);
+
+            // Extract log from receipt
+            const logs = await web3pgp.extractKeyUpdatedLog(receipt);
+
+            expect(logs).toHaveLength(1);
+            expect(logs[0]!.fingerprint).toBe(key);
+            expect(logs[0]!.openPGPMsg).toBe(msgForExtraction);
+            expect(logs[0]!.transactionHash).toBe(receipt.transactionHash);
+            expect(logs[0]!.blockTimestamp).toBeInstanceOf(Date);
+        });
+    });
+
+    describe('Ownership Challenge and Proof', () => {
+        test('should challenge ownership of a key', async () => {
+            const keyForChallenge = generateUniqueFingerprint();
+            const challengeData = generateUniqueFingerprint();
+
+            // Register key for challenge test
+            await web3pgp.register(keyForChallenge, [], mockOpenPGPMsg);
+            const receipt = await web3pgp.challengeOwnership(keyForChallenge, challengeData);
+            
+            expect(receipt.status).toBe('success');
+            expect(receipt.blockNumber).toBeGreaterThan(0n);
+        });
+
+        test('should search OwnershipChallenged event logs', async () => {
+            const key = generateUniqueFingerprint();
+            const challenge = generateUniqueFingerprint();
+
+            // Register key and challenge ownership
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            const receipt = await web3pgp.challengeOwnership(key, challenge);
+
+            // Search for challenge logs
+            const logs = await web3pgp.searchOwnershipChallengedLogs(key);
+
+            expect(logs.length).toBeGreaterThanOrEqual(1);
+            const challengeLog = logs.find(l => l.transactionHash === receipt.transactionHash);
+            expect(challengeLog).toBeDefined();
+            expect(challengeLog!.fingerprint).toBe(key);
+            expect(challengeLog!.challenge).toBe(challenge);
+            expect(challengeLog!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should search OwnershipChallenged logs for multiple keys', async () => {
+            const key1 = generateUniqueFingerprint();
+            const key2 = generateUniqueFingerprint();
+            const challenge1 = generateUniqueFingerprint();
+            const challenge2 = generateUniqueFingerprint();
+
+            // Register and challenge keys
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            await web3pgp.register(key2, [], mockOpenPGPMsg);
+            await web3pgp.challengeOwnership(key1, challenge1);
+            await web3pgp.challengeOwnership(key2, challenge2);
+
+            // Search for challenges on multiple keys
+            const logs = await web3pgp.searchOwnershipChallengedLogs([key1, key2]);
+
+            expect(logs.length).toBeGreaterThanOrEqual(2);
+            const fingerprints = logs.map(l => l.fingerprint);
+            expect(fingerprints).toContain(key1);
+            expect(fingerprints).toContain(key2);
+        });
+
+        test('should search OwnershipChallenged logs by challenge data', async () => {
+            const key = generateUniqueFingerprint();
+            const challenge = generateUniqueFingerprint();
+
+            // Register and challenge
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            const receipt = await web3pgp.challengeOwnership(key, challenge);
+
+            // Search for specific challenge
+            const logs = await web3pgp.searchOwnershipChallengedLogs(undefined, challenge);
+
+            expect(logs.length).toBeGreaterThanOrEqual(1);
+            const challengeLog = logs.find(l => l.transactionHash === receipt.transactionHash);
+            expect(challengeLog).toBeDefined();
+            expect(challengeLog!.challenge).toBe(challenge);
+        });
+
+        test('should extract OwnershipChallenged log from receipt', async () => {
+            const key = generateUniqueFingerprint();
+            const challenge = generateUniqueFingerprint();
+
+            // Register and challenge
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            const receipt = await web3pgp.challengeOwnership(key, challenge);
+
+            // Extract log from receipt
+            const logs = await web3pgp.extractOwnershipChallengedLog(receipt);
+
+            expect(logs).toHaveLength(1);
+            expect(logs[0]!.fingerprint).toBe(key);
+            expect(logs[0]!.challenge).toBe(challenge);
+            expect(logs[0]!.transactionHash).toBe(receipt.transactionHash);
+            expect(logs[0]!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should prove ownership in response to challenge', async () => {
+            const key = generateUniqueFingerprint();
+            const challenge = generateUniqueFingerprint();
+            const signature = generateUniqueFingerprint();
+
+            // Register, challenge, and prove
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.challengeOwnership(key, challenge);
+            const receipt = await web3pgp.proveOwnership(key, challenge, signature);
+
+            expect(receipt.status).toBe('success');
+            expect(receipt.blockNumber).toBeGreaterThan(0n);
+        });
+
+        test('should search OwnershipProved event logs', async () => {
+            const key = generateUniqueFingerprint();
+            const challenge = generateUniqueFingerprint();
+            const signature = generateUniqueFingerprint();
+
+            // Register, challenge, and prove
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.challengeOwnership(key, challenge);
+            const receipt = await web3pgp.proveOwnership(key, challenge, signature);
+
+            // Search for proof logs
+            const logs = await web3pgp.searchOwnershipProvedLogs(key);
+
+            expect(logs.length).toBeGreaterThanOrEqual(1);
+            const proofLog = logs.find(l => l.transactionHash === receipt.transactionHash);
+            expect(proofLog).toBeDefined();
+            expect(proofLog!.fingerprint).toBe(key);
+            expect(proofLog!.challenge).toBe(challenge);
+            expect(proofLog!.signature).toBe(signature);
+            expect(proofLog!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should search OwnershipProved logs by challenge', async () => {
+            const key = generateUniqueFingerprint();
+            const challenge = generateUniqueFingerprint();
+            const signature = generateUniqueFingerprint();
+
+            // Register, challenge, and prove
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.challengeOwnership(key, challenge);
+            const receipt = await web3pgp.proveOwnership(key, challenge, signature);
+
+            // Search for specific challenge proof
+            const logs = await web3pgp.searchOwnershipProvedLogs(undefined, challenge);
+
+            expect(logs.length).toBeGreaterThanOrEqual(1);
+            const proofLog = logs.find(l => l.transactionHash === receipt.transactionHash);
+            expect(proofLog).toBeDefined();
+            expect(proofLog!.challenge).toBe(challenge);
+        });
+
+        test('should extract OwnershipProved log from receipt', async () => {
+            const key = generateUniqueFingerprint();
+            const challenge = generateUniqueFingerprint();
+            const signature = generateUniqueFingerprint();
+
+            // Register, challenge, and prove
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.challengeOwnership(key, challenge);
+            const receipt = await web3pgp.proveOwnership(key, challenge, signature);
+
+            // Extract log from receipt
+            const logs = await web3pgp.extractOwnershipProvedLog(receipt);
+
+            expect(logs).toHaveLength(1);
+            expect(logs[0]!.fingerprint).toBe(key);
+            expect(logs[0]!.challenge).toBe(challenge);
+            expect(logs[0]!.signature).toBe(signature);
+            expect(logs[0]!.transactionHash).toBe(receipt.transactionHash);
+            expect(logs[0]!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should handle multiple challenges for same key', async () => {
+            const key = generateUniqueFingerprint();
+            const challenge1 = generateUniqueFingerprint();
+            const challenge2 = generateUniqueFingerprint();
+            const signature1 = generateUniqueFingerprint();
+            const signature2 = generateUniqueFingerprint();
+
+            // Register and perform multiple challenge/proof cycles
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.challengeOwnership(key, challenge1);
+            await web3pgp.proveOwnership(key, challenge1, signature1);
+            await web3pgp.challengeOwnership(key, challenge2);
+            await web3pgp.proveOwnership(key, challenge2, signature2);
+
+            // Search for all proofs for the key
+            const proofLogs = await web3pgp.searchOwnershipProvedLogs(key);
+            expect(proofLogs.length).toBeGreaterThanOrEqual(2);
+
+            const challenges = proofLogs.map(l => l.challenge);
+            expect(challenges).toContain(challenge1);
+            expect(challenges).toContain(challenge2);
+        });
+    });
+
+    describe('Key Certification', () => {
+        const generateIssuersAndKeys = async () => {
+            const keyToCertify = generateUniqueFingerprint();
+            const issuerKey = generateUniqueFingerprint();
+            // Register both keys
+            await web3pgp.register(keyToCertify, [], mockOpenPGPMsg);
+            await web3pgp.register(issuerKey, [], mockOpenPGPMsg);
+            return { keyToCertify, issuerKey };
+        };
+
+        test('should certify a key', async () => {
+            const { keyToCertify, issuerKey } = await generateIssuersAndKeys();
+            const certSignature = generateUniqueFingerprint();
+
+            const receipt = await web3pgp.certifyKey(keyToCertify, issuerKey, certSignature);
+            
+            expect(receipt.status).toBe('success');
+            expect(receipt.blockNumber).toBeGreaterThan(0n);
+        });
+
+        test('should search KeyCertified event logs', async () => {
+            const key = generateUniqueFingerprint();
+            const issuer = generateUniqueFingerprint();
+            const cert = '0xd1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1' as `0x${string}`;
+
+            // Register both keys and certify
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.register(issuer, [], mockOpenPGPMsg);
+            const receipt = await web3pgp.certifyKey(key, issuer, cert);
+
+            // Search for certification logs
+            const logs = await web3pgp.searchKeyCertifiedLogs(key);
+
+            expect(logs.length).toBeGreaterThanOrEqual(1);
+            const certLog = logs.find(l => l.transactionHash === receipt.transactionHash);
+            expect(certLog).toBeDefined();
+            expect(certLog!.fingerprint).toBe(key);
+            expect(certLog!.issuerFingerprint).toBe(issuer);
+            expect(certLog!.keyCertificate).toBe(cert);
+            expect(certLog!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should search KeyCertified logs for multiple keys', async () => {
+            const key1 = generateUniqueFingerprint();
+            const key2 = generateUniqueFingerprint();
+            const issuer = generateUniqueFingerprint();
+
+            // Register all keys
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+            await web3pgp.register(key2, [], mockOpenPGPMsg);
+            await web3pgp.register(issuer, [], mockOpenPGPMsg);
+
+            // Certify both keys
+            await web3pgp.certifyKey(key1, issuer, '0xaaaa' as `0x${string}`);
+            await web3pgp.certifyKey(key2, issuer, '0xbbbb' as `0x${string}`);
+
+            // Search for certifications of multiple keys
+            const logs = await web3pgp.searchKeyCertifiedLogs([key1, key2]);
+
+            expect(logs.length).toBeGreaterThanOrEqual(2);
+            const fingerprints = logs.map(l => l.fingerprint);
+            expect(fingerprints).toContain(key1);
+            expect(fingerprints).toContain(key2);
+        });
+
+        test('should extract KeyCertified log from receipt', async () => {
+            const key = generateUniqueFingerprint();
+            const issuer = generateUniqueFingerprint();
+            const cert = generateUniqueFingerprint();
+
+            // Register and certify
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.register(issuer, [], mockOpenPGPMsg);
+            const receipt = await web3pgp.certifyKey(key, issuer, cert);
+
+            // Extract log from receipt
+            const logs = await web3pgp.extractKeyCertifiedLog(receipt);
+
+            expect(logs).toHaveLength(1);
+            expect(logs[0]!.fingerprint).toBe(key);
+            expect(logs[0]!.issuerFingerprint).toBe(issuer);
+            expect(logs[0]!.keyCertificate).toBe(cert);
+            expect(logs[0]!.transactionHash).toBe(receipt.transactionHash);
+            expect(logs[0]!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should revoke a key certification', async () => {
+            const key = generateUniqueFingerprint();
+            const issuer = generateUniqueFingerprint();
+            const cert = '0xf3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3' as `0x${string}`;
+            const revocation = '0x0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a' as `0x${string}`;
+
+            // Register, certify, and revoke
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.register(issuer, [], mockOpenPGPMsg);
+            await web3pgp.certifyKey(key, issuer, cert);
+            const receipt = await web3pgp.revokeCertification(key, issuer, revocation);
+
+            expect(receipt.status).toBe('success');
+            expect(receipt.blockNumber).toBeGreaterThan(0n);
+        });
+
+        test('should search KeyCertificationRevoked event logs', async () => {
+            const key = generateUniqueFingerprint();
+            const issuer = generateUniqueFingerprint();
+            const cert = '0x1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b' as `0x${string}`;
+            const revocation = '0x2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b' as `0x${string}`;
+
+            // Register, certify, and revoke
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.register(issuer, [], mockOpenPGPMsg);
+            await web3pgp.certifyKey(key, issuer, cert);
+            const receipt = await web3pgp.revokeCertification(key, issuer, revocation);
+
+            // Search for revocation logs
+            const logs = await web3pgp.searchKeyCertificationRevokedLogs(key);
+
+            expect(logs.length).toBeGreaterThanOrEqual(1);
+            const revocationLog = logs.find(l => l.transactionHash === receipt.transactionHash);
+            expect(revocationLog).toBeDefined();
+            expect(revocationLog!.fingerprint).toBe(key);
+            expect(revocationLog!.issuerFingerprint).toBe(issuer);
+            expect(revocationLog!.revocationSignature).toBe(revocation);
+            expect(revocationLog!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should extract KeyCertificationRevoked log from receipt', async () => {
+            const key = generateUniqueFingerprint();
+            const issuer = generateUniqueFingerprint();
+            const cert = generateUniqueFingerprint();
+            const revocation = generateUniqueFingerprint();
+
+            // Register, certify, and revoke
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.register(issuer, [], mockOpenPGPMsg);
+            await web3pgp.certifyKey(key, issuer, cert);
+            const receipt = await web3pgp.revokeCertification(key, issuer, revocation);
+
+            // Extract log from receipt
+            const logs = await web3pgp.extractKeyCertificationRevokedLog(receipt);
+
+            expect(logs).toHaveLength(1);
+            expect(logs[0]!.fingerprint).toBe(key);
+            expect(logs[0]!.issuerFingerprint).toBe(issuer);
+            expect(logs[0]!.revocationSignature).toBe(revocation);
+            expect(logs[0]!.transactionHash).toBe(receipt.transactionHash);
+            expect(logs[0]!.blockTimestamp).toBeInstanceOf(Date);
+        });
+
+        test('should handle multiple certifications on same key', async () => {
+            const key = generateUniqueFingerprint();
+            const issuer1 = generateUniqueFingerprint();
+            const issuer2 = generateUniqueFingerprint();
+
+            // Register all keys
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.register(issuer1, [], mockOpenPGPMsg);
+            await web3pgp.register(issuer2, [], mockOpenPGPMsg);
+
+            // Certify from multiple issuers
+            await web3pgp.certifyKey(key, issuer1, '0xcccc' as `0x${string}`);
+            await web3pgp.certifyKey(key, issuer2, '0xdddd' as `0x${string}`);
+
+            // Search for all certifications on the key
+            const logs = await web3pgp.searchKeyCertifiedLogs(key);
+
+            expect(logs.length).toBeGreaterThanOrEqual(2);
+            const issuers = logs.map(l => l.issuerFingerprint);
+            expect(issuers).toContain(issuer1);
+            expect(issuers).toContain(issuer2);
+        });
+    });
+
+    describe('searchKeyEvents with All Event Types', () => {
+        test('should include KeyUpdated events in searchKeyEvents', async () => {
+            const key = generateUniqueFingerprint();
+            const updateMsg = generateUniqueFingerprint();
+
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            const receipt = await web3pgp.update(key, updateMsg);
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            const events = await web3pgp.searchKeyEvents(blockBefore, blockAfter);
+
+            const updateEvent = events.find(e => isKeyUpdatedLog(e));
+            expect(updateEvent).toBeDefined();
+            expect(isKeyUpdatedLog(updateEvent!)).toBe(true);
+            
+            if (isKeyUpdatedLog(updateEvent!)) {
+                expect(updateEvent.fingerprint).toBe(key);
+                expect(updateEvent.openPGPMsg).toBe(updateMsg);
+                expect(updateEvent.transactionHash).toBe(receipt.transactionHash);
+            }
+        });
+
+        test('should include OwnershipChallenged and OwnershipProved events', async () => {
+            const key = generateUniqueFingerprint();
+            const challenge = generateUniqueFingerprint();
+            const signature = generateUniqueFingerprint();
+
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            await web3pgp.challengeOwnership(key, challenge);
+            const receipt = await web3pgp.proveOwnership(key, challenge, signature);
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            const events = await web3pgp.searchKeyEvents(blockBefore, blockAfter);
+
+            const challengeEvent = events.find(e => isOwnershipChallengedLog(e));
+            const proofEvent = events.find(e => isOwnershipProvedLog(e));
+
+            expect(challengeEvent).toBeDefined();
+            expect(proofEvent).toBeDefined();
+
+            if (isOwnershipChallengedLog(challengeEvent!)) {
+                expect(challengeEvent.fingerprint).toBe(key);
+                expect(challengeEvent.challenge).toBe(challenge);
+            }
+
+            if (isOwnershipProvedLog(proofEvent!)) {
+                expect(proofEvent.fingerprint).toBe(key);
+                expect(proofEvent.challenge).toBe(challenge);
+                expect(proofEvent.signature).toBe(signature);
+                expect(proofEvent.transactionHash).toBe(receipt.transactionHash);
+            }
+        });
+
+        test('should include KeyCertified and KeyCertificationRevoked events', async () => {
+            const key = generateUniqueFingerprint();
+            const issuer = generateUniqueFingerprint();
+            const cert = generateUniqueFingerprint();
+            const revocation = generateUniqueFingerprint();
+
+            await web3pgp.register(key, [], mockOpenPGPMsg);
+            await web3pgp.register(issuer, [], mockOpenPGPMsg);
+            
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+            await web3pgp.certifyKey(key, issuer, cert);
+            const receipt = await web3pgp.revokeCertification(key, issuer, revocation);
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            const events = await web3pgp.searchKeyEvents(blockBefore, blockAfter);
+
+            const certEvent = events.find(e => isKeyCertifiedLog(e));
+            const revocationEvent = events.find(e => isKeyCertificationRevokedLog(e));
+
+            expect(certEvent).toBeDefined();
+            expect(revocationEvent).toBeDefined();
+
+            if (isKeyCertifiedLog(certEvent!)) {
+                expect(certEvent.fingerprint).toBe(key);
+                expect(certEvent.issuerFingerprint).toBe(issuer);
+                expect(certEvent.keyCertificate).toBe(cert);
+            }
+
+            if (isKeyCertificationRevokedLog(revocationEvent!)) {
+                expect(revocationEvent.fingerprint).toBe(key);
+                expect(revocationEvent.issuerFingerprint).toBe(issuer);
+                expect(revocationEvent.revocationSignature).toBe(revocation);
+                expect(revocationEvent.transactionHash).toBe(receipt.transactionHash);
+            }
+        });
+
+        test('should return all 8 event types in comprehensive test', async () => {
+            const key1 = generateUniqueFingerprint();
+            const subkey1 = generateUniqueFingerprint();
+            const issuer1 = generateUniqueFingerprint();
+            const updateMsg = generateUniqueFingerprint();
+            const challenge = generateUniqueFingerprint();
+            const signature = generateUniqueFingerprint();
+            const cert = generateUniqueFingerprint();
+            const revocation = generateUniqueFingerprint();
+
+            const blockBefore = await anvil.getPublicClient().getBlockNumber();
+
+            // 1. KeyRegistered
+            await web3pgp.register(key1, [], mockOpenPGPMsg);
+
+            // 2. SubkeyAdded
+            await web3pgp.addSubkey(key1, subkey1, mockOpenPGPMsg);
+
+            // 3. KeyUpdated
+            await web3pgp.update(key1, updateMsg);
+
+            // 4. OwnershipChallenged
+            await web3pgp.challengeOwnership(key1, challenge);
+
+            // 5. OwnershipProved
+            await web3pgp.proveOwnership(key1, challenge, signature);
+
+            // Register issuer for certification
+            await web3pgp.register(issuer1, [], mockOpenPGPMsg);
+
+            // 6. KeyCertified
+            await web3pgp.certifyKey(key1, issuer1, cert);
+
+            // 7. KeyCertificationRevoked
+            await web3pgp.revokeCertification(key1, issuer1, revocation);
+
+            // 8. KeyRevoked
+            await web3pgp.revoke(key1, mockRevocationCert);
+
+            const blockAfter = await anvil.getPublicClient().getBlockNumber();
+
+            const events = await web3pgp.searchKeyEvents(blockBefore, blockAfter);
+
+            expect(events.length).toBeGreaterThanOrEqual(8);
+
+            // Verify we have all event types
+            expect(events.some(e => isKeyRegisteredLog(e))).toBe(true);
+            expect(events.some(e => isSubkeyAddedLog(e))).toBe(true);
+            expect(events.some(e => isKeyUpdatedLog(e))).toBe(true);
+            expect(events.some(e => isOwnershipChallengedLog(e))).toBe(true);
+            expect(events.some(e => isOwnershipProvedLog(e))).toBe(true);
+            expect(events.some(e => isKeyCertifiedLog(e))).toBe(true);
+            expect(events.some(e => isKeyCertificationRevokedLog(e))).toBe(true);
+            expect(events.some(e => isKeyRevokedLog(e))).toBe(true);
+        });
+    });});

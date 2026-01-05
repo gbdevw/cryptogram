@@ -1,5 +1,5 @@
 import { BlockTag, TransactionReceipt } from 'viem';
-import { KeyRegisteredLog, KeyRevokedLog, SubkeyAddedLog } from './types/types';
+import { KeyCertificationRevokedLog, KeyCertifiedLog, KeyRegisteredLog, KeyRevokedLog, KeyUpdatedLog, OwnershipChallengedLog, OwnershipProvedLog, SubkeyAddedLog } from './types/types';
 import { IFlatFee } from '../flatfee/flatefee.interface';
 
 /**
@@ -97,6 +97,17 @@ export interface IWeb3PGP extends IFlatFee {
     register(
         primaryKeyFingerprint: `0x${string}`,
         subkeyFingerprints: `0x${string}`[],
+        openPGPMsg: `0x${string}`
+    ): Promise<TransactionReceipt>;
+
+    /**
+     * Update the metadata of an already registered public key.
+     * @param fingerprint The fingerprint of the key to update.
+     * @param openPGPMsg A binary OpenPGP message containing the updated key and metadata.
+     * @return Transaction receipt after updating the key.
+     */
+    update(
+        fingerprint: `0x${string}`,
         openPGPMsg: `0x${string}`
     ): Promise<TransactionReceipt>;
 
@@ -200,6 +211,16 @@ export interface IWeb3PGP extends IFlatFee {
     searchKeyRegisteredLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRegisteredLog[]>;
 
     /**
+     * Search for KeyUpdated event logs.
+     * 
+     * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
+     * @return An array of KeyUpdatedLog objects matching the search criteria.
+     */
+    searchKeyUpdatedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyUpdatedLog[]>;
+
+    /**
      * Get the log of a subkey addition event using the provided primary key fingerprint, subkey fingerprint, and block number.
      * @param primaryKeyFingerprint The fingerprint of the primary key.
      * @param subkeyFingerprint The fingerprint of the subkey.
@@ -238,6 +259,53 @@ export interface IWeb3PGP extends IFlatFee {
     searchKeyRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyRevokedLog[]>;
 
     /**
+     * Search for OwnershipChallenged event logs.
+     * 
+     * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
+     * @param challenge The challenge(s) to search logs for. Default to all challenges.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
+     * @return An array of OwnershipChallengedLog objects matching the search criteria.
+     */
+    searchOwnershipChallengedLogs(fingerprint?: `0x${string}` | `0x${string}`[], challenge?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<OwnershipChallengedLog[]>;
+
+    /**
+     * Search for OwnershipProved event logs.
+     * 
+     * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
+     * @param challenge The challenge(s) to search logs for. Default to all challenges.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
+     * @return An array of OwnershipProvedLog objects matching the search criteria.
+     */
+    searchOwnershipProvedLogs(fingerprint?: `0x${string}` | `0x${string}`[], challenge?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<OwnershipProvedLog[]>;
+    
+    /**
+     * Search for KeyCertified event logs.
+     * 
+     * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
+     * @param issuerFingerprint The fingerprint(s) of the issuer to search logs for. Default to all issuers.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
+     * @return An array of KeyCertifiedLog objects matching the search criteria.
+     */
+    searchKeyCertifiedLogs(fingerprint?: `0x${string}` | `0x${string}`[], issuerFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyCertifiedLog[]>;
+
+    /**
+     * Search for KeyCertificationRevoked event logs.
+     * 
+     * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
+     * @param issuerFingerprint The fingerprint(s) of the issuer to search logs for. Default to all issuers.
+     * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
+     * @param toBlock The ending block number of the search range. 'latest' is used by default. 'pending' is not allowed.
+     * @return An array of KeyCertificationRevokedLog objects matching the search criteria.
+     */
+    searchKeyCertificationRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], issuerFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyCertificationRevokedLog[]>;
+    
+    // TODO: Update searchKeyEvents to include those logs as well
+    // TODO: add extract functions for those logs as well
+
+    /**
      * Searches for all key-related events (KeyRegistered, SubkeyAdded, KeyRevoked) within a specified
      * block range.
      * 
@@ -255,6 +323,13 @@ export interface IWeb3PGP extends IFlatFee {
     extractKeyRegisteredLog(receipt: TransactionReceipt): Promise<KeyRegisteredLog[]>;
 
     /**
+     * Extracts KeyUpdatedLog entries from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @return The list of KeyUpdatedLog extracted from the receipt.
+     */
+    extractKeyUpdatedLog(receipt: TransactionReceipt): Promise<KeyUpdatedLog[]>;
+
+    /**
      * Extracts SubkeyAddedLog entries from a transaction receipt.
      * @param receipt The transaction receipt to extract logs from.
      * @return The list of SubkeyAddedLog extracted from the receipt.
@@ -267,6 +342,34 @@ export interface IWeb3PGP extends IFlatFee {
      * @return The list of KeyRevokedLog extracted from the receipt.
      */
     extractKeyRevokedLog(receipt: TransactionReceipt): Promise<KeyRevokedLog[]>;
+
+    /**
+     * Extracts OwnershipChallengedLog entries from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @return The list of OwnershipChallengedLog extracted from the receipt.
+     */
+    extractOwnershipChallengedLog(receipt: TransactionReceipt): Promise<OwnershipChallengedLog[]>;
+
+    /**
+     * Extracts OwnershipProvedLog entries from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @return The list of OwnershipProvedLog extracted from the receipt.
+     */
+    extractOwnershipProvedLog(receipt: TransactionReceipt): Promise<OwnershipProvedLog[]>;
+
+    /**
+     * Extracts KeyCertifiedLog entries from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @return The list of KeyCertifiedLog extracted from the receipt.
+     */
+    extractKeyCertifiedLog(receipt: TransactionReceipt): Promise<KeyCertifiedLog[]>;
+
+    /**
+     * Extracts KeyCertificationRevokedLog entries from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @return The list of KeyCertificationRevokedLog extracted from the receipt.
+     */
+    extractKeyCertificationRevokedLog(receipt: TransactionReceipt): Promise<KeyCertificationRevokedLog[]>;
 
     /*****************************************************************************************************************/
     /* UTILITY FUNCTIONS                                                                                             */
