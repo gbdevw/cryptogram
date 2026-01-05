@@ -16,6 +16,13 @@ export type KeyRegisteredLog =  BaseLog & {
     openPGPMsg: `0x${string}`;
 };
 
+export type KeyUpdatedLog = BaseLog & {
+    // The declared fingerprint of the updated key as bytes32 hex string
+    fingerprint: `0x${string}`;
+    // Hex-encoded OpenPGP binary message published on-chain which should contain the updated public key data
+    openPGPMsg: `0x${string}`;
+};
+
 /**
  * Type representing a SubkeyAdded event log emitted by the Web3PGP smart contract.
  * 
@@ -45,6 +52,7 @@ export type KeyRevokedLog =  BaseLog & {
     // Hex-encoded OpenPGP binary message published on-chain which should contain the revocation certificate
     revocationCertificate?: `0x${string}`;
 };
+
 /**
  * Type representing a KeyCertified event log emitted by the Web3PGP smart contract.
  * 
@@ -81,7 +89,8 @@ export type KeyCertificationRevokedLog = BaseLog & {
 export type OwnershipChallengedLog = BaseLog & {
     // The fingerprint of the challenged key as bytes32 hex string
     fingerprint: `0x${string}`;
-    // The challenge data sent to the key owner for signing as bytes32 hex string
+    // The challenge data sent to the key owner for signing as bytes32 hex string which is the keccak256 hash of a
+    // random nonce
     challenge: `0x${string}`;
 };
 
@@ -93,7 +102,7 @@ export type OwnershipChallengedLog = BaseLog & {
 export type OwnershipProvedLog = BaseLog & {
     // The fingerprint of the key whose ownership was proved as bytes32 hex string
     fingerprint: `0x${string}`;
-    // The original challenge data as bytes32 hex string
+    // The original challenge data (keccak256 hash of a random nonce) as bytes32 hex string
     challenge: `0x${string}`;
     // Hex-encoded OpenPGP signature made over the challenge data
     signature: `0x${string}`;
