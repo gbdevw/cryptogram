@@ -56,6 +56,7 @@ contract Web3PGPTest is Test {
 
     event KeyRegistered(bytes32 indexed primaryKeyFingerprint, bytes32[] subkeyFingerprints, bytes openPGPMsg);
     event SubkeyAdded(bytes32 indexed parentKeyFingerprint, bytes32 indexed subkeyFingerprint, bytes openPGPMsg);
+    event KeyUpdated(bytes32 indexed fingerprint, bytes openPGPMsg);
     event KeyRevoked(bytes32 indexed fingerprint, bytes revocationCertificate);
     event OwnershipChallenged(bytes32 indexed fingerprint, bytes32 indexed challenge);
     event OwnershipProved(bytes32 indexed fingerprint, bytes32 indexed challenge, bytes signature);
@@ -980,5 +981,388 @@ contract Web3PGPTest is Test {
         // Zero limit returns empty
         uint256[] memory revs = pgp.listCertificationRevocations(fp, 0, 0);
         assertEq(revs.length, 0);
+    }
+
+    /*****************************************************************************************************************/
+    /* SUBKEY VALIDATION IN CERTIFICATION TESTS                                                                     */
+    /*****************************************************************************************************************/
+
+    function testCertifyKeyTargetIsSubkeyReverts() public {
+        bytes32 parent = keccak256("parent-cert-subkey");
+        bytes32 subkey = keccak256("subkey-cert-target");
+        bytes32 issuer = keccak256("issuer-cert-subkey");
+        bytes memory cert = "certification";
+        
+        // Register parent, subkey, and issuer
+        pgp.register(parent, new bytes32[](0), "parent");
+        pgp.addSubkey(parent, subkey, "subkey");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        // Attempting to certify a subkey should revert
+        vm.expectRevert(abi.encodeWithSelector(IWeb3PGP.TargetIsASubkey.selector, subkey));
+        pgp.certifyKey(subkey, issuer, cert);
+    }
+
+    function testCertifyKeyIssuerIsSubkeyReverts() public {
+        bytes32 parent = keccak256("parent-cert-issuer-sub");
+        bytes32 subkey = keccak256("subkey-cert-issuer");
+        bytes32 target = keccak256("target-cert-issuer-sub");
+        bytes memory cert = "certification";
+        
+        // Register parent, subkey (as issuer), and target
+        pgp.register(parent, new bytes32[](0), "parent");
+        pgp.addSubkey(parent, subkey, "subkey");
+        pgp.register(target, new bytes32[](0), "target");
+        
+        // Attempting to certify with a subkey as issuer should revert
+        vm.expectRevert(abi.encodeWithSelector(IWeb3PGP.TargetIsASubkey.selector, subkey));
+        pgp.certifyKey(target, subkey, cert);
+    }
+
+    function testCertifyKeyBothAreSubkeysReverts() public {
+        bytes32 parent1 = keccak256("parent1-both-sub");
+        bytes32 parent2 = keccak256("parent2-both-sub");
+        bytes32 subkey1 = keccak256("subkey1-both-sub");
+        bytes32 subkey2 = keccak256("subkey2-both-sub");
+        bytes memory cert = "certification";
+        
+        // Register two parent keys with their subkeys
+        pgp.register(parent1, new bytes32[](0), "parent1");
+        pgp.addSubkey(parent1, subkey1, "subkey1");
+        pgp.register(parent2, new bytes32[](0), "parent2");
+        pgp.addSubkey(parent2, subkey2, "subkey2");
+        
+        // Attempting to certify one subkey with another as issuer should revert
+        // The check for target being a subkey happens first
+        vm.expectRevert(abi.encodeWithSelector(IWeb3PGP.TargetIsASubkey.selector, subkey1));
+        pgp.certifyKey(subkey1, subkey2, cert);
+    }
+
+    function testRevokeCertificationTargetIsSubkeyReverts() public {
+        bytes32 parent = keccak256("parent-revoke-sub");
+        bytes32 subkey = keccak256("subkey-revoke-target");
+        bytes32 issuer = keccak256("issuer-revoke-sub");
+        bytes memory revocation = "revocation";
+        
+        // Register parent, subkey, and issuer
+        pgp.register(parent, new bytes32[](0), "parent");
+        pgp.addSubkey(parent, subkey, "subkey");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        // Attempting to revoke certification of a subkey should revert
+        vm.expectRevert(abi.encodeWithSelector(IWeb3PGP.TargetIsASubkey.selector, subkey));
+        pgp.revokeCertification(subkey, issuer, revocation);
+    }
+
+    function testRevokeCertificationIssuerIsSubkeyReverts() public {
+        bytes32 parent = keccak256("parent-revoke-issuer-sub");
+        bytes32 subkey = keccak256("subkey-revoke-issuer");
+        bytes32 target = keccak256("target-revoke-issuer-sub");
+        bytes memory revocation = "revocation";
+        
+        // Register parent, subkey (as issuer), and target
+        pgp.register(parent, new bytes32[](0), "parent");
+        pgp.addSubkey(parent, subkey, "subkey");
+        pgp.register(target, new bytes32[](0), "target");
+        
+        // Attempting to revoke certification with a subkey as issuer should revert
+        vm.expectRevert(abi.encodeWithSelector(IWeb3PGP.TargetIsASubkey.selector, subkey));
+        pgp.revokeCertification(target, subkey, revocation);
+    }
+
+    function testRevokeCertificationBothAreSubkeysReverts() public {
+        bytes32 parent1 = keccak256("parent1-revoke-both-sub");
+        bytes32 parent2 = keccak256("parent2-revoke-both-sub");
+        bytes32 subkey1 = keccak256("subkey1-revoke-both-sub");
+        bytes32 subkey2 = keccak256("subkey2-revoke-both-sub");
+        bytes memory revocation = "revocation";
+        
+        // Register two parent keys with their subkeys
+        pgp.register(parent1, new bytes32[](0), "parent1");
+        pgp.addSubkey(parent1, subkey1, "subkey1");
+        pgp.register(parent2, new bytes32[](0), "parent2");
+        pgp.addSubkey(parent2, subkey2, "subkey2");
+        
+        // Attempting to revoke certification of one subkey with another as issuer should revert
+        // The check for target being a subkey happens first
+        vm.expectRevert(abi.encodeWithSelector(IWeb3PGP.TargetIsASubkey.selector, subkey1));
+        pgp.revokeCertification(subkey1, subkey2, revocation);
+    }
+
+    function testCertifyKeyPrimaryKeysSucceeds() public {
+        bytes32 target = keccak256("target-primary-cert");
+        bytes32 issuer = keccak256("issuer-primary-cert");
+        bytes memory cert = "certification";
+        
+        // Register both as primary keys (not subkeys)
+        pgp.register(target, new bytes32[](0), "target");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        // Should succeed without reverting
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit KeyCertified(target, issuer, cert);
+        pgp.certifyKey(target, issuer, cert);
+    }
+
+    function testRevokeCertificationPrimaryKeysSucceeds() public {
+        bytes32 target = keccak256("target-primary-revoke");
+        bytes32 issuer = keccak256("issuer-primary-revoke");
+        bytes memory cert = "certification";
+        bytes memory revocation = "revocation";
+        
+        // Register both as primary keys (not subkeys)
+        pgp.register(target, new bytes32[](0), "target");
+        pgp.register(issuer, new bytes32[](0), "issuer");
+        
+        // First certify
+        pgp.certifyKey(target, issuer, cert);
+        
+        // Then revoke should succeed
+        vm.expectEmit(true, true, false, true, address(pgp));
+        emit KeyCertificationRevoked(target, issuer, revocation);
+        pgp.revokeCertification(target, issuer, revocation);
+    }
+
+    /*****************************************************************************************************************/
+    /* KEY UPDATE TESTS                                                                                              */
+    /*****************************************************************************************************************/
+
+    function testUpdateEmitsEvent() public {
+        bytes32 fp = keccak256("key-to-update");
+        bytes memory updatedKeyData = "updated-key-data";
+        
+        // Register key first
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Expect KeyUpdated event
+        vm.expectEmit(true, false, false, true, address(pgp));
+        emit KeyUpdated(fp, updatedKeyData);
+        
+        pgp.update(fp, updatedKeyData);
+    }
+
+    function testUpdateTargetNotRegisteredReverts() public {
+        bytes32 fp = keccak256("unregistered-update");
+        bytes memory updatedData = "updated";
+        
+        // Try to update a key that doesn't exist
+        vm.expectRevert();
+        pgp.update(fp, updatedData);
+    }
+
+    function testUpdateTargetIsSubkeyReverts() public {
+        bytes32 parent = keccak256("parent-update");
+        bytes32 subkey = keccak256("subkey-update");
+        bytes memory updatedData = "updated-subkey";
+        
+        // Register parent and subkey
+        pgp.register(parent, new bytes32[](0), "parent");
+        pgp.addSubkey(parent, subkey, "subkey");
+        
+        // Cannot update a subkey
+        vm.expectRevert(abi.encodeWithSelector(IWeb3PGP.TargetIsASubkey.selector, subkey));
+        pgp.update(subkey, updatedData);
+    }
+
+    function testMultipleUpdates() public {
+        bytes32 fp = keccak256("multi-update");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Perform multiple updates at different blocks
+        vm.roll(10);
+        pgp.update(fp, "update1");
+        
+        vm.roll(20);
+        pgp.update(fp, "update2");
+        
+        vm.roll(30);
+        pgp.update(fp, "update3");
+        
+        // Verify we can retrieve all updates
+        uint256[] memory updates = pgp.listKeyUpdates(fp, 0, 10);
+        assertEq(updates.length, 3);
+        assertEq(updates[0], 10);
+        assertEq(updates[1], 20);
+        assertEq(updates[2], 30);
+    }
+
+    /*****************************************************************************************************************/
+    /* LIST KEY UPDATES TESTS                                                                                        */
+    /*****************************************************************************************************************/
+
+    function testListKeyUpdatesEmpty() public {
+        bytes32 fp = keccak256("empty-updates");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // No updates yet
+        uint256[] memory updates = pgp.listKeyUpdates(fp, 0, 10);
+        assertEq(updates.length, 0);
+    }
+
+    function testListKeyUpdatesBasic() public {
+        bytes32 fp = keccak256("basic-updates");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Create updates at specific blocks
+        vm.roll(50);
+        pgp.update(fp, "update-a");
+        
+        vm.roll(100);
+        pgp.update(fp, "update-b");
+        
+        vm.roll(150);
+        pgp.update(fp, "update-c");
+        
+        // List all updates
+        uint256[] memory updates = pgp.listKeyUpdates(fp, 0, 10);
+        assertEq(updates.length, 3);
+        assertEq(updates[0], 50);
+        assertEq(updates[1], 100);
+        assertEq(updates[2], 150);
+    }
+
+    function testListKeyUpdatesPagination() public {
+        bytes32 fp = keccak256("paginated-updates");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Create 5 updates at specific blocks
+        vm.roll(10);
+        pgp.update(fp, "update-0");
+        
+        vm.roll(20);
+        pgp.update(fp, "update-1");
+        
+        vm.roll(30);
+        pgp.update(fp, "update-2");
+        
+        vm.roll(40);
+        pgp.update(fp, "update-3");
+        
+        vm.roll(50);
+        pgp.update(fp, "update-4");
+        
+        // Test pagination with limit 2
+        uint256[] memory page1 = pgp.listKeyUpdates(fp, 0, 2);
+        assertEq(page1.length, 2);
+        assertEq(page1[0], 10);
+        assertEq(page1[1], 20);
+        
+        // Second page
+        uint256[] memory page2 = pgp.listKeyUpdates(fp, 2, 2);
+        assertEq(page2.length, 2);
+        assertEq(page2[0], 30);
+        assertEq(page2[1], 40);
+        
+        // Last item
+        uint256[] memory page3 = pgp.listKeyUpdates(fp, 4, 2);
+        assertEq(page3.length, 1);
+        assertEq(page3[0], 50);
+    }
+
+    function testListKeyUpdatesStartOutOfBounds() public {
+        bytes32 fp = keccak256("update-out-bounds");
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.update(fp, "update");
+        
+        // Start index beyond the list
+        uint256[] memory updates = pgp.listKeyUpdates(fp, 10, 10);
+        assertEq(updates.length, 0);
+    }
+
+    function testListKeyUpdatesWithZeroLimit() public {
+        bytes32 fp = keccak256("update-zero-limit");
+        pgp.register(fp, new bytes32[](0), "key");
+        pgp.update(fp, "update");
+        
+        // Zero limit returns empty
+        uint256[] memory updates = pgp.listKeyUpdates(fp, 0, 0);
+        assertEq(updates.length, 0);
+    }
+
+    function testListKeyUpdatesWithLargeLimitReturnsAll() public {
+        bytes32 fp = keccak256("update-large-limit");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Create three updates
+        vm.roll(25);
+        pgp.update(fp, "update-1");
+        
+        vm.roll(50);
+        pgp.update(fp, "update-2");
+        
+        vm.roll(75);
+        pgp.update(fp, "update-3");
+        
+        // Request with a large limit that exceeds remaining items
+        uint256[] memory updates = pgp.listKeyUpdates(fp, 0, 100);
+        assertEq(updates.length, 3);
+        assertEq(updates[0], 25);
+        assertEq(updates[1], 50);
+        assertEq(updates[2], 75);
+    }
+
+    function testListKeyUpdatesPartialPage() public {
+        bytes32 fp = keccak256("update-partial");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Create 5 updates at specific blocks
+        vm.roll(100);
+        pgp.update(fp, "update-0");
+        
+        vm.roll(101);
+        pgp.update(fp, "update-1");
+        
+        vm.roll(102);
+        pgp.update(fp, "update-2");
+        
+        vm.roll(103);
+        pgp.update(fp, "update-3");
+        
+        vm.roll(104);
+        pgp.update(fp, "update-4");
+        
+        // Request start 3 limit 5 -> should return only last 2 (indices 3 and 4)
+        uint256[] memory updates = pgp.listKeyUpdates(fp, 3, 5);
+        assertEq(updates.length, 2);
+        assertEq(updates[0], 103);
+        assertEq(updates[1], 104);
+    }
+
+    function testListKeyUpdatesExactBoundary() public {
+        bytes32 fp = keccak256("update-boundary");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        vm.roll(40);
+        pgp.update(fp, "update-1");
+        
+        vm.roll(41);
+        pgp.update(fp, "update-2");
+        
+        // Request start 1 limit 1 -> should return only second update
+        uint256[] memory updates = pgp.listKeyUpdates(fp, 1, 1);
+        assertEq(updates.length, 1);
+        assertEq(updates[0], 41);
+    }
+
+    function testUpdateBlockNumbersCorrect() public {
+        bytes32 fp = keccak256("update-block-nums");
+        pgp.register(fp, new bytes32[](0), "key");
+        
+        // Update at specific blocks
+        vm.roll(123);
+        pgp.update(fp, "data1");
+        
+        vm.roll(456);
+        pgp.update(fp, "data2");
+        
+        vm.roll(789);
+        pgp.update(fp, "data3");
+        
+        // Verify correct block numbers are stored
+        uint256[] memory updates = pgp.listKeyUpdates(fp, 0, 10);
+        assertEq(updates.length, 3);
+        assertEq(updates[0], 123);
+        assertEq(updates[1], 456);
+        assertEq(updates[2], 789);
     }
 }

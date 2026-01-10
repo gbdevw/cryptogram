@@ -453,6 +453,15 @@ interface IWeb3PGP {
     function getKeyPublicationBlock(bytes32[] calldata fingerprints) external view returns (uint256[] memory);
 
     /**
+     * @notice Returns a list of block numbers when updates were published for a given key.
+     * @param fingerprint The fingerprint of the public key to retrieve update information for.
+     * @param start The starting index for the update list.
+     * @param limit The maximum number of updates to return.
+     * @return An array of block numbers when updates were published for the specified key.
+     */
+    function listKeyUpdates(bytes32 fingerprint, uint256 start, uint256 limit) external view returns (uint256[] memory);
+
+    /**
      * @notice Returns a list of block numbers when revocation certificates were published for a given key.
      * @param fingerprint The fingerprint of the public key to retrieve revocation information for.
      * @param start The starting index for the revocation list.

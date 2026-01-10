@@ -42,10 +42,12 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
          * @notice Map used to register when a key was published (block number).
          */
         mapping(bytes32 => uint256) keysToPublicationBlockNumber;
+
         /**
          * @notice Map used to register the block numbers when key revocation certificates were published for the key.
          */
         mapping(bytes32 => uint256[]) keysToRevocations;
+
         /**
          * @notice Map used to register the link between a subkey fingerprint and its parent fingerprint.
          *
@@ -53,6 +55,7 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
          * to another subkey.
          */
         mapping(bytes32 => bytes32) subKeyToParent;
+
         /**
          * @notice Map used to find the declared subkeys of a parent key.
          *
@@ -70,6 +73,11 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
          * @dev Map used to register the block numbers when key certification revocations were published for the key.
          */
         mapping(bytes32 => uint256[]) keysToCertificationRevocations;
+
+        /**
+         * @dev Map used to register the block numbers when key updates were published for the key.
+         */
+        mapping(bytes32 => uint256[]) keysToUpdates;
     }
 
     /// @dev keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Web3PGP")) - 1)) & ~bytes32(uint256(0xff))
@@ -151,6 +159,8 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
         _checkKeyIsRegistered(fingerprint);
         // Target key must not be a subkey
         _checkIsNotSubkey(fingerprint);
+        // Store the block number when the key update was published for the key
+        _registerKeyUpdate(fingerprint, block.number);
         // Emit the KeyUpdated event to signal that the public key has been updated
         // and to store the provided OpenPGP message as is in the Ethereum log system.
         emit KeyUpdated(fingerprint, openPGPMsg);
@@ -335,11 +345,29 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
     }
 
     /**
-     * @notice Returns a list of block numbers when revocation certificates were published for a given key.
-     * @param fingerprint The fingerprint of the public key to retrieve revocation information for.
-     * @param start The starting index for the revocation list.
-     * @param limit The maximum number of revocations to return.
-     * @return An array of block numbers when revocation certificates were published for the specified key.
+     * @inheritdoc IWeb3PGP
+     */
+    function listKeyUpdates(bytes32 fingerprint, uint256 start, uint256 limit) external view returns (uint256[] memory) {
+        Web3PGPStorage storage $ = _getWeb3PGPStorage();
+        uint256[] memory updates = $.keysToUpdates[fingerprint];
+        // Return an empty array if the start index is out of bounds or if the updates array is empty or if limit == 0.
+        if (start >= updates.length || updates.length == 0 || limit == 0)
+            return new uint256[](0);
+        // Compute the size of the result array
+        uint256 size = (updates.length - start) > limit
+            ? limit
+            : updates.length - start;
+        uint256[] memory result = new uint256[](size);
+        uint256 count = 0;
+        for (uint256 i = start; i < updates.length && count < limit; i++) {
+            result[count] = updates[i];
+            count++;
+        }
+        return result;
+    }
+
+    /**
+     * @inheritdoc IWeb3PGP
      */
     function listRevocations(
         bytes32 fingerprint,
@@ -532,6 +560,14 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
                 blockNumber
             );
         }
+    }
+
+    function _registerKeyUpdate(
+        bytes32 fingerprint,
+        uint256 blockNumber
+    ) internal {
+        Web3PGPStorage storage $ = _getWeb3PGPStorage();
+        $.keysToUpdates[fingerprint].push(blockNumber);
     }
 
     function _registerSubkey(
