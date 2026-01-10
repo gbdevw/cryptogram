@@ -48,6 +48,15 @@ export interface IWeb3PGP extends IFlatFee {
     getKeyPublicationBlockBatch(fingerprints: `0x${string}`[]): Promise<bigint[]>;
 
     /**
+     * List the block numbers when updates were published for the given fingerprint.
+     * @param fingerprint The fingerprint of the key to check.
+     * @param start The starting index in the list of updates.
+     * @param limit The maximum number of results to return.
+     * @return An array of block numbers when updates were published.
+     */
+    listKeyUpdates(fingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]>;
+
+    /**
      * List the block numbers when revocation certificates were published for the given fingerprint.
      * @param fingerprint The fingerprint of the key to check.
      * @param start The starting index in the list of revocations.

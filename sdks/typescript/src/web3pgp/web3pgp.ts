@@ -99,6 +99,22 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     }
 
     /**
+     * List the block numbers when updates were published for the given fingerprint.
+     * @param fingerprint The fingerprint of the key to check.
+     * @param start The starting index in the list of updates.
+     * @param limit The maximum number of results to return.
+     * @return An array of block numbers when updates were published.
+     */
+    listKeyUpdates(fingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]>{
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3PGPABI,
+            functionName: 'listKeyUpdates',
+            args: [toBytes32(fingerprint), start, limit],
+        }) as Promise<bigint[]>;
+    }
+
+    /**
      * List the block numbers when revocation certificates were published for the given fingerprint.
      * @param fingerprint The fingerprint of the key to check.
      * @param start The starting index in the list of revocations.
