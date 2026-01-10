@@ -1,4 +1,4 @@
-import { isHex, pad, padHex } from "viem"
+import { isHex, padHex } from "viem"
 
 export class InvalidHexError extends Error {
     public readonly code = 'INVALID_HEX';

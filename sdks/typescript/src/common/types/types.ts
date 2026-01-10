@@ -11,4 +11,5 @@ export type BaseLog = {
     blockNumber: bigint;
     blockHash: `0x${string}`;
     blockTimestamp: Date;
+    logIndex: number;
 }

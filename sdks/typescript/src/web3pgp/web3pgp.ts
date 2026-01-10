@@ -1,8 +1,8 @@
 import { Web3PGP as Web3PGPABI }  from '../abis/Web3PGP';
 import { toBytes32 } from '../utils/0xstr';
-import { Address, BlockTag, PublicClient, TransactionReceipt, WalletClient, parseEventLogs } from 'viem';
+import { BlockTag, PublicClient, TransactionReceipt, WalletClient, parseEventLogs, toEventSelector } from 'viem';
 import { IWeb3PGP } from './web3pgp.interface';
-import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog, KeyCertificationRevokedLog, KeyCertifiedLog, KeyUpdatedLog, OwnershipChallengedLog, OwnershipProvedLog } from './types/types';
+import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog, KeyCertificationRevokedLog, KeyCertifiedLog, KeyUpdatedLog, OwnershipChallengedLog, OwnershipProvedLog, Web3PGPEvents, Web3PGPEventLog } from './types/types';
 import { FlatFee } from '../flatfee/flatefee';
 import { getBlockTimestamp } from '../utils/viemutils';
 
@@ -354,12 +354,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     /**
      * Challenge ownership of a public key.
      * @param fingerprint The fingerprint of the key to challenge.
-     * @param challenge The challenge data sent to the user for signing.
+     * @param challengeHash The keccak256 hash of the challenge data sent to the user for signing.
      * @return Transaction receipt after issuing the challenge.
      */
     public async challengeOwnership(
         fingerprint: `0x${string}`,
-        challenge: `0x${string}`
+        challengeHash: `0x${string}`
     ): Promise<TransactionReceipt> {
         this.ensureWalletClient();
         // Get the required fee for challenge
@@ -372,7 +372,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             functionName: 'challengeOwnership',
             args: [
                 toBytes32(fingerprint),
-                toBytes32(challenge)
+                toBytes32(challengeHash)
             ],
             value: fee
         });
@@ -385,13 +385,13 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     /**
      * Prove ownership of a public key by responding to a challenge.
      * @param fingerprint The fingerprint of the key.
-     * @param challenge The original challenge data.
+     * @param challengeHash The keccak256 hash of the challenge data.
      * @param signature A signature made over the challenge data.
      * @return Transaction receipt after proving ownership.
      */
     public async proveOwnership(
         fingerprint: `0x${string}`,
-        challenge: `0x${string}`,
+        challengeHash: `0x${string}`,
         signature: `0x${string}`
     ): Promise<TransactionReceipt> {
         this.ensureWalletClient();
@@ -405,7 +405,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             functionName: 'proveOwnership',
             args: [
                 toBytes32(fingerprint),
-                toBytes32(challenge),
+                toBytes32(challengeHash),
                 signature
             ],
             value: fee
@@ -419,8 +419,6 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     /*****************************************************************************************************************/
     /* LOGS FUNCTIONS                                                                                                */
     /*****************************************************************************************************************/
-
-    // TODO: Add log types and functions for new events (KeyCertified and CertificationRevoked)
 
     /**
      * Get the log of a key registration event using the provided primary key fingerprint and block number.
@@ -472,16 +470,14 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         
         // Batch fetch timestamps for unique block numbers
         const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
-        const blockTimestamps = new Map(
-            await Promise.all(uniqueBlocks.map(async bn => 
-                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
-            ))
-        );
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
 
         return logs.map(log => ({
+            type: Web3PGPEvents.KeyRegistered,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprints: log.args.subkeyFingerprints,
@@ -518,16 +514,14 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         });
 
         const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
-        const blockTimestamps = new Map(
-            await Promise.all(uniqueBlocks.map(async bn => 
-                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
-            ))
-        );
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
 
         return logs.map(log => ({
+            type: Web3PGPEvents.KeyUpdated,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             openPGPMsg: log.args.openPGPMsg
@@ -591,35 +585,19 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         
         // Batch fetch timestamps for unique block numbers
         const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
-        const blockTimestamps = new Map(
-            await Promise.all(uniqueBlocks.map(async bn => 
-                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
-            ))
-        );
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
 
         return logs.map(log => ({
+            type: Web3PGPEvents.SubkeyAdded,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprint: log.args.subkeyFingerprint,
             openPGPMsg: log.args.openPGPMsg
         }));
-    }
-
-    /**
-     * Get the log of a key revocation event using the provided fingerprint and block number.
-     * @param fingerprint The fingerprint of the key to retrieve the log for.
-     * @param blockNumber The block number where the event was emitted.
-     * @throws Error if the event log cannot be found.
-     * @return The KeyRevokedLog object containing event details.
-     */
-    public async getKeyRevokedLog(fingerprint: `0x${string}`, blockNumber: bigint): Promise<KeyRevokedLog> {
-        const logs = await this.searchKeyRevokedLogs(fingerprint, blockNumber, blockNumber);
-        if (logs.length === 1) return logs[0]!;
-        if (logs.length === 0) throw new Error(`KeyRevoked event log not found for fingerprint ${fingerprint} at block ${blockNumber}`);
-        throw new Error(`Multiple KeyRevoked logs found for fingerprint ${fingerprint} at block ${blockNumber}`);
     }
 
     /**
@@ -655,16 +633,14 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         
         // Batch fetch timestamps for unique block numbers
         const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
-        const blockTimestamps = new Map(
-            await Promise.all(uniqueBlocks.map(async bn => 
-                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
-            ))
-        );
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
 
         return logs.map(log => ({
+            type: Web3PGPEvents.KeyRevoked,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             revocationCertificate: log.args.revocationCertificate
@@ -708,16 +684,14 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         });
 
         const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
-        const blockTimestamps = new Map(
-            await Promise.all(uniqueBlocks.map(async bn => 
-                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
-            ))
-        );
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
 
         return logs.map(log => ({
+            type: Web3PGPEvents.OwnershipChallenged,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             challenge: log.args.challenge
@@ -761,16 +735,14 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         });
 
         const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
-        const blockTimestamps = new Map(
-            await Promise.all(uniqueBlocks.map(async bn => 
-                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
-            ))
-        );
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
 
         return logs.map(log => ({
+            type: Web3PGPEvents.OwnershipProved,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             challenge: log.args.challenge,
@@ -816,16 +788,14 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         });
 
         const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
-        const blockTimestamps = new Map(
-            await Promise.all(uniqueBlocks.map(async bn => 
-                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
-            ))
-        );
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
 
         return logs.map(log => ({
+            type: Web3PGPEvents.KeyCertified,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             issuerFingerprint: log.args.issuer,
@@ -871,16 +841,14 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         });
 
         const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
-        const blockTimestamps = new Map(
-            await Promise.all(uniqueBlocks.map(async bn => 
-                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
-            ))
-        );
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
 
         return logs.map(log => ({
+            type: Web3PGPEvents.KeyCertificationRevoked,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             issuerFingerprint: log.args.issuer,
@@ -889,14 +857,17 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     }
 
     /**
-     * Searches for all key-related events (KeyRegistered, SubkeyAdded, KeyRevoked, KeyUpdated, OwnershipChallenged, OwnershipProved,
-     * KeyCertified, KeyCertificationRevoked) within a specified block range.
+     * Searches for all key-related events within a specified block range. Optionally filters by fingerprints.
      * 
-     * @param fromBlock Starting block number (inclusive). 'earliest' block is used if not provided. 'pending' is not allowed.
-     * @param toBlock Ending block number (inclusive). 'latest' block is used if not provided. 'pending' is not allowed.
-     * @return An array of key-related event logs (KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog).
+     * Note: The fingerprints are the subjects of the events (i.e., the keys being registered, updated, revoked, certified, etc.).
+     * Results will also include subkeys added, challenges, and proofs of ownership related to the listed fingerprints.
+     * 
+     * @param fingerprints The fingerprint(s) of the keys to filter events for. Can be a single fingerprint or an array. Defaults to all keys if not provided.
+     * @param fromBlock Starting block number (inclusive). Defaults to 'earliest' if not provided. 'pending' is not allowed.
+     * @param toBlock Ending block number (inclusive). Defaults to 'latest' if not provided. 'pending' is not allowed.
+     * @return An array of Web3PGPEventLog.
      */
-    public async searchKeyEvents(fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<(KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog)[]> {
+    public async searchKeyEvents(fingerprints?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<Web3PGPEventLog[]> {
         
         // Reject pending block tags for fromBlock/toBlock
         if (fromBlock === 'pending' || toBlock === 'pending') {
@@ -907,36 +878,55 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
         const from = fromBlock ?? 'earliest';
         const to = toBlock ?? 'latest';
 
-        const logs = await this.client.getLogs({
-            address: this.address,
-            fromBlock: from,
-            toBlock: to,
-            events: [
-                Web3PGP.KEY_REGISTERED_EVENT,
-                Web3PGP.SUBKEY_ADDED_EVENT,
-                Web3PGP.KEY_REVOKED_EVENT,
-                Web3PGP.KEY_UPDATED_EVENT,
-                Web3PGP.OWNERSHIP_CHALLENGED_EVENT,
-                Web3PGP.OWNERSHIP_PROVED_EVENT,
-                Web3PGP.KEY_CERTIFIED_EVENT,
-                Web3PGP.KEY_CERTIFICATION_REVOKED_EVENT
-            ],
+        // Prepare event selectors for all key-related events (topic 0)
+        const eventSelectors = [
+            Web3PGP.KEY_REGISTERED_EVENT,
+            Web3PGP.SUBKEY_ADDED_EVENT,
+            Web3PGP.KEY_REVOKED_EVENT,
+            Web3PGP.KEY_UPDATED_EVENT,
+            Web3PGP.OWNERSHIP_CHALLENGED_EVENT,
+            Web3PGP.OWNERSHIP_PROVED_EVENT,
+            Web3PGP.KEY_CERTIFIED_EVENT,
+            Web3PGP.KEY_CERTIFICATION_REVOKED_EVENT
+        ].map(abi => toEventSelector(abi));
+
+        // Prepare topic 1 if fingerprints are provided
+        const fingerprintsArray = fingerprints !== undefined ? (Array.isArray(fingerprints) ? fingerprints.map(fp => toBytes32(fp)) : [toBytes32(fingerprints)]) : undefined;
+
+        // Use low-level eth_getLogs to fetch all relevant logs in one call
+        const rawLogs = await this.client.request({            
+            method: 'eth_getLogs',
+            params: [{
+                address: this.address,
+                fromBlock: typeof from === 'bigint' ? `0x${from.toString(16)}` : from,
+                toBlock: typeof to === 'bigint' ? `0x${to.toString(16)}` : to,
+                topics: fingerprintsArray !== undefined ? [eventSelectors, fingerprintsArray] : [eventSelectors]
+            }]
+        });
+
+        // Parse the raw logs using the ABI
+        const parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            logs: rawLogs,
             strict: true
-        })
+        });
 
         // Batch fetch timestamps for unique block numbers
-        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
-        const blockTimestamps = new Map(
-            await Promise.all(uniqueBlocks.map(async bn => 
-                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
-            ))
-        );
+        // Ensure blockNumbers are bigint (convert from hex strings if needed)
+        const uniqueBlocks = [...new Set(parsedLogs.map(l => {
+            const blockNum = l.blockNumber;
+            return typeof blockNum === 'string' ? BigInt(blockNum) : blockNum;
+        }))];
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
 
-        return logs.map(log => {
+        return parsedLogs.map(log => {
+            // Convert blockNumber to bigint if it's a string
+            const blockNumber = typeof log.blockNumber === 'string' ? BigInt(log.blockNumber) : log.blockNumber;
+            
             const baseLog = {
-                blockNumber: log.blockNumber,
+                blockNumber,
                 blockHash: log.blockHash,
-                blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+                blockTimestamp: blockTimestamps.get(blockNumber)!,
                 transactionHash: log.transactionHash
             };
 
@@ -944,6 +934,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
                 case 'KeyRegistered':
                     return {
                         ...baseLog,
+                        type: Web3PGPEvents.KeyRegistered,
                         primaryKeyFingerprint: log.args.primaryKeyFingerprint,
                         subkeyFingerprints: log.args.subkeyFingerprints,
                         openPGPMsg: log.args.openPGPMsg
@@ -951,6 +942,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
                 case 'SubkeyAdded':
                     return {
                         ...baseLog,
+                        type: Web3PGPEvents.SubkeyAdded,
                         primaryKeyFingerprint: log.args.primaryKeyFingerprint,
                         subkeyFingerprint: log.args.subkeyFingerprint,
                         openPGPMsg: log.args.openPGPMsg
@@ -958,24 +950,28 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
                 case 'KeyRevoked':
                     return {
                         ...baseLog,
+                        type: Web3PGPEvents.KeyRevoked,
                         fingerprint: log.args.fingerprint,
                         revocationCertificate: log.args.revocationCertificate
                     } as KeyRevokedLog;
                 case 'KeyUpdated':
                     return {
                         ...baseLog,
+                        type: Web3PGPEvents.KeyUpdated,
                         fingerprint: log.args.fingerprint,
                         openPGPMsg: log.args.openPGPMsg
                     } as KeyUpdatedLog;
                 case 'OwnershipChallenged':
                     return {
                         ...baseLog,
+                        type: Web3PGPEvents.OwnershipChallenged,
                         fingerprint: log.args.fingerprint,
                         challenge: log.args.challenge
                     } as OwnershipChallengedLog;
                 case 'OwnershipProved':
                     return {
                         ...baseLog,
+                        type: Web3PGPEvents.OwnershipProved,
                         fingerprint: log.args.fingerprint,
                         challenge: log.args.challenge,
                         signature: log.args.signature
@@ -983,6 +979,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
                 case 'KeyCertified':
                     return {
                         ...baseLog,
+                        type: Web3PGPEvents.KeyCertified,
                         fingerprint: log.args.fingerprint,
                         issuerFingerprint: log.args.issuer,
                         keyCertificate: log.args.keyCertificate
@@ -990,10 +987,14 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
                 case 'KeyCertificationRevoked':
                     return {
                         ...baseLog,
+                        type: Web3PGPEvents.KeyCertificationRevoked,
                         fingerprint: log.args.fingerprint,
                         issuerFingerprint: log.args.issuer,
                         revocationSignature: log.args.revocationSignature
                     } as KeyCertificationRevokedLog;
+                default:
+                    // This should never happen due to strict parsing
+                    throw new Error(`Unhandled event type: ${log.eventName}`);
             }
         });
     }
@@ -1003,67 +1004,27 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      * @param receipt The transaction receipt to extract logs from.
      * @returns An array of KeyRegisteredLog objects extracted from the receipt.
      */
-    extractKeyRegisteredLog(receipt: TransactionReceipt): Promise<KeyRegisteredLog[]> {
+    public async extractKeyRegisteredLog(receipt: TransactionReceipt): Promise<KeyRegisteredLog[]> {
         let parsedLogs = parseEventLogs({
             abi: Web3PGPABI,
             eventName: 'KeyRegistered',
             logs: receipt.logs
         });
 
-        return Promise.all(parsedLogs.map(async log => ({
+        const uniqueBlocks = Array.from(new Set(parsedLogs.map(log => log.blockNumber)));
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
+
+        return parsedLogs.map(log => ({
+            type: Web3PGPEvents.KeyRegistered,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             primaryKeyFingerprint: log.args.primaryKeyFingerprint,
             subkeyFingerprints: log.args.subkeyFingerprints,
             openPGPMsg: log.args.openPGPMsg
-        })));
-    }
-
-    /**
-     * Extract SubkeyAdded event logs from a transaction receipt.
-     * @param receipt The transaction receipt to extract logs from.
-     * @returns An array of SubkeyAddedLog objects extracted from the receipt.
-     */
-    extractSubkeyAddedLog(receipt: TransactionReceipt): Promise<SubkeyAddedLog[]> {
-        let parsedLogs = parseEventLogs({
-            abi: Web3PGPABI,
-            eventName: 'SubkeyAdded',
-            logs: receipt.logs
-        });
-
-        return Promise.all(parsedLogs.map(async log => ({
-            blockNumber: log.blockNumber,
-            blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
-            transactionHash: log.transactionHash,
-            primaryKeyFingerprint: log.args.primaryKeyFingerprint,
-            subkeyFingerprint: log.args.subkeyFingerprint,
-            openPGPMsg: log.args.openPGPMsg
-        })));
-    }
-
-    /**
-     * Extract KeyRevoked event logs from a transaction receipt.
-     * @param receipt The transaction receipt to extract logs from.
-     * @returns An array of KeyRevokedLog objects extracted from the receipt.
-     */
-    extractKeyRevokedLog(receipt: TransactionReceipt): Promise<KeyRevokedLog[]> {
-        let parsedLogs = parseEventLogs({
-            abi: Web3PGPABI,
-            eventName: 'KeyRevoked',
-            logs: receipt.logs
-        });
-
-        return Promise.all(parsedLogs.map(async log => ({
-            blockNumber: log.blockNumber,
-            blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
-            transactionHash: log.transactionHash,
-            fingerprint: log.args.fingerprint,
-            revocationCertificate: log.args.revocationCertificate
-        })));
+        }));
     }
 
     /**
@@ -1078,14 +1039,74 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             logs: receipt.logs
         });
 
-        return Promise.all(parsedLogs.map(async log => ({
+        const uniqueBlocks = Array.from(new Set(parsedLogs.map(log => log.blockNumber)));
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
+
+        return parsedLogs.map(log => ({
+            type: Web3PGPEvents.KeyUpdated,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             openPGPMsg: log.args.openPGPMsg
-        })));
+        }));
+    }
+
+    /**
+     * Extract SubkeyAdded event logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of SubkeyAddedLog objects extracted from the receipt.
+     */
+    public async extractSubkeyAddedLog(receipt: TransactionReceipt): Promise<SubkeyAddedLog[]> {
+        let parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            eventName: 'SubkeyAdded',
+            logs: receipt.logs
+        });
+
+        const uniqueBlocks = Array.from(new Set(parsedLogs.map(log => log.blockNumber)));
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
+
+        return parsedLogs.map(log => ({
+            type: Web3PGPEvents.SubkeyAdded,
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
+            transactionHash: log.transactionHash,
+            primaryKeyFingerprint: log.args.primaryKeyFingerprint,
+            subkeyFingerprint: log.args.subkeyFingerprint,
+            openPGPMsg: log.args.openPGPMsg
+        }));
+    }
+
+    /**
+     * Extract KeyRevoked event logs from a transaction receipt.
+     * @param receipt The transaction receipt to extract logs from.
+     * @returns An array of KeyRevokedLog objects extracted from the receipt.
+     */
+    public async extractKeyRevokedLog(receipt: TransactionReceipt): Promise<KeyRevokedLog[]> {
+        let parsedLogs = parseEventLogs({
+            abi: Web3PGPABI,
+            eventName: 'KeyRevoked',
+            logs: receipt.logs
+        });
+
+        const uniqueBlocks = Array.from(new Set(parsedLogs.map(log => log.blockNumber)));
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
+
+        return parsedLogs.map(log => ({
+            type: Web3PGPEvents.KeyRevoked,
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
+            transactionHash: log.transactionHash,
+            fingerprint: log.args.fingerprint,
+            revocationCertificate: log.args.revocationCertificate
+        }));
     }
 
     /**
@@ -1101,14 +1122,19 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             logs: receipt.logs
         });
 
-        return Promise.all(parsedLogs.map(async log => ({
+        const uniqueBlocks = Array.from(new Set(parsedLogs.map(log => log.blockNumber)));
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
+
+        return parsedLogs.map(log => ({
+            type: Web3PGPEvents.OwnershipChallenged,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             challenge: log.args.challenge
-        })));
+        }));
     }
 
     /**
@@ -1124,15 +1150,20 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             logs: receipt.logs
         });
 
-        return Promise.all(parsedLogs.map(async log => ({
+        const uniqueBlocks = Array.from(new Set(parsedLogs.map(log => log.blockNumber)));
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
+
+        return parsedLogs.map(log => ({
+            type: Web3PGPEvents.OwnershipProved,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             challenge: log.args.challenge,
             signature: log.args.signature
-        })));
+        }));
     }
 
     /**
@@ -1148,15 +1179,20 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             logs: receipt.logs
         });
 
-        return Promise.all(parsedLogs.map(async log => ({
+        const uniqueBlocks = Array.from(new Set(parsedLogs.map(log => log.blockNumber)));
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
+
+        return parsedLogs.map(log => ({
+            type: Web3PGPEvents.KeyCertified,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             issuerFingerprint: log.args.issuer,
             keyCertificate: log.args.keyCertificate
-        })));
+        }));
     }
 
     /**
@@ -1172,15 +1208,20 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             logs: receipt.logs
         });
 
-        return Promise.all(parsedLogs.map(async log => ({
+        const uniqueBlocks = Array.from(new Set(parsedLogs.map(log => log.blockNumber)));
+        const blockTimestamps = await this.getBlockTimestamps(uniqueBlocks);
+
+        return parsedLogs.map(log => ({
+            type: Web3PGPEvents.KeyCertificationRevoked,
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
-            blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             fingerprint: log.args.fingerprint,
             issuerFingerprint: log.args.issuer,
             revocationSignature: log.args.revocationSignature
-        })));
+        }));
     }
 
     /*****************************************************************************************************************/
@@ -1191,7 +1232,20 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      * Get the current block number of the connected blockchain.
      * @return The current block number as a bigint.
      */
-    getBlockNumber(): Promise<bigint> {
+    public getBlockNumber(): Promise<bigint> {
         return this.client.getBlockNumber();
+    }
+
+    /**
+     * Helper to efficiently fetch timestamps for a list of logs.
+     * Deduplicates block lookups to minimize RPC calls.
+     */
+    private async getBlockTimestamps(blockNumbers: bigint[]): Promise<Map<bigint, Date>> {
+        const uniqueBlocks = [...new Set(blockNumbers)];
+        return new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
     }
 }

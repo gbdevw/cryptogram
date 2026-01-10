@@ -1,5 +1,5 @@
 import { BlockTag, TransactionReceipt } from 'viem';
-import { KeyCertificationRevokedLog, KeyCertifiedLog, KeyRegisteredLog, KeyRevokedLog, KeyUpdatedLog, OwnershipChallengedLog, OwnershipProvedLog, SubkeyAddedLog } from './types/types';
+import { KeyCertificationRevokedLog, KeyCertifiedLog, KeyRegisteredLog, KeyRevokedLog, KeyUpdatedLog, OwnershipChallengedLog, OwnershipProvedLog, SubkeyAddedLog, Web3PGPEventLog } from './types/types';
 import { IFlatFee } from '../flatfee/flatefee.interface';
 
 /**
@@ -164,25 +164,25 @@ export interface IWeb3PGP extends IFlatFee {
      * Challenges ownership of a key.
      *
      * @param fingerprint The fingerprint of the key.
-     * @param challenge A challenge value.
+     * @param challengeHash The keccak256 hash of the challenge.
      * @returns A transaction receipt.
      */
     challengeOwnership(
         fingerprint: `0x${string}`,
-        challenge: `0x${string}`
+        challengeHash: `0x${string}`
     ): Promise<TransactionReceipt>;
 
     /**
      * Proves ownership of a key by responding to a challenge.
      *
      * @param fingerprint The fingerprint of the key.
-     * @param challenge The challenge that was issued.
+     * @param challengeHash The keccak256 hash of the challenge.
      * @param signature A signature proving ownership.
      * @returns A transaction receipt.
      */
     proveOwnership(
         fingerprint: `0x${string}`,
-        challenge: `0x${string}`,
+        challengeHash: `0x${string}`,
         signature: `0x${string}`
     ): Promise<TransactionReceipt>;
 
@@ -241,15 +241,6 @@ export interface IWeb3PGP extends IFlatFee {
     searchSubkeyAddedLogs(primaryKeyFingerprint?: `0x${string}` | `0x${string}`[], subkeyFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<SubkeyAddedLog[]>;
 
     /**
-     * Get the log of a key revocation event using the provided fingerprint and block number.
-     * @param fingerprint The fingerprint of the key to retrieve the log for.
-     * @param blockNumber The block number where the event was emitted.
-     * @throws Error if the event log cannot be found.
-     * @return The KeyRevokedLog object containing event details.
-     */
-    getKeyRevokedLog(fingerprint: `0x${string}`, blockNumber: bigint): Promise<KeyRevokedLog>;
-
-    /**
      * Search for KeyRevoked event logs.
      * @param fingerprint The fingerprint(s) of the key to search logs for. Default to all keys.
      * @param fromBlock The starting block number of the search range. 'earliest' is used by default. 'pending' is not allowed.
@@ -301,19 +292,19 @@ export interface IWeb3PGP extends IFlatFee {
      * @return An array of KeyCertificationRevokedLog objects matching the search criteria.
      */
     searchKeyCertificationRevokedLogs(fingerprint?: `0x${string}` | `0x${string}`[], issuerFingerprint?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<KeyCertificationRevokedLog[]>;
-    
-    // TODO: Update searchKeyEvents to include those logs as well
-    // TODO: add extract functions for those logs as well
 
     /**
-     * Searches for all key-related events (KeyRegistered, SubkeyAdded, KeyRevoked) within a specified
-     * block range.
+     * Searches for all key-related events within a specified block range. Optionally filters by fingerprints.
      * 
+     * Note: The fingerprints are the subjects of the events (i.e., the keys being registered, updated, revoked, certified, etc.).
+     * Results will also include subkeys added, challenges, and proofs of ownership related to the listed fingerprints.
+     * 
+     * @param fingerprints The fingerprint(s) of the keys to filter events for. Can be a single fingerprint or an array. Defaults to all keys if not provided.
      * @param fromBlock Starting block number (inclusive). Defaults to 'earliest' if not provided. 'pending' is not allowed.
      * @param toBlock Ending block number (inclusive). Defaults to 'latest' if not provided. 'pending' is not allowed.
-     * @return An array of key-related event logs (KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog).
+     * @return An array of Web3PGPEventLog.
      */
-    searchKeyEvents(fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<(KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog)[]>;
+    searchKeyEvents(fingerprints?: `0x${string}` | `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<Web3PGPEventLog[]>;
 
     /**
      * Extracts KeyRegisteredLog entries from a transaction receipt.

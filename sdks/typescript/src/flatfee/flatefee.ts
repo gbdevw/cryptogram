@@ -184,6 +184,7 @@ export class FlatFee implements IFlatFee {
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
             blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             oldFee: log.args.oldFee,
             newFee: log.args.newFee
@@ -223,6 +224,7 @@ export class FlatFee implements IFlatFee {
             blockHash: log.blockHash,
             blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
             to: log.args.to,
             amount: log.args.amount
         })));
@@ -245,6 +247,7 @@ export class FlatFee implements IFlatFee {
             blockNumber: log.blockNumber,
             blockHash: log.blockHash,
             blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
+            logIndex: log.logIndex,
             transactionHash: log.transactionHash,
             to: log.args.to,
             amount: log.args.amount
@@ -270,7 +273,8 @@ export class FlatFee implements IFlatFee {
             blockTimestamp: await getBlockTimestamp(this.client, log.blockNumber),
             transactionHash: log.transactionHash,
             oldFee: log.args.oldFee,
-            newFee: log.args.newFee
+            newFee: log.args.newFee,
+            logIndex: log.logIndex
         })));
     }
 }
