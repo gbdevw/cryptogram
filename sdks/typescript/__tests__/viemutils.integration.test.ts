@@ -17,8 +17,12 @@ describe('Viemutils Integration Tests', () => {
     let publicClient: PublicClient;
 
     beforeAll(async () => {
-        console.log('Starting Anvil blockchain...');
-        anvil = new AnvilHelper({ port: 8545, blockTime: 1 });
+        // Use dynamic port based on Jest worker ID for parallel test execution
+        const workerId = process.env.JEST_WORKER_ID ? parseInt(process.env.JEST_WORKER_ID) : 1;
+        const port = 8545 + (workerId - 1) * 100; // Worker 1: 8545, Worker 2: 8645, Worker 3: 8745, Worker 4: 8845
+        
+        console.log(`Starting Anvil blockchain on port ${port} (Worker ${workerId})...`);
+        anvil = new AnvilHelper({ port, blockTime: 0.01 });
         await anvil.start();
         console.log('Anvil started at', anvil.getRpcUrl());
 
