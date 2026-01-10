@@ -234,6 +234,9 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
         _checkKeyIsRegistered(issuerFingerprint);
         // Issuer must be different from the target key
         _checkNotSelfCertification(fingerprint, issuerFingerprint);
+        // Both issuer and target keys must not be subkeys
+        _checkIsNotSubkey(fingerprint);
+        _checkIsNotSubkey(issuerFingerprint);
         // Store the block number when the key certification was published for the key
         _registerKeyCertification(fingerprint, block.number);
         // Emit a KeyCertified event for the key to store the provided key certification as is in the Ethereum log system
@@ -259,6 +262,9 @@ contract Web3PGP is FlatFee, IWeb3PGP, UUPSUpgradeable {
         _checkKeyIsRegistered(issuerFingerprint);
         // Issuer must be different from the target key
         _checkNotSelfCertification(fingerprint, issuerFingerprint);
+        // Both issuer and target keys must not be subkeys
+        _checkIsNotSubkey(fingerprint);
+        _checkIsNotSubkey(issuerFingerprint);
         // Store the block number when the key certification revocation was published for the key
         _registerCertificationRevocation(fingerprint, block.number);
         // Emit a KeyCertificationRevoked event for the key to store the provided revocation signature as is in the Ethereum log system
