@@ -542,24 +542,6 @@ describe('Web3PGPService Integration Tests', () => {
         });
 
         test('should prevent malicious revocation certificate injection by ignoring invalid standalone revocation certificates', async () => {
-            // TODO: Enqueter sur le bug
-    //           ● Web3PGPService Integration Tests › Key Retrieval › should prevent malicious revocation certificate injection by ignoring invalid standalone revocation certificates
-
-    // Error revoking key: Revocation signature does not match key
-
-    //   at Object.Error [as wrapError] (src/util.js:614:16)
-    //   at Object.wrapError (src/openpgp.js:168:16)
-    //   at Web3PGPService.getPublicKey (src/web3pgp/web3pgp.service.ts:1391:44)
-    //   at Object.<anonymous> (__tests__/web3pgp.service.integration.test.ts:557:32)
-
-    // Cause:
-    // Revocation signature does not match key
-
-    //   at ja.Error [as applyRevocationCertificate] (src/key/key.js:651:17)
-    //   at Object.revocationCertificate (src/openpgp.js:156:24)
-    //   at Web3PGPService.getPublicKey (src/web3pgp/web3pgp.service.ts:1391:44)
-    //   at Object.<anonymous> (__tests__/web3pgp.service.integration.test.ts:557:32)
-
             // 1. Generate Alice's and Bob's OpenPGP key pair
             let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();
             let [bobPrivateKey, bobPublicKey, bobRevocationCert] = await createBobOpenPGPKeys();
