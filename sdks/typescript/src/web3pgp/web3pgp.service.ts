@@ -1234,10 +1234,10 @@ export class Web3PGPService implements IWeb3PGPService {
         // 3. List all subkeys and their revocations (certifications and revocations are not handled because subkeys cannot be certified)
         const subkeys = await this.fetchAllPaginated((start, limit) => this.web3pgp.listSubkeys(normalizedFingerprint, start, limit));
 
-        // 4. Use the target fingerprint to retrieve blocks with logs related to the primary key
+        // 4. Use the target fingerprint to retrieve blocks with logs related to the primary key and its subkeys
         let blockNumbers = await Promise.all([
             this.web3pgp.getKeyPublicationBlockBatch(subkeys),
-            this.fetchAllPaginated((start, limit) => this.web3pgp.list(normalizedFingerprint, start, limit)),
+            this.fetchAllPaginated((start, limit) => this.web3pgp.listKeyUpdates(normalizedFingerprint, start, limit)),
             this.fetchAllPaginated((start, limit) => this.web3pgp.listRevocations(normalizedFingerprint, start, limit)),
             this.fetchAllPaginated((start, limit) => this.web3pgp.listCertifications(normalizedFingerprint, start, limit)),
             this.fetchAllPaginated((start, limit) => this.web3pgp.listCertificationRevocations(normalizedFingerprint, start, limit)),
@@ -1246,30 +1246,114 @@ export class Web3PGPService implements IWeb3PGPService {
                     this.fetchAllPaginated((start, limit) => 
                         this.web3pgp.listRevocations(subkeyFingerprint, start, limit)
                     )
-                ) 
-            ) as bigint[]
+                )
+            )
         ]);
 
         // 5. Merge and deduplicate all block numbers with key events
         const rawBlocks = [publicationBlockNumber, ...blockNumbers.flat()];
         const uniqueBlocks = [...new Set(rawBlocks)].filter(b => b > 0n);
 
-        // 6. Build a map of the expectations for each block
+        // 6. Build a map of the expectations for each block to ensure data consistency
         const expectationsMap: Map<bigint, (logs: Web3PGPEventLog[]) => boolean> = new Map();
+        
         for (const blockNumber of uniqueBlocks) {
-            // Count how many events and their types we expect in this block
-            const KeyRegisteredORSubkeyAddedExpected = blockNumbers[0].filter(b => b === blockNumber).length;
-            const KeyRevokedExpected = blockNumbers[1].filter(b => b === blockNumber).length + ;
+            const isPublicationBlock = blockNumber === publicationBlockNumber;
+
+            // 1. Calculate how many explicit 'SubkeyAdded' events are expected in this block.
+            // We exclude subkeys from the publication block count here because they are implicitly 
+            // included within the 'KeyRegistered' event, not emitted as separate 'SubkeyAdded' events.
+            const subkeyAddedEventsExpected = blockNumbers[0].filter(b => b === blockNumber && b !== publicationBlockNumber).length;
+            
+            // 2. Calculate the total expected registration events (KeyRegistered + SubkeyAdded).
+            // If this is the publication block, we MUST expect exactly 1 'KeyRegistered' event.
+            // This prevents a race condition where an empty RPC response (0 events) would validate 
+            // as correct against an expectation of 0 events.
+            const totalRegistrationEventsExpected = subkeyAddedEventsExpected + (isPublicationBlock ? 1 : 0);
+
+            // 3. Calculate expectations for other event types
+            const KeyUpdatedExpected = blockNumbers[1].filter(b => b === blockNumber).length;
+            
+            // Initial count for primary key revocations
+            let KeyRevokedExpected = blockNumbers[2].filter(b => b === blockNumber).length;
+            
+            const KeyCertifiedExpected = blockNumbers[3].filter(b => b === blockNumber).length;
+            const KeyCertificationRevokedExpected = blockNumbers[4].filter(b => b === blockNumber).length;
+            
+            // Add expectations for subkey revocations (iterating through the rest of the batch)
+            for (let i = 5; i < blockNumbers.length; i++) {
+                KeyRevokedExpected += blockNumbers[i].filter((b: bigint) => b === blockNumber).length;
+            }
+
+            // Build the predicate function that validates if the retrieved logs match the expectations
+            expectationsMap.set(blockNumber, (logs: Web3PGPEventLog[]) => {
+                const counts = {
+                    [Web3PGPEvents.KeyRegistered]: 0,
+                    [Web3PGPEvents.SubkeyAdded]: 0,
+                    [Web3PGPEvents.KeyUpdated]: 0,
+                    [Web3PGPEvents.KeyRevoked]: 0,
+                    [Web3PGPEvents.KeyCertified]: 0,
+                    [Web3PGPEvents.KeyCertificationRevoked]: 0
+                };
+                
+                // Count actual events received from RPC
+                for (const log of logs) {
+                    if (counts.hasOwnProperty(log.type)) {
+                        counts[log.type as keyof typeof counts]++;
+                    }
+                }
+
+                // Combine KeyRegistered and SubkeyAdded for comparison
+                const keyRegisteredOrSubkeyAddedCount = counts[Web3PGPEvents.KeyRegistered] + counts[Web3PGPEvents.SubkeyAdded];
+
+                // Strict equality check:
+                // We use === to ensure we have exactly the number of events recorded in the smart contract state.
+                // If the RPC is lagging and returns fewer events (or empty), this returns false and triggers a retry.
+                return (
+                    keyRegisteredOrSubkeyAddedCount === totalRegistrationEventsExpected &&
+                    counts[Web3PGPEvents.KeyUpdated] === KeyUpdatedExpected &&
+                    counts[Web3PGPEvents.KeyRevoked] === KeyRevokedExpected &&
+                    counts[Web3PGPEvents.KeyCertified] === KeyCertifiedExpected &&
+                    counts[Web3PGPEvents.KeyCertificationRevoked] === KeyCertificationRevokedExpected
+                );
+            });
         }
 
-        // 6. Use the searchKeyEvents method to find all relevant logs
+        // 7. Use the searchKeyEvents method to find all relevant logs until we satisfy the expectations for each block
+        //
+        // Note: We perform up to 3 attempts per block with exponential backoff in case the RPC returns incomplete data.
+        // This can happen when writing data to the blockchain and then immediatly querying for events, especially on public RPCs.
+        // Although the low level client waits for the transaction to be mined, the event indexer used by the RPC may still be lagging behind.
+        // Furthermore, load balancing and network latency can cause inconsistent results across multiple requests. This is why we
+        // use the data from the smart contract state (step 5) as the source of truth for the expected events.
         const logs = await Promise.all(
             uniqueBlocks.map(blockNumber => 
-                this.concurrencyLimit(() => this.web3pgp.searchKeyEvents([normalizedFingerprint, ...subkeys], blockNumber, blockNumber))
+                this.concurrencyLimit(async () => {
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        console.debug(`[Web3PGP - Service] Searching for key events for block ${blockNumber}, attempt ${attempt}...`);
+                        let logs = await this.web3pgp.searchKeyEvents([normalizedFingerprint, ...subkeys], blockNumber, blockNumber);
+                        const validate = expectationsMap.get(blockNumber);
+                        if (!validate) {
+                            // This should never happen
+                            throw new Web3PGPServiceCriticalError(`Missing expectations validator for block ${blockNumber}`);
+                        }
+                        if (validate(logs)) {
+                            console.debug(`[Web3PGP - Service] Retrieved all (${logs.length}) expected logs for block ${blockNumber} after ${attempt} attempt(s)`);
+                            return logs;
+                        } else {
+                            // Log and wait with an exponential backoff before retrying (start at 200ms)
+                            const delay = 200 * Math.pow(2, attempt - 1);
+                            console.debug(`[Web3PGP - Service] Retrieved logs for block ${blockNumber} do not match expectations on attempt ${attempt}. Retrying in ${delay}ms...`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                        }
+                    }
+                    // If we reach here, all attempts failed
+                    throw new Web3PGPServiceError(`Failed to retrieve expected logs for block ${blockNumber} after 3 attempts.`);
+                })
             ) as Promise<Web3PGPEventLog[]>[]
         );
 
-        // 7. Flatten and sort the logs array
+        // 8. Flatten and sort the logs array
         const flattenedLogs = logs
             .flat()
             .sort((a, b) => {
@@ -1284,7 +1368,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 return 0;
             });
 
-        // 8. KeyRegisteredLog contains the primary key and should be the first log given we sorted them
+        // 9. KeyRegisteredLog contains the primary key and should be the first log given we sorted them
         // and no other log can be emitted by the smart contract before that log
         if (flattenedLogs[0].type !== Web3PGPEvents.KeyRegistered) {
             throw new Web3PGPServiceError(
@@ -1294,7 +1378,7 @@ export class Web3PGPService implements IWeb3PGPService {
         console.debug(`[Web3PGP - Service] Found KeyRegistered log for primary key ${normalizedFingerprint} at block ${flattenedLogs[0].blockNumber} - tx ${flattenedLogs[0].transactionHash}`);
         let primaryKey = await this.extractFromKeyRegisteredLog(flattenedLogs[0]);
 
-        // 9. Iterate over the logs and reconstruct the key
+        // 10. Iterate over the logs and reconstruct the key
         console.debug(`[Web3PGP - Service] Reconstructing primary key ${normalizedFingerprint} from ${flattenedLogs.length} logs`);
         const historyLogs = flattenedLogs.slice(1); // Exclude the first log (KeyRegistered)
         for (const log of historyLogs) {
@@ -1311,13 +1395,19 @@ export class Web3PGPService implements IWeb3PGPService {
                         if (revokedKey) {
                             primaryKey = await primaryKey.update(revokedKey, log.blockTimestamp);
                         } else if (revocationCert) {
-                            const result = await openpgp.revokeKey({ 
-                                key: primaryKey, 
-                                revocationCertificate: revocationCert,
-                                date: log.blockTimestamp,
-                                format: 'object'
-                            });
-                            primaryKey = await primaryKey.update(result.publicKey, log.blockTimestamp);
+                            try {
+                                const result = await openpgp.revokeKey({ 
+                                    key: primaryKey, 
+                                    revocationCertificate: revocationCert,
+                                    date: log.blockTimestamp,
+                                    format: 'object'
+                                });
+                                
+                                primaryKey = await primaryKey.update(result.publicKey, log.blockTimestamp);
+                            } catch (err) {
+                                // Wrap and throw error when the application of the revocation certificate fails because it does not match the key
+                                throw new Web3PGPServiceValidationError(`Failed to apply standalone revocation certificate for key ${log.fingerprint} from KeyRevokedLog event: ${err}`);
+                            }
                         }
                         break;
                     case Web3PGPEvents.KeyUpdated:
@@ -1350,7 +1440,7 @@ export class Web3PGPService implements IWeb3PGPService {
             }      
         }
 
-        // 10. Return the reconstructed public key
+        // 11. Return the reconstructed public key
         console.debug(`[Web3PGP - Service] Successfully retrieved and reconstructed the public key`);
         return primaryKey;
     }

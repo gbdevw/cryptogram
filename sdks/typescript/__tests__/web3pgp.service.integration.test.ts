@@ -435,8 +435,6 @@ describe('Web3PGPService Integration Tests', () => {
             expect(await OpenPGPUtils.isSubkeyRevoked(publicKey.subkeys[0]!, publicKey)).toBe(true);
             // 4. Publish the revocation certificate for the subkey
             await service.revoke(publicKey, to0x(publicKey.subkeys[0]!.getFingerprint()));
-            // Wait for transaction to be processed
-            await new Promise(resolve => setTimeout(resolve, 2000));
             // 5. Retrieve the key using the service
             let retrievedKey = await service.getPublicKey(to0x(publicKey.getFingerprint()));
             // 6. Verify the retrieved key matches the original and the subkey is marked as revoked
@@ -544,6 +542,24 @@ describe('Web3PGPService Integration Tests', () => {
         });
 
         test('should prevent malicious revocation certificate injection by ignoring invalid standalone revocation certificates', async () => {
+            // TODO: Enqueter sur le bug
+    //           ● Web3PGPService Integration Tests › Key Retrieval › should prevent malicious revocation certificate injection by ignoring invalid standalone revocation certificates
+
+    // Error revoking key: Revocation signature does not match key
+
+    //   at Object.Error [as wrapError] (src/util.js:614:16)
+    //   at Object.wrapError (src/openpgp.js:168:16)
+    //   at Web3PGPService.getPublicKey (src/web3pgp/web3pgp.service.ts:1391:44)
+    //   at Object.<anonymous> (__tests__/web3pgp.service.integration.test.ts:557:32)
+
+    // Cause:
+    // Revocation signature does not match key
+
+    //   at ja.Error [as applyRevocationCertificate] (src/key/key.js:651:17)
+    //   at Object.revocationCertificate (src/openpgp.js:156:24)
+    //   at Web3PGPService.getPublicKey (src/web3pgp/web3pgp.service.ts:1391:44)
+    //   at Object.<anonymous> (__tests__/web3pgp.service.integration.test.ts:557:32)
+
             // 1. Generate Alice's and Bob's OpenPGP key pair
             let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();
             let [bobPrivateKey, bobPublicKey, bobRevocationCert] = await createBobOpenPGPKeys();
