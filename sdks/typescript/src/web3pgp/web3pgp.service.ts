@@ -503,42 +503,21 @@ export class Web3PGPService implements IWeb3PGPService {
             const pk = await OpenPGPUtils.sanitizePrimaryKey(certifiedKey);
 
             // 3. Keep only valid certifications made by the issuer
-            const issuerKeyID = issuer.getKeyID();
-            const issuerKeyPacket = issuer.keyPacket; 
-            
             let hasValidCertification = false;
-            
             for (const user of pk.users) {
-                const verifyData: { key: openpgp.PublicKeyPacket; userId?: openpgp.UserIDPacket; userAttribute?: openpgp.UserAttributePacket } = {
-                    key: pk.keyPacket as openpgp.PublicKeyPacket
-                };
-                if (user.userID) {
-                    verifyData.userId = user.userID;
-                } else if (user.userAttribute) {
-                    verifyData.userAttribute = user.userAttribute;
-                } else {
-                    // No user ID or attribute to verify against - Skip
-                    continue;
-                }
-
-                // A. Filter candidates (Sync)
-                const candidates = user.otherCertifications.filter(cert => 
-                    cert.issuerKeyID && 
-                    !cert.revoked && 
-                    cert.issuerKeyID.equals(issuerKeyID)
-                );
-
-                // B. Verify candidates (Async)
+                // Verify each certification signature using the issuer public key
+                console.debug(`[WEB3PGP SERVICE] Verifying ${user.otherCertifications.length} certifications for user ID "${user.userID?.toString()}"...`);
                 const validCertifications: openpgp.SignaturePacket[] = [];
-                for (const cert of candidates) {
+                for (const cert of user.otherCertifications) {
                     try {
-                        await cert.verify(
-                            issuerKeyPacket,
-                            cert.signatureType ?? openpgp.enums.signature.certGeneric,
-                            verifyData
-                        );
-                        validCertifications.push(cert);
-                        hasValidCertification = true;
+                        console.debug(`[WEB3PGP SERVICE] Verifying certification made by ${cert.issuerFingerprint ?? cert.issuerKeyID.toHex()}...`);
+                        const verified = await user.verifyCertificate(cert, [issuer]);
+                        if (verified) {
+                            validCertifications.push(cert);
+                            hasValidCertification = true;
+                        } else {
+                            console.debug(`[WEB3PGP SERVICE] Invalid certification signature found and skipped.`);
+                        }
                     } catch (e) {
                         console.debug(`[WEB3PGP SERVICE] Invalid certification signature found and skipped: ${e}`);
                     }
@@ -1042,7 +1021,6 @@ export class Web3PGPService implements IWeb3PGPService {
             // Read the OpenPGP message using the hex-encoded binary openPGP message from the log data
             let pk = await openpgp.readKey({ binaryKey: toBytes(log.keyCertificate) });
             const pkFp = toBytes32(to0x(pk.getFingerprint()));
-            const issuerFp = toBytes32(to0x(log.issuerFingerprint));
             
             // Verify the fingerprint matches the declared one
             if (pkFp !== toBytes32(to0x(log.fingerprint))) {
@@ -1050,13 +1028,9 @@ export class Web3PGPService implements IWeb3PGPService {
             }
             // Remove extra subkeys
             pk = await OpenPGPUtils.sanitizePrimaryKey(pk);
-            // Remove certifications not made by the issuer
+            // Remove certifications revocations
             pk.users.forEach(user => {
-                user.otherCertifications = user.otherCertifications.filter(cert => 
-                    !cert.issuerFingerprint || // Keep certifications without issuerFingerprint (legacy) 
-                    issuerFp == toBytes32(toHex(cert.issuerFingerprint)) // Keep only certifications made by the issuer
-                );
-                user.revocationSignatures = []; // Clear revocation signatures as they are not needed here
+                user.revocationSignatures = [];
             })
             // Verify the key if needed
             //
@@ -1129,17 +1103,6 @@ export class Web3PGPService implements IWeb3PGPService {
             }
             // Remove extra subkeys
             pk = await OpenPGPUtils.sanitizePrimaryKey(pk);
-            // Remove certifications not made by the issuer
-            pk.users.forEach(user => {
-                user.otherCertifications = user.otherCertifications.filter(cert => 
-                    !cert.issuerFingerprint || // Keep certifications without issuerFingerprint (legacy) 
-                    issuerFp == toBytes32(toHex(cert.issuerFingerprint)) // Keep only certifications made by the issuer
-                );
-                user.revocationSignatures = user.revocationSignatures.filter(revSig => 
-                    !revSig.issuerFingerprint || // Keep revocation signatures without issuerFingerprint (legacy) 
-                    issuerFp == toBytes32(toHex(revSig.issuerFingerprint)) // Keep only revocation signatures made by the issuer
-                );
-            })
             // Verify the key if needed
             //
             // Note: Certifications and their revocations are not verified here as they will be verified by the caller when needed.
