@@ -39,9 +39,9 @@ export class OpenPGPUtils {
      */
     static async sanitizePrimaryKey(key: openpgp.Key): Promise<openpgp.Key> {
         // Create a copy of the public key and remove subkeys
-        const publicKey = key.toPublic();
-        publicKey.subkeys = [];
-        return publicKey;
+        const clonedKey = await openpgp.readKey({ binaryKey: key.toPublic().write() }); ;
+        clonedKey.subkeys = [];
+        return clonedKey;
     }
 
     /**

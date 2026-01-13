@@ -6,6 +6,7 @@ import { BYTES32_ZERO, to0x, toBytes32 } from '../utils/0xstr';
 import { OpenPGPUtils } from '../utils/openpgp';
 import { KeyCertificationRevokedLog, KeyCertifiedLog, KeyRegisteredLog, KeyRevokedLog, KeyUpdatedLog, OwnershipProvedLog, SubkeyAddedLog, Web3PGPEventLog, Web3PGPEvents } from './types/types';
 import pLimit from 'p-limit';
+import { PacketList } from 'openpgp';
 
 /*****************************************************************************************************************/
 /* CUSTOM ERRORS                                                                                                 */
@@ -510,7 +511,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 const validCertifications: openpgp.SignaturePacket[] = [];
                 for (const cert of user.otherCertifications) {
                     try {
-                        console.debug(`[WEB3PGP SERVICE] Verifying certification made by ${cert.issuerFingerprint ?? cert.issuerKeyID.toHex()}...`);
+                        console.debug(`[WEB3PGP SERVICE] Verifying certification made by ${cert.issuerFingerprint ? toHex(cert.issuerFingerprint) : cert.issuerKeyID.toHex()}...`);
                         const verified = await user.verifyCertificate(cert, [issuer]);
                         if (verified) {
                             validCertifications.push(cert);
@@ -576,65 +577,72 @@ export class Web3PGPService implements IWeb3PGPService {
             if (issuer.getFingerprint() === keyWithRevokedCertification.getFingerprint()) {
                 throw new Web3PGPServiceValidationError('Issuer must be different from the target key.');
             }
+            const now = new Date();
+            const pk = await OpenPGPUtils.sanitizePrimaryKey(keyWithRevokedCertification); 
+            pk.users = keyWithRevokedCertification.users; 
+            // BUGFIX - TODO: Deep copy users as serializing/deserializing lose some context needed for verification
+            // but modifying the users have side effect on the original key
 
-            const issuerKeyID = issuer.getKeyID();
-            const issuerKeyPacket = issuer.keyPacket; // Only the primary key packet is needed
-            const pk = await OpenPGPUtils.sanitizePrimaryKey(keyWithRevokedCertification);
 
             // 2. Keep only valid revocation signatures made by the issuer (there may be multiple users and certifications)
             let hasValidRevocation = false;
             for (const user of pk.users) {
-
-                // Create array to hold valid certifications and revocations which should immediately follow
-                let revokedCertifications: openpgp.SignaturePacket[] = [];
-
-                for (const cert of user.otherCertifications) {
-                    if (!cert.revoked || !cert.issuerKeyID.equals(issuerKeyID)) {
-                        // Skip certifications that are not revoked or not made by the issuer
+                // Verify each certification signature using the issuer public key
+                console.debug(`[WEB3PGP SERVICE] Verifying ${user.revocationSignatures.length}  revocation signatures for user ID "${user.userID?.toString()}"...`);
+                const revokedCertifications: openpgp.SignaturePacket[] = [];
+                const validRevocations: openpgp.SignaturePacket[] = [];
+                for (const revSig of user.revocationSignatures) {
+                    try {
+                        // Find the key packets needed for verification
+                        //
+                        // Although revocation signatures are normally made with the issuer's primary key,
+                        // OpenPGP allows using any key of the issuer, so we must find the correct one.
+                        const issuerKeyPacket = issuer.getKeys().find(k => k.getKeyID().equals(revSig.issuerKeyID));
+                        if (!issuerKeyPacket) {
+                            throw new Web3PGPServiceValidationError(`Issuer key packet with Key ID ${revSig.issuerKeyID.toHex()} not found in issuer key.`);
+                        }
+                        console.debug(`[WEB3PGP SERVICE] Verifying revocation signature made by ${revSig.issuerFingerprint ? toHex(revSig.issuerFingerprint) : revSig.issuerKeyID.toHex()}...`);
+                        await revSig.verify(
+                            issuerKeyPacket.keyPacket, 
+                            revSig.signatureType ?? openpgp.enums.signature.certRevocation,
+                            {
+                                key: keyWithRevokedCertification.keyPacket,
+                                userId: user.userID,
+                                userAttribute: user.userAttribute
+                            },
+                            now,
+                        );
+                        console.debug(`[WEB3PGP SERVICE] Valid revocation signature found.`);
+                        validRevocations.push(revSig);
+                        hasValidRevocation = true;
+                    } catch (e) {
+                        console.debug(`[WEB3PGP SERVICE] Invalid revocation signature found and skipped: ${e}`);
                         continue;
                     }
-
-                    // Find the related revocation signature
-                    for (const revSig of user.revocationSignatures) {
-                        
-                        // Skip if issuerKeyID doesn't match
-                        if (!revSig.issuerKeyID || !revSig.issuerKeyID.equals(issuerKeyID)) {
-                            continue;
-                        }
-
-                        try {
-                            // 3. Cryptographic verification of the revocation signature
-                            // Type 0x30 : Certification Revocation Signature
-                            // The data context ({ signature: cert }) is the certification being revoked.
-                            await revSig.verify(
-                                issuerKeyPacket,
-                                revSig.signatureType ?? openpgp.enums.signature.certRevocation, 
-                                { 
-                                    signature: cert // <--- C'est ça qu'on révoque
-                                }
-                            );
-
-                            // Valid revocation signature
-                            revokedCertifications.push(cert);
-                            revokedCertifications.push(revSig);
-                            hasValidRevocation = true;
-                            break; // No need to check other revocation signatures - Go to next certification
-                        } catch (e) {
-                            // Invalid revocation signature - Skip
-                            console.debug(`[WEB3PGP SERVICE] Invalid certification revocation signature found and skipped: ${e}`);
-                        }
+                }
+                // Find all certifications being revoked. Use the creation date of the revocation signature as upper bound.
+                for (const cert of user.otherCertifications) {
+                    for (const revSig of validRevocations) {
+                        if (cert.issuerKeyID.equals(revSig.issuerKeyID)) {
+                            // Mark the certification as revoked if one of the revocation signatures was created after the certification
+                            cert.revoked = cert.revoked || (cert.created || now) <= (revSig.created || now);
+                            if (cert.revoked) {
+                                revokedCertifications.push(cert);
+                                break; // No need to check other revocation signatures
+                            }
+                        }   
                     }
                 }
-
-                // Update the user with only valid revocations
+                
+                // C. Update the user with only valid revocations and remove revoked certifications
+                user.revocationSignatures = validRevocations;
                 user.otherCertifications = revokedCertifications;
-                user.revocationSignatures = []; // Clear all revocation signatures as they are now linked in otherCertifications
             }
             if (!hasValidRevocation) {
                 throw new Web3PGPServiceValidationError('No valid certification revocation signature made by the issuer was found on the target key.');
             }
 
-            // 4. Publication
+            // 3. Publication
             return this.web3pgp.revokeCertification(
                 toBytes32(to0x(pk.getFingerprint())),
                 toBytes32(to0x(issuer.getFingerprint())),

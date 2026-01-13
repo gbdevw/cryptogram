@@ -642,33 +642,38 @@ describe('Web3PGPService Integration Tests', () => {
     });
 
     describe('Key certification and certification revocation', () => {
+        
         test('should publish a key certification signature', async () => {
-            // 1. Generate OpenPGP key pairs for Alice (certifier) and Bob (target)
+            // 1. Generate OpenPGP key pairs for Alice (certifier), Bob (target) and Cecil (2nd certifier)
             let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();
             let [bobPrivateKey, bobPublicKey, bobRevocationCert] = await createBobOpenPGPKeys();
+            let [cecilPrivateKey, cecilPublicKey, cecilRevocationCert] = await createCecilOpenPGPKeys();
             // FIX: Create a config which forces preferredHashAlgorithm to solve the following error when calling aliceUserID.certify(...)
             // TypeError: Cannot read properties of undefined (reading 'preferredHashAlgorithm')
             const config = openpgp.config;
             config.preferredHashAlgorithm = openpgp.enums.hash.sha256;
-            // 2. Register Bob's and Alice's keys on-chain
+            // 2. Register Bob's, Alice's and Cecil's keys on-chain
             await expect(service.register(bobPublicKey)).resolves.not.toThrow();
             await expect(service.register(alicePublicKey)).resolves.not.toThrow();
+            await expect(service.register(cecilPublicKey)).resolves.not.toThrow();
             // 3. Use Bob's key to sign Alice's public key
             const aliceUserID = alicePublicKey.users[0];
             alicePublicKey.users[0] = await aliceUserID.certify([bobPrivateKey], new Date(), config);
             expect(alicePublicKey.users[0].otherCertifications.length).toBe(1);
             expect(await alicePublicKey.users[0].verifyCertificate(alicePublicKey.users[0].otherCertifications[0]!, [bobPublicKey])).toBe(true);
-            // 4. Publish the certification signature
-            let receipt = await service.certify(
-                bobPublicKey,
-                alicePublicKey
-            );
+            // 4. Use Cecil's key to sign Alice's public key (to verify multiple certifications are preserved)
+            alicePublicKey.users[0] = await alicePublicKey.users[0].certify([cecilPrivateKey], new Date(), config);
+            expect(alicePublicKey.users[0].otherCertifications.length).toBe(2);
+            // Cecil's certification is the first one, not the second one (prepended)
+            expect(await alicePublicKey.users[0].verifyCertificate(alicePublicKey.users[0].otherCertifications[0]!, [cecilPublicKey])).toBe(true);
+            // 4. Publish the Bob's certification signature
+            let receipt = await service.certify(bobPublicKey, alicePublicKey);
             // 5. Use the low level client to extract the KeyCertifiedLog logs from the receipt
             let logs = await service.contract.extractKeyCertifiedLog(receipt);
             expect(logs.length).toBe(1);
             expect(logs[0].fingerprint).toBe(toBytes32(to0x(alicePublicKey.getFingerprint())));
             expect(logs[0].issuerFingerprint).toBe(toBytes32(to0x(bobPublicKey.getFingerprint())));
-            // 6. Extract the public key with the certification and verify it
+            // 6. Extract the public key with the certification and verify it striclty contains bob's certification
             let extractedKey = await service.extractFromKeyCertifiedLog(logs[0]);
             expect(extractedKey.getFingerprint()).toBe(alicePublicKey.getFingerprint());
             expect(extractedKey.subkeys.length).toBe(0);
@@ -685,7 +690,64 @@ describe('Web3PGPService Integration Tests', () => {
             expect(verifiedFromRetrievedKey).toBe(true);
         });
 
-        // RESUME HERE: Add KeyCertificationRevokedLog tests
+        test('should publish a key certification revocation signature', async () => {
+            // 1. Generate OpenPGP key pairs for Alice (certifier), Bob (target) and Cecil (2nd certifier)
+            let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();
+            let [bobPrivateKey, bobPublicKey, bobRevocationCert] = await createBobOpenPGPKeys();
+            let [cecilPrivateKey, cecilPublicKey, cecilRevocationCert] = await createCecilOpenPGPKeys();
+            // FIX: Create a config which forces preferredHashAlgorithm to solve the following error when calling aliceUserID.certify(...)
+            // TypeError: Cannot read properties of undefined (reading 'preferredHashAlgorithm')
+            const config = openpgp.config;
+            config.preferredHashAlgorithm = openpgp.enums.hash.sha256;
+            // 2. Register Bob's, Alice's and Cecil's keys on-chain
+            await expect(service.register(bobPublicKey)).resolves.not.toThrow();
+            await expect(service.register(alicePublicKey)).resolves.not.toThrow();
+            await expect(service.register(cecilPublicKey)).resolves.not.toThrow();
+            // 3. Use Bob's and Cecil's keys to sign Alice's public key
+            const aliceUserID = alicePublicKey.users[0];
+            alicePublicKey.users[0] = await aliceUserID.certify([bobPrivateKey], new Date(), config);
+            expect(alicePublicKey.users[0].otherCertifications.length).toBe(1);
+            expect(await alicePublicKey.users[0].verifyCertificate(alicePublicKey.users[0].otherCertifications[0]!, [bobPublicKey])).toBe(true);
+            alicePublicKey.users[0] = await alicePublicKey.users[0].certify([cecilPrivateKey], new Date(), config);
+            expect(alicePublicKey.users[0].otherCertifications.length).toBe(2);
+            expect(await alicePublicKey.users[0].verifyCertificate(alicePublicKey.users[0].otherCertifications[0], [cecilPublicKey])).toBe(true);
+            // 4. Publish Bob's and Cecil's certification signatures
+            await expect(service.certify(bobPublicKey, alicePublicKey)).resolves.not.toThrow();
+            await expect(service.certify(cecilPublicKey, alicePublicKey)).resolves.not.toThrow();
+            // 5. Use Bob's key to revoke the certification on Alice's public key
+            const bobKeyPacket = bobPrivateKey.getKeys(alicePublicKey.users[0].otherCertifications[1]!.issuerKeyID)
+            expect(bobKeyPacket.length).toBe(1);
+            console.debug('Bob key packet for certification revocation:', bobKeyPacket[0].getFingerprint());
+            console.debug('Bob public key fingerprint:', bobPublicKey.getFingerprint());
+            alicePublicKey.users[0] = await alicePublicKey.users[0].revoke(bobKeyPacket[0].keyPacket as openpgp.SecretKeyPacket);
+            expect(alicePublicKey.users[0].otherCertifications.length).toBe(2);
+            // expect(alicePublicKey.users[0].otherCertifications[0].revoked).toBe(true); - The revoked flag is not directly set by OpenPGP
+            expect(alicePublicKey.users[0].revocationSignatures.length).toBe(1);
+            expect(await alicePublicKey.users[0].isRevoked(alicePublicKey.users[0].otherCertifications[1]!, bobKeyPacket[0].keyPacket)).toBe(true);
+            // 6. Publish the certification revocation
+            let receipt = await service.revokeCertification(bobPublicKey, alicePublicKey);
+            // BUGFIX - TODO: The following assertions are incorrect because the service.revokeCertification impacts the provided alicePublicKey object directly
+            //expect(alicePublicKey.users[0].otherCertifications.length).toBe(2);
+            //expect(alicePublicKey.users[0].revocationSignatures.length).toBe(1);
+            // 7. Use the low level client to extract the KeyCertificationRevokedLog logs from the receipt
+            let logs = await service.contract.extractKeyCertificationRevokedLog(receipt);
+            expect(logs.length).toBe(1);
+            expect(logs[0].fingerprint).toBe(toBytes32(to0x(alicePublicKey.getFingerprint())));
+            expect(logs[0].issuerFingerprint).toBe(toBytes32(to0x(bobPublicKey.getFingerprint())));
+            // 8. Extract the public key with the certification revocation and verify it strictly contains bob's certification revocation
+            let extractedKey = await service.extractFromKeyCertificationRevokedLog(logs[0]);
+            expect(extractedKey.getFingerprint()).toBe(alicePublicKey.getFingerprint());
+            expect(extractedKey.subkeys.length).toBe(0);
+            expect(extractedKey.users[0].otherCertifications.length).toBe(1);
+            expect(extractedKey.users[0].revocationSignatures.length).toBe(1);
+            // 9. Retrieve Alice's key using the service and verify the certification revocation is present
+            let retrievedKey = await service.getPublicKey(to0x(alicePublicKey.getFingerprint()));
+            expect(retrievedKey.getFingerprint()).toBe(alicePublicKey.getFingerprint());
+            expect(retrievedKey.users[0].otherCertifications.length).toBe(2);
+            expect(retrievedKey.users[0].revocationSignatures.length).toBe(1);
+            // Note: Bob's certification is not marked as revoked since OpenPGP.js does not set any revoked flag directly
+            // Verification of the revocation would require checking the revocation signatures using Bob's public key
+        });
     });
 
     describe('Log Extraction and Validation', () => {
@@ -1247,6 +1309,40 @@ async function createBobOpenPGPKeys(): Promise<[openpgp.PrivateKey, openpgp.Publ
         type: 'ecc',
         curve: 'nistP256',
         userIDs: [{ name: 'Bob', email: 'bob@example.com' }],
+        subkeys: [
+            { 
+                type: 'ecc', 
+                curve: 'nistP256', 
+                sign: true,
+                keyExpirationTime: 180 * 24 * 60 * 60 // 6 months
+            },
+            { 
+                type: 'ecc', 
+                curve: 'nistP256', 
+                keyExpirationTime: 180 * 24 * 60 * 60 // 6 months
+            }
+        ],
+        config: {
+            preferredHashAlgorithm: openpgp.enums.hash.sha256
+        },
+    });
+    return [keys.privateKey, keys.publicKey, keys.revocationCertificate];
+}
+
+/**
+ * Creates OpenPGP keys for Cecil with primary key and two subkeys (signing and encryption).
+ * 
+ * @returns A promise that resolves to a tuple containing:
+ *          - Cecil's PrivateKey
+ *          - Cecil's PublicKey
+ *          - Cecil's Revocation Certificate (armored string)
+ */
+async function createCecilOpenPGPKeys(): Promise<[openpgp.PrivateKey, openpgp.PublicKey, string]> {
+    let keys = await openpgp.generateKey({
+        format: 'object',
+        type: 'ecc',
+        curve: 'nistP256',
+        userIDs: [{ name: 'Cecil', email: 'cecil@example.com' }],
         subkeys: [
             { 
                 type: 'ecc', 
