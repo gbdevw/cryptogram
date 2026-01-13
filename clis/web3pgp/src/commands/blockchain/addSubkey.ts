@@ -21,7 +21,8 @@ export function createAddSubkeyCommand(deps: AddSubkeyDeps): Command {
     .action(async (subkeyFingerprintArg: string, options: { key?: string }) => {
       try {
         // Subkey fingerprint is mandatory
-        cmdLogger.debug({ subkeyFingerprint: subkeyFingerprintArg }, 'Processing subkey fingerprint');
+        const subkeyFingerprint = subkeyFingerprintArg.replaceAll(/\s/g, '');
+        cmdLogger.debug({ subkeyFingerprint: subkeyFingerprint }, 'Processing subkey fingerprint');
 
         let keyData: Buffer | string;
         if (options.key) {
@@ -37,13 +38,13 @@ export function createAddSubkeyCommand(deps: AddSubkeyDeps): Command {
         // Parse the key - tries armored format first, then binary
         const key = (await readKeyData(keyData)) as openpgp.PublicKey;
 
-        cmdLogger.info({ subkeyFingerprint: subkeyFingerprintArg }, 'Adding subkey to blockchain');
-        const result = await service.addSubkey(key, to0x(subkeyFingerprintArg));
+        cmdLogger.info({ subkeyFingerprint: subkeyFingerprint }, 'Adding subkey to blockchain');
+        const result = await service.addSubkey(key, to0x(subkeyFingerprint));
 
         outputJson({
           success: true,
           message: 'Subkey added successfully',
-          subkeyFingerprint: subkeyFingerprintArg,
+          subkeyFingerprint: subkeyFingerprint,
           transaction: { hash: result.transactionHash, blockNumber: result.blockNumber.toString() },
         });
 

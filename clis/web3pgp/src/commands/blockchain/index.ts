@@ -7,6 +7,9 @@ import { createAddSubkeyCommand } from './addSubkey';
 import { createRevokeCommand } from './revoke';
 import { createSyncCommand } from './sync';
 import { createGenerateKeyCommand } from './generateKey';
+import { createUpdateCommand } from './update';
+import { createCertifyCommand } from './certify';
+import { createRevokeCertificationCommand } from './revoke-certification';
 
 export interface BlockchainCommandsDeps {
   logger: Logger;
@@ -20,8 +23,11 @@ export function createBlockchainCommands(deps: BlockchainCommandsDeps): Command[
   return [
     createGetPublicKeyCommand(deps),
     createRegisterCommand(deps),
+    createUpdateCommand(deps),
     createAddSubkeyCommand(deps),
     createRevokeCommand(deps),
+    createCertifyCommand(deps),
+    createRevokeCertificationCommand(deps),
     createSyncCommand(deps),
     createGenerateKeyCommand({ logger: deps.logger }),
   ];

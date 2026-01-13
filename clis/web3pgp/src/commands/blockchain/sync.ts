@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { Logger } from 'pino';
-import { KeyRegisteredLog, KeyRevokedLog, SubkeyAddedLog, IWeb3PGPService, Web3PGPServiceValidationError } from '@cryptogram/dexes';
+import { IWeb3PGPService, Web3PGPServiceValidationError, Web3PGPEventLog, Web3PGPEvents } from '@cryptogram/dexes';
 
 import { exitWithError } from '../factory';
 
@@ -108,7 +108,7 @@ export function createSyncCommand(deps: SyncDeps): Command {
 
           // Fetch the events
           cmdLogger.info({ fromBlock, toBlock: target }, `Fetching events from blockchain from block ${fromBlock} to ${target}`);
-          const logs = await service.searchKeyEvents(fromBlock, target);
+          const logs = await service.searchKeyEvents(undefined, fromBlock, target);
 
           // Process and output events
           await processKeyEvents(logs, service, cmdLogger);
@@ -150,46 +150,98 @@ export function createSyncCommand(deps: SyncDeps): Command {
  * @throws Will not throw; validation errors are logged and skipped
  */
 async function processKeyEvents(
-  logs: (KeyRegisteredLog | SubkeyAddedLog | KeyRevokedLog)[],
+  logs: Web3PGPEventLog[],
   service: IWeb3PGPService,
   logger: Logger
 ): Promise<void> {
   for (const log of logs) {
     try {
-      if (isKeyRegisteredLog(log)) {
-        logger.info({
-          block: log.blockNumber,
-          tx: log.transactionHash,
-          primaryKeyFingerprint: log.primaryKeyFingerprint,
-        }, 'Processing KeyRegistered event');
-
-        const pk = await service.extractFromKeyRegisteredLog(log);
-        console.log(await pk.armor());
-      } else if (isSubkeyAddedLog(log)) {
-        logger.info({
-          block: log.blockNumber,
-          tx: log.transactionHash,
-          primaryKeyFingerprint: log.primaryKeyFingerprint,
-          subkeyFingerprint: log.subkeyFingerprint,
-        }, 'Processing SubkeyAdded event');
-
-        const pk = await service.extractFromSubkeyAddedLog(log);
-        console.log(await pk.armor());
-      } else if (isKeyRevokedLog(log)) {
-        logger.info({
-          block: log.blockNumber,
-          tx: log.transactionHash,
-          fingerprint: log.fingerprint,
-        }, 'Processing KeyRevoked event');
-
-        const [revoked, cert] = await service.extractFromKeyRevokedLog(log);
-        if (revoked) {
-          console.log(await revoked.armor());
-        } else if (cert) {
-          console.log(cert);
-        } else {
-          logger.warn({ log }, 'No revocation information found in KeyRevoked event - skipping');
+      switch (log.type) {
+        case Web3PGPEvents.KeyRegistered: {
+          logger.info({
+            block: log.blockNumber,
+            tx: log.transactionHash,
+            primaryKeyFingerprint: log.primaryKeyFingerprint,
+          }, 'Processing KeyRegistered event');
+          const pk = await service.extractFromKeyRegisteredLog(log);
+          console.log(await pk.armor());
+          break;
         }
+        case Web3PGPEvents.SubkeyAdded: {
+          logger.info({
+            block: log.blockNumber,
+            tx: log.transactionHash,
+            primaryKeyFingerprint: log.primaryKeyFingerprint,
+            subkeyFingerprint: log.subkeyFingerprint,
+          }, 'Processing SubkeyAdded event');
+          const subPk = await service.extractFromSubkeyAddedLog(log);
+          console.log(await subPk.armor());
+          break;
+        }
+        case Web3PGPEvents.KeyRevoked: {
+          logger.info({
+            block: log.blockNumber,
+            tx: log.transactionHash,
+            fingerprint: log.fingerprint,
+          }, 'Processing KeyRevoked event');
+          const [revoked, cert] = await service.extractFromKeyRevokedLog(log);
+          if (revoked) {
+            console.log(await revoked.armor());
+          } else if (cert) {
+            console.log(cert);
+          } else {
+            logger.warn({ log }, 'No revocation information found in KeyRevoked event - skipping');
+          }
+          break;
+        }
+        case Web3PGPEvents.KeyUpdated: {
+          logger.info({
+            block: log.blockNumber,
+            tx: log.transactionHash,
+            fingerprint: log.fingerprint,
+          }, 'Processing KeyUpdated event');
+          const updatedPk = await service.extractFromKeyUpdatedLog(log);
+          console.log(await updatedPk.armor());
+          break;
+        }
+        case Web3PGPEvents.KeyCertified: {
+          logger.info({
+            block: log.blockNumber,
+            tx: log.transactionHash,
+            issuerFingerprint: log.issuerFingerprint,
+            subjectFingerprint: log.fingerprint,
+          }, 'Processing KeyCertified event');
+          const certifiedPk = await service.extractFromKeyCertifiedLog(log);
+          console.log(await certifiedPk.armor());
+          break;
+        }
+        case Web3PGPEvents.KeyCertificationRevoked: {
+          logger.info({
+            block: log.blockNumber,
+            tx: log.transactionHash,
+            issuerFingerprint: log.issuerFingerprint,
+            subjectFingerprint: log.fingerprint,
+          }, 'Processing KeyCertificationRevoked event');
+          const decertifiedPk = await service.extractFromKeyCertificationRevokedLog(log);
+          console.log(await decertifiedPk.armor());
+          break;
+        }
+        case Web3PGPEvents.OwnershipChallenged:
+          logger.info({
+            block: log.blockNumber,
+            tx: log.transactionHash,
+            fingerprint: log.fingerprint,
+          }, 'Received OwnershipChallenged event - no OpenPGP message to output');
+          break;
+        case Web3PGPEvents.OwnershipProved:
+          logger.info({
+            block: log.blockNumber,
+            tx: log.transactionHash,
+            fingerprint: log.fingerprint,
+          }, 'Received OwnershipProved event - no OpenPGP message to output');
+          break;
+        default:
+          logger.warn({ log }, 'Unknown event type - skipping');
       }
     } catch (error) {
       if (error instanceof Web3PGPServiceValidationError) {
@@ -204,45 +256,6 @@ async function processKeyEvents(
       }
     }
   }
-}
-
-/**
- * Type guard to check if a log is a KeyRegisteredLog.
- * 
- * @param log Event log to check
- * @returns True if log is a KeyRegisteredLog
- */
-function isKeyRegisteredLog(log: unknown): log is KeyRegisteredLog {
-  return !!(log && typeof log === 'object' && 'primaryKeyFingerprint' in log && !('subkeyFingerprint' in log));
-}
-
-/**
- * Type guard to check if a log is a SubkeyAddedLog.
- * 
- * @param log Event log to check
- * @returns True if log is a SubkeyAddedLog
- */
-function isSubkeyAddedLog(log: unknown): log is SubkeyAddedLog {
-  return !!(log && typeof log === 'object' && 'subkeyFingerprint' in log);
-}
-
-/**
- * Type guard to check if a log is a KeyRevokedLog.
- * 
- * Ensures the log has both fingerprint and revocationCertificate properties,
- * which together uniquely identify a KeyRevokedLog from other event types.
- * 
- * @param log Event log to check
- * @returns True if log is a KeyRevokedLog
- */
-function isKeyRevokedLog(log: unknown): log is KeyRevokedLog {
-  return !!(
-    log &&
-    typeof log === 'object' &&
-    'fingerprint' in log &&
-    'revocationCertificate' in log &&
-    !('primaryKeyFingerprint' in log)
-  );
 }
 
 /**

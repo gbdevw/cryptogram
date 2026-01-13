@@ -31,7 +31,8 @@ export function createRevokeCommand(deps: RevokeDeps): Command {
     .action(async (fingerprintArg: string, options: { key?: string }) => {
       try {
         // Fingerprint is mandatory
-        cmdLogger.debug({ fingerprint: fingerprintArg }, 'Processing fingerprint');
+        const fingerprint = fingerprintArg.replaceAll(/\s/g, '');
+        cmdLogger.debug({ fingerprint: fingerprint }, 'Processing fingerprint');
 
         let keyBuffer: Buffer;
 
@@ -64,12 +65,12 @@ export function createRevokeCommand(deps: RevokeDeps): Command {
         // Call revoke with certificate data and the fingerprint
         const result = await service.revoke(
           keyOrCert,
-          to0x(fingerprintArg)
+          to0x(fingerprint)
         );
 
         cmdLogger.info(
           {
-            fingerprint: fingerprintArg,
+            fingerprint: fingerprint,
             transactionHash: result.transactionHash,
             blockNumber: result.blockNumber,
           },

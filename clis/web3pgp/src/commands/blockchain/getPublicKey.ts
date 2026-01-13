@@ -17,14 +17,15 @@ export function createGetPublicKeyCommand(deps: GetPublicKeyDeps): Command {
     .argument('<fingerprint>', 'Key fingerprint')
     .action(async (fingerprintArg: string) => {
       try {
-        cmdLogger.info({ fingerprint: fingerprintArg }, 'Retrieving public key');
-        const publicKey = await service.getPublicKey(to0x(fingerprintArg));
+        const fp = fingerprintArg.replaceAll(/\s/g, '');
+        cmdLogger.info({ fingerprint: fp }, 'Retrieving public key');
+        const publicKey = await service.getPublicKey(to0x(fp));
 
         if (!publicKey) {
-          throw new Error(`No key found for fingerprint: ${fingerprintArg}`);
+          throw new Error(`No key found for fingerprint: ${fp}`);
         }
 
-        cmdLogger.info({ fingerprint: fingerprintArg }, 'Key retrieved');
+        cmdLogger.info({ fingerprint: fp }, 'Key retrieved');
         console.log(publicKey.armor());
 
         process.exit(0);
