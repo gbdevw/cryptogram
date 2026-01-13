@@ -1,3 +1,5 @@
+import { BaseLog } from "../../common/types/types";
+
 /**
  * This struct is used to describe the recipient of a document and indicate if the recipient is requested to
  * sign the document.
@@ -19,19 +21,16 @@ export enum EventType {
 }
 
 /**
- * Base type representing common properties of all event logs emitted by the Web3Doc smart contract.
- * 
- * @property transactionHash The hash of the transaction that emitted the event.
- * @property blockNumber The number of the block that contains the transaction.
- * @property blockHash The hash of the block that contains the transaction.
- * @property blockTimestamp The timestamp of the block that contains the transaction.
+ * Constants representing the different event types emitted by the Web3Doc smart contract.
  */
-type BaseLog = {
-    transactionHash: `0x${string}`;
-    blockNumber: bigint;
-    blockHash: `0x${string}`;
-    blockTimestamp: Date;
-}
+export const Web3DocEvents = {
+    Document: 'Document',
+    Copy: 'Copy',
+    Notification: 'Notification',
+    Signature: 'Signature',
+    Timestamp: 'Timestamp',
+    SignatureRevocation: 'SignatureRevocation'
+} as const;
 
 /**
  * Type representing a Document event emitted when a user sends a document to peers.
@@ -45,7 +44,7 @@ type BaseLog = {
  * @property mimeType Optional, The MIME type of the document and additional attributes (RFC6838)
  */
 export type DocumentLog = BaseLog & {
-
+    type: typeof Web3DocEvents.Document;
     id: bigint;
     emitter: `0x${string}`;
     dochash: `0x${string}`;
@@ -53,7 +52,7 @@ export type DocumentLog = BaseLog & {
     document: `0x${string}`;
     uri: string;
     mimeType: string;
-};
+};  
 
 /**
  * Type representing a Copy event emitted when a user sends a certified copy of a document.
@@ -65,6 +64,7 @@ export type DocumentLog = BaseLog & {
  * @property uri The URI which can be used to download the binary OpenPGP message containing the document from an off-chain storage.
  */
 export type CopyLog = BaseLog & {
+    type: typeof Web3DocEvents.Copy;
     copy: bigint;
     original: bigint;
     emitter: `0x${string}`;
@@ -82,6 +82,7 @@ export type CopyLog = BaseLog & {
  * @property signatureRequested If true, the recipient is prompted by the emitter to sign the document.
  */
 export type NotificationLog = BaseLog & {
+    type: typeof Web3DocEvents.Notification;
     id: bigint;
     emitter: `0x${string}`;
     recipient: `0x${string}`;
@@ -94,11 +95,30 @@ export type NotificationLog = BaseLog & {
  *
  * @property id The unique ID of the document being signed.
  * @property emitter The fingerprint of the key used to create the signature.
+ * @property signatureHash The keccak256 hash of the signature created over the document (hashed by the smart contract).
  * @property signature The binary OpenPGP message which contains the detached signature over the document.
  */
 export type SignatureLog = BaseLog & {
+    type: typeof Web3DocEvents.Signature;
     id: bigint;
     emitter: `0x${string}`;
+    signatureHash: `0x${string}`;
+    signature: `0x${string}`;
+};
+
+/**
+ * Type representing a SignatureRevocation event emitted when a user revokes a previously published signature.
+ *
+ * @property id The unique ID of the document whose signature is being revoked.
+ * @property emitter The fingerprint of the key that created the signature being revoked.
+ * @property signatureHash The keccak256 hash of the signature being revoked.
+ * @property signature A detached binary OpenPGP signature created over the signature hash.
+ */
+export type SignatureRevocationLog = BaseLog & {
+    type: typeof Web3DocEvents.SignatureRevocation;
+    id: bigint;
+    emitter: `0x${string}`;
+    signatureHash: `0x${string}`;
     signature: `0x${string}`;
 };
 
@@ -111,22 +131,10 @@ export type SignatureLog = BaseLog & {
  * @property signature A detached binary OpenPGP signature created over the keccak256 hash of the document.
  */
 export type TimestampLog = BaseLog & {
+    type: typeof Web3DocEvents.Timestamp;
     id: bigint;
     emitter: `0x${string}`;
     dochash: `0x${string}` ;
     signature: `0x${string}`;
 };
-/**
- * Type representing a SignatureRevocation event emitted when a user revokes a previously published signature.
- *
- * @property id The unique ID of the document whose signature is being revoked.
- * @property emitter The fingerprint of the key that created the signature being revoked.
- * @property signatureHash The hash of the signature being revoked.
- * @property signature A detached binary OpenPGP signature created over the signature hash.
- */
-export type SignatureRevocationLog = BaseLog & {
-    id: bigint;
-    emitter: `0x${string}`;
-    signatureHash: `0x${string}`;
-    signature: `0x${string}`;
-};
+

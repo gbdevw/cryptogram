@@ -1,5 +1,5 @@
 import { Address, BlockTag, TransactionReceipt } from 'viem';
-import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, NotificationLog } from './types/types'
+import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, NotificationLog, SignatureRevocationLog } from './types/types'
 import { IFlatFee } from '../flatfee/flatefee.interface';
 
 /**
@@ -312,10 +312,28 @@ export interface IWeb3Doc extends IFlatFee {
      */
     searchSignatureLogs(
         ids?: bigint[], 
-        emitters?: `0x${string}`[], 
+        emitters?: `0x${string}`[],
+        signatureHashes?: `0x${string}`[],
         fromBlock?: BlockTag | bigint, 
         toBlock?: BlockTag | bigint): Promise<SignatureLog[]>;
 
+    /**
+     * Retireve signature revocation events emitted by the smart contract, filtered by the provided criteria.
+     * Each value in a filter is combined using a logical OR, while all defined filters are combined using a logical AND.
+     * 
+     * @param ids Filter by signature IDs. Signature IDs uniqueness is guaranteed by the smart contract.
+     * @param emitters Filter by emitter fingerprints.
+     * @param signatureHashes Filter by signature hashes.
+     * @param fromBlock Filter events from this block number. Genesis block if not specified.
+     * @param toBlock Filter events up to this block number. Latest block if not specified.
+     * @returns The list of SignatureRevocationLog matching the provided filters.
+     */
+    searchSignatureRevocationLogs(
+        ids?: bigint[], 
+        emitters?: `0x${string}`[],
+        signatureHashes?: `0x${string}`[],
+        fromBlock?: BlockTag | bigint, 
+        toBlock?: BlockTag | bigint): Promise<SignatureRevocationLog[]>;
     
     /**
      * Retries Timestamp events emitted by the smart contract, filtered by the provided criteria.
@@ -342,6 +360,13 @@ export interface IWeb3Doc extends IFlatFee {
      * @returns The TimestampLog if found, otherwise undefined.
      */
     getTimestampLogByID(id: bigint, blockNumber: bigint): Promise<TimestampLog | undefined>;
+
+    /**
+     * Retrieves Timestamp events by document hash.
+     * @param dochash The keccak256 hash of the document.
+     * @returns An array of TimestampLog entries associated with the document hash.
+     */
+    getTimestampLogsByHash(dochash: `0x${string}`): Promise<TimestampLog[]>;
 
     /*****************************************************************************************************************/
     /* LOGS PARSING FUNCTIONS                                                                                        */
@@ -374,6 +399,15 @@ export interface IWeb3Doc extends IFlatFee {
      */
     extractSignatureLog(receipt: TransactionReceipt, timestamp?: Date): Promise<SignatureLog[]>;
 
+    /**
+     * Extracts SignatureRevocationLog entries from a given transaction receipt.
+     * 
+     * @param receipt The transaction receipt containing the logs to be parsed.
+     * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
+     * @returns A promise that resolves to an array of SignatureRevocationLog entries extracted from the transaction receipt.
+     */
+    extractSignatureRevocationLog(receipt: TransactionReceipt, timestamp?: Date): Promise<SignatureRevocationLog[]>;
+    
     /**
      * Extracts TimestampLog entries from a given transaction receipt.
      * 

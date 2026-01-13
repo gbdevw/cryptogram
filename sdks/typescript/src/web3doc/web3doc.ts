@@ -1,14 +1,12 @@
 import { Address, TransactionReceipt, PublicClient, WalletClient, parseEventLogs, BlockTag } from 'viem';
 import { IWeb3Doc } from './web3doc.interface';
 import { IWeb3PGP } from '../web3pgp/web3pgp.interface';
-import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, NotificationLog } from './types/types';
+import { Recipient, DocumentLog, CopyLog, SignatureLog, TimestampLog, NotificationLog, Web3DocEvents, SignatureRevocationLog } from './types/types';
 import { Web3Doc as Web3DocABI }  from '../abis/Web3Doc';
 import { to0x, toBytes32 } from '../utils/0xstr';
 import { FlatFee } from '../flatfee/flatefee';
 import { getBlockTimestamp } from '../utils/viemutils';
 import { Web3DocCriticalError, Web3DocError } from './types/errors';
-
-    // TODO: Add log types and functions for new event (SignatureRevoked) + refactor to support hash
 
 /**
  * Implementation of the Web3Doc contract interface.
@@ -25,6 +23,7 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
     private static readonly COPY_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Copy')!;
     private static readonly NOTIFICATION_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Notification')!;
     private static readonly SIGNATURE_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Signature')!;
+    private static readonly SIGNATURE_REVOCATION_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'SignatureRevocation')!;
     private static readonly TIMESTAMP_EVENT = Web3DocABI.find(item => item.type === 'event' && item.name === 'Timestamp')!;
 
     /**
@@ -391,6 +390,70 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
         }) as Promise<bigint[]>;
     }
 
+        /**
+     * Returns the block number in which the signature with the given hash was created or 0 if the signature does not exist.
+     *
+     * @param signatureHash The hash of the signature.
+     * @return The block number in which the signature was created, or 0 if the signature does not exist.
+     */
+    public async getSignatureBlockNumberByHash(signatureHash: `0x${string}`): Promise<bigint> {
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'getSignatureBlockNumberByHash',
+            args: [signatureHash],
+        });
+    }
+
+    /**
+     * Returns the block numbers in which the signatures with the given hashes were created.
+     *
+     * @param signatureHashes The hashes of the signatures.
+     * @return The block numbers in which the signatures were created.
+     */
+    public async getSignatureBlockNumberByHashBatch(signatureHashes: `0x${string}`[]): Promise<bigint[]> {
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'getSignatureBlockNumberByHashBatch',
+            args: [signatureHashes],
+        }) as Promise<bigint[]>;
+    }
+
+    /**
+     * Lists the document IDs by the given document hash.
+     *
+     * @param dochash The hash of the document.
+     * @param start The starting index from which to list documents (0-based).
+     * @param limit The maximum number of documents to list.
+     * @return An array of document IDs with the given hash.
+     */
+    public async listDocumentIdsByHash(dochash: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'listDocumentIdsByHash',
+            args: [dochash, start, limit],
+        }) as Promise<bigint[]>;
+    }
+
+    /**
+     * Lists the block numbers of signature revocations for the given signature hash.
+     *
+     * @param signatureHash The hash of the signature.
+     * @param start The starting index from which to list revocations (0-based).
+     * @param limit The maximum number of revocations to list.
+     * @return An array of block numbers where the signature was revoked.
+     */
+    public async listSignatureRevocationsBlockNumbers(signatureHash: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
+        return this.client.readContract({
+            address: this.address,
+            abi: Web3DocABI,
+            functionName: 'listSignatureRevocationsBlockNumbers',
+            args: [signatureHash, start, limit],
+        }) as Promise<bigint[]>;
+    }
+
     /*****************************************************************************************************************/
     /* LOGS SEARCH FUNCTIONS                                                                                         */
     /*****************************************************************************************************************/
@@ -459,6 +522,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.Document,
             id: log.args.id,
             emitter: log.args.emitter,
             dochash: log.args.dochash,
@@ -554,6 +619,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.Copy,
             copy: log.args.copy,
             original: log.args.original,
             emitter: log.args.emitter,
@@ -647,6 +714,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.Notification,
             id: log.args.id,
             recipient: log.args.recipient,
             emitter: log.args.emitter,
@@ -684,6 +753,7 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
      * 
      * @param ids Filter by signature IDs. Signature IDs uniqueness is guaranteed by the smart contract.
      * @param emitters Filter by emitter fingerprints.
+     * @param signatureHashes Filter by signature hashes.
      * @param fromBlock Filter events from this block number. Genesis block if not specified.
      * @param toBlock Filter events up to this block number. Latest block if not specified.
      * @returns The list of SignatureLog matching the provided filters.
@@ -691,6 +761,7 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
     public async searchSignatureLogs(
         ids?: bigint[], 
         emitters?: `0x${string}`[], 
+        signatureHashes?: `0x${string}`[],
         fromBlock?: BlockTag | bigint, 
         toBlock?: BlockTag | bigint
     ): Promise<SignatureLog[]> {
@@ -705,13 +776,16 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
 
         // Build args only if a filter is provided
         let args: any = undefined;
-        if (ids !== undefined || emitters !== undefined) {
+        if (ids !== undefined || emitters !== undefined || signatureHashes !== undefined) {
             args = {};
             if (ids !== undefined) {
                 args.id = ids;
             }
             if (emitters !== undefined) {
                 args.emitter = emitters.map(toBytes32);
+            }
+            if (signatureHashes !== undefined) {
+                args.signatureHash = signatureHashes;
             }
         }
 
@@ -737,8 +811,11 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.Signature,
             id: log.args.id,
             emitter: log.args.emitter,
+            signatureHash: log.args.signatureHash,
             signature: log.args.signature,
         }));
     }
@@ -807,6 +884,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.Timestamp,
             id: log.args.id,
             emitter: log.args.emitter,
             dochash: log.args.dochash,
@@ -829,70 +908,6 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
     }
 
     /**
-     * Returns the block number in which the signature with the given hash was created or 0 if the signature does not exist.
-     *
-     * @param signatureHash The hash of the signature.
-     * @return The block number in which the signature was created, or 0 if the signature does not exist.
-     */
-    public async getSignatureBlockNumberByHash(signatureHash: `0x${string}`): Promise<bigint> {
-        return this.client.readContract({
-            address: this.address,
-            abi: Web3DocABI,
-            functionName: 'getSignatureBlockNumberByHash',
-            args: [signatureHash],
-        });
-    }
-
-    /**
-     * Returns the block numbers in which the signatures with the given hashes were created.
-     *
-     * @param signatureHashes The hashes of the signatures.
-     * @return The block numbers in which the signatures were created.
-     */
-    public async getSignatureBlockNumberByHashBatch(signatureHashes: `0x${string}`[]): Promise<bigint[]> {
-        return this.client.readContract({
-            address: this.address,
-            abi: Web3DocABI,
-            functionName: 'getSignatureBlockNumberByHashBatch',
-            args: [signatureHashes],
-        }) as Promise<bigint[]>;
-    }
-
-    /**
-     * Lists the document IDs by the given document hash.
-     *
-     * @param dochash The hash of the document.
-     * @param start The starting index from which to list documents (0-based).
-     * @param limit The maximum number of documents to list.
-     * @return An array of document IDs with the given hash.
-     */
-    public async listDocumentIdsByHash(dochash: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
-        return this.client.readContract({
-            address: this.address,
-            abi: Web3DocABI,
-            functionName: 'listDocumentIdsByHash',
-            args: [dochash, start, limit],
-        }) as Promise<bigint[]>;
-    }
-
-    /**
-     * Lists the block numbers of signature revocations for the given signature hash.
-     *
-     * @param signatureHash The hash of the signature.
-     * @param start The starting index from which to list revocations (0-based).
-     * @param limit The maximum number of revocations to list.
-     * @return An array of block numbers where the signature was revoked.
-     */
-    public async listSignatureRevocationsBlockNumbers(signatureHash: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
-        return this.client.readContract({
-            address: this.address,
-            abi: Web3DocABI,
-            functionName: 'listSignatureRevocationsBlockNumbers',
-            args: [signatureHash, start, limit],
-        }) as Promise<bigint[]>;
-    }
-
-    /**
      * Extracts Document logs from a transaction receipt.
      * @param receipt The transaction receipt to extract logs from.
      * @param timestamp Optional timestamp to assign to all extracted logs. This is useful when the receipt is from a transaction included in the latest block or in a block that has not been indexed yet.
@@ -912,6 +927,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
                 blockHash: log.blockHash,
                 blockTimestamp: timestamp,
                 transactionHash: log.transactionHash,
+                logIndex: log.logIndex,
+                type: Web3DocEvents.Document,
                 id: log.args.id,
                 emitter: log.args.emitter,
                 dochash: log.args.dochash,
@@ -942,6 +959,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             document: log.args.document,
             uri: log.args.uri,
             mimeType: log.args.mimeType,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.Document,
         }));
     }
 
@@ -965,6 +984,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
                 blockHash: log.blockHash,
                 blockTimestamp: timestamp,
                 transactionHash: log.transactionHash,
+                logIndex: log.logIndex,
+                type: Web3DocEvents.Copy,
                 copy: log.args.copy,
                 original: log.args.original,
                 emitter: log.args.emitter,
@@ -986,6 +1007,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.Copy,
             copy: log.args.copy,
             original: log.args.original,
             emitter: log.args.emitter,
@@ -1014,8 +1037,11 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
                 blockHash: log.blockHash,
                 blockTimestamp: timestamp,
                 transactionHash: log.transactionHash,
+                logIndex: log.logIndex,
+                type: Web3DocEvents.Signature,
                 id: log.args.id,
                 emitter: log.args.emitter,
+                signatureHash: log.args.signatureHash,
                 signature: log.args.signature,
             }));
         }
@@ -1033,8 +1059,11 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.Signature,
             id: log.args.id,
             emitter: log.args.emitter,
+            signatureHash: log.args.signatureHash,
             signature: log.args.signature,
         }));
     }
@@ -1059,6 +1088,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
                 blockHash: log.blockHash,
                 blockTimestamp: timestamp,
                 transactionHash: log.transactionHash,
+                logIndex: log.logIndex,
+                type: Web3DocEvents.Timestamp,
                 id: log.args.id,
                 emitter: log.args.emitter,
                 dochash: log.args.dochash,
@@ -1079,6 +1110,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.Timestamp,
             id: log.args.id,
             emitter: log.args.emitter,
             dochash: log.args.dochash,
@@ -1107,6 +1140,8 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
                 blockHash: log.blockHash,
                 blockTimestamp: timestamp,
                 transactionHash: log.transactionHash,
+                logIndex: log.logIndex,
+                type: Web3DocEvents.Notification,
                 id: log.args.id,
                 recipient: log.args.recipient,
                 emitter: log.args.emitter,
@@ -1128,11 +1163,192 @@ export class Web3Doc extends FlatFee implements IWeb3Doc {
             blockHash: log.blockHash,
             blockTimestamp: blockTimestamps.get(log.blockNumber)!,
             transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.Notification,
             id: log.args.id,
             recipient: log.args.recipient,
             emitter: log.args.emitter,
             source: log.args.source,
             signatureRequested: log.args.signatureRequested,
         }));
+    }
+
+    /**
+     * Retireve signature revocation events emitted by the smart contract, filtered by the provided criteria.
+     * Each value in a filter is combined using a logical OR, while all defined filters are combined using a logical AND.
+     * 
+     * @param ids Filter by signature IDs. Signature IDs uniqueness is guaranteed by the smart contract.
+     * @param emitters Filter by emitter fingerprints.
+     * @param signatureHashes Filter by signature hashes.
+     * @param fromBlock Filter events from this block number. Genesis block if not specified.
+     * @param toBlock Filter events up to this block number. Latest block if not specified.
+     * @returns The list of SignatureRevocationLog matching the provided filters.
+     */
+    public async searchSignatureRevocationLogs(ids?: bigint[], emitters?: `0x${string}`[], signatureHashes?: `0x${string}`[], fromBlock?: BlockTag | bigint, toBlock?: BlockTag | bigint): Promise<SignatureRevocationLog[]> {
+        // Reject pending block tags for fromBlock/toBlock
+        if (fromBlock === 'pending' || toBlock === 'pending') {
+            throw new Error('fromBlock and toBlock cannot be "pending" for log searches');
+        }
+
+        // Use default values: fromBlock = earliest block, toBlock = latest block
+        const from = fromBlock ?? 'earliest';
+        const to = toBlock ?? 'latest';
+
+        // Build args only if a filter is provided
+        let args: any = undefined;
+        if (ids !== undefined || emitters !== undefined || signatureHashes !== undefined) {
+            args = {};
+            if (ids !== undefined) {
+                args.id = ids;
+            }
+            if (emitters !== undefined) {
+                args.emitter = emitters.map(toBytes32);
+            }
+            if (signatureHashes !== undefined) {
+                args.signatureHash = signatureHashes;
+            }
+        }
+
+        const logs = await this.client.getLogs({
+            strict: true,
+            address: this.address,
+            event: Web3Doc.SIGNATURE_REVOCATION_EVENT,
+            fromBlock: from,
+            toBlock: to,
+            ...(args !== undefined && { args })
+        });
+        
+        // Batch fetch timestamps for unique block numbers
+        const uniqueBlocks = [...new Set(logs.map(l => l.blockNumber))];
+        const blockTimestamps = new Map(
+            await Promise.all(uniqueBlocks.map(async bn => 
+                [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+            ))
+        );
+
+        return logs.map(log => ({
+            blockNumber: log.blockNumber,
+            blockHash: log.blockHash,
+            blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+            transactionHash: log.transactionHash,
+            logIndex: log.logIndex,
+            type: Web3DocEvents.SignatureRevocation,
+            id: log.args.id,
+            emitter: log.args.emitter,
+            signatureHash: log.args.signatureHash,
+            signature: log.args.signature,
+        }));
+    }
+
+    /**
+     * Retrieves Timestamp events by document hash.
+     * @param dochash The keccak256 hash of the document.
+     * @returns An array of TimestampLog entries associated with the document hash.
+     */
+    public async getTimestampLogsByHash(dochash: `0x${string}`): Promise<TimestampLog[]> {
+
+        // TODO: Add concurrency control if needed
+
+        // List all document IDs for the given document hash
+        let ids = await this.fetchAllPaginated((start, limit) => 
+            this.listDocumentIdsByHash(dochash, start, limit)
+        );
+        if (ids.length === 0) {
+            return [];
+        }
+
+        // List block numbers for each document ID
+        let blockNumbers = await this.getDocumentBlockNumberByIDBatch(ids);
+        if (blockNumbers.length !== ids.length) {
+            throw new Web3DocCriticalError('Mismatch between document IDs and block numbers length');
+        }
+
+        // Search timestamp logs by IDs
+        const timestampLogs = await Promise.all(
+            blockNumbers.map(async (blockNumber) => {
+                return this.searchTimestampLogs(ids, undefined, [dochash], blockNumber, blockNumber);
+            })
+        );
+
+        // Flatten the array of arrays
+        return timestampLogs.flat();
+    }
+    
+    extractSignatureRevocationLog(receipt: TransactionReceipt, timestamp?: Date): Promise<SignatureRevocationLog[]> {
+        const parsedLogs = parseEventLogs({
+            strict: true,
+            abi: Web3DocABI,
+            eventName: 'SignatureRevocation',
+            logs: receipt.logs
+        });
+
+        if (timestamp) {
+            // Use the provided timestamp for all logs
+            return Promise.resolve(parsedLogs.map(log => ({
+                blockNumber: log.blockNumber,
+                blockHash: log.blockHash,
+                blockTimestamp: timestamp,
+                transactionHash: log.transactionHash,
+                logIndex: log.logIndex,
+                type: Web3DocEvents.SignatureRevocation,
+                id: log.args.id,
+                emitter: log.args.emitter,
+                signatureHash: log.args.signatureHash,
+                signature: log.args.signature,
+            })));
+        }
+
+        // Get block timestamps from the chain
+        const uniqueBlocks = [...new Set(parsedLogs.map(l => l.blockNumber))];
+        return Promise.all(uniqueBlocks.map(async bn => 
+            [bn, await getBlockTimestamp(this.client, bn)] as [bigint, Date]
+        )).then(blockTimestampArray => {
+            const blockTimestamps = new Map(blockTimestampArray);
+
+            return parsedLogs.map(log => ({
+                blockNumber: log.blockNumber,
+                blockHash: log.blockHash,
+                blockTimestamp: blockTimestamps.get(log.blockNumber)!,
+                transactionHash: log.transactionHash,
+                logIndex: log.logIndex,
+                type: Web3DocEvents.SignatureRevocation,
+                id: log.args.id,
+                emitter: log.args.emitter,
+                signatureHash: log.args.signatureHash,
+                signature: log.args.signature,
+            }));
+        });
+    }
+
+    /*****************************************************************************************************************/
+    /* UTILITY METHODS                                                                                              */
+    /*****************************************************************************************************************/
+
+    /**
+     * Helper method to fetch all items from a paginated contract method.
+     * @param fetchFn The paginated fetch function to call
+     * @param limit The number of items to fetch per page
+     * @param maxItems The maximum number of items to fetch in total (safety limit)
+     * @returns An array containing all fetched items
+     */
+    private async fetchAllPaginated<T>(
+        fetchFn: (start: bigint, limit: bigint) => Promise<T[]>,
+        limit: bigint = 1000n,
+        maxItems: bigint = 100000n // Safety limit
+    ): Promise<T[]> {
+        const results: T[] = [];
+        let start = 0n;
+
+        do {
+            const batch = await fetchFn(start, limit);
+            results.push(...batch);
+
+            if (batch.length < Number(limit) || results.length >= Number(maxItems)) {
+                break;
+            }
+            start += limit;
+        } while (true);
+
+        return results;
     }
 }
