@@ -12,7 +12,7 @@ export interface CertifyDeps {
 
 /**
  * Certify a public key on the blockchain
- * Usage: web3pgp certify --issuer <fingerprint> --key <path> | read from stdin
+ * Usage: web3pgp certify <issuerFingerprint> --key <path> | read from stdin
  */
 export function createCertifyCommand(deps: CertifyDeps): Command {
   const { logger, service } = deps;
@@ -20,12 +20,12 @@ export function createCertifyCommand(deps: CertifyDeps): Command {
 
   return new Command('certify')
     .description('Add a third-party key certification attached to the provided key on the blockchain')
-    .requiredOption('--issuer <fingerprint>', 'Hex string fingerprint of the issuer')
+    .argument('<issuerFingerprint>', 'Hex string fingerprint of the issuer')
     .option('--key <path>', 'Path to PGP public key file to certify (armored or binary)')
-    .action(async (options: { issuer: string; key?: string }) => {
+    .action(async (issuerFingerprint: string, options: { key?: string }) => {
       try {
         // Convert issuer fingerprint to bytes32 format
-        const issuerFp = toBytes32(to0x(options.issuer.replaceAll(/\s/g, '')));
+        const issuerFp = toBytes32(to0x(issuerFingerprint.replaceAll(/\s/g, '')));
         cmdLogger.info({ issuerFp }, 'Fetching issuer public key');
 
         let keyData: Buffer | string;

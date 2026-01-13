@@ -10,6 +10,8 @@ import { createGenerateKeyCommand } from './generateKey';
 import { createUpdateCommand } from './update';
 import { createCertifyCommand } from './certify';
 import { createRevokeCertificationCommand } from './revoke-certification';
+import { createChallengeCommand } from './challenge';
+import { createProveCommand } from './prove';
 
 export interface BlockchainCommandsDeps {
   logger: Logger;
@@ -30,5 +32,7 @@ export function createBlockchainCommands(deps: BlockchainCommandsDeps): Command[
     createRevokeCertificationCommand(deps),
     createSyncCommand(deps),
     createGenerateKeyCommand({ logger: deps.logger }),
+    createChallengeCommand(deps),
+    createProveCommand(deps),
   ];
 }
