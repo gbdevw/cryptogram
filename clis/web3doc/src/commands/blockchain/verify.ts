@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { Logger } from 'pino';
 import { keccak_256 } from '@noble/hashes/sha3';
 import { to0x, Web3DocService } from '@cryptogram/dexes';
-import { toHex } from 'viem';
+import { toBytes, toHex } from 'viem';
 import { Config } from 'openpgp';
 
 export interface VerifyCommandDeps {
@@ -120,11 +120,39 @@ export function createVerifyCommand(deps: VerifyCommandDeps): Command {
               showComment: true,
               commentString: 'TimestampID=' + options.id + ' ; Hash=' + documentHash + '; Emitter=' + to0x(timestamp.publicKey.getFingerprint()),
             } as Partial<Config> as  Config));
-        } else {
-            // Verify all timestamps matching the document hash
-            throw new Error('Not implemented yet: verify all timestamps matching the document hash');
-        }
+        } 
+        else {
+          // Verify all timestamps matching the document hash
+          const ids = await web3docService.findTimestampsByHash(toBytes(documentHash));
+          if (ids.length === 0) {
+            throw new Error('No timestamps found for the provided document or hash');
+          }
+          cmdLogger.info({ count: ids.length }, 'Verifying all matching timestamps by document hash');
+          for (const id of ids) {
+            try {
+              const timestamp = await web3docService.verifyTimestamp(id);
+              cmdLogger.info({ id, tx: timestamp.tx, timestampDate: timestamp.date, emitter: to0x(timestamp.publicKey.getFingerprint()) }, 'Timestamp data retrieved and verified');
 
+              // Verify the document hash matches the timestamped hash
+              const timestampedHash = to0x(toHex(Buffer.from(timestamp.documentHash)));
+              cmdLogger.info({ id, timestampedHash, documentHash }, 'Verifying document hash matches the timestamped hash');
+              if (timestampedHash !== documentHash) {
+                  cmdLogger.warn({ id }, 'The provided document or hash does not match the timestamped hash on the blockchain - skipping');
+                  continue;
+              }
+
+              // Write the armored signature to stdout
+              cmdLogger.info({ id }, 'Verification completed successfully for this timestamp');
+              console.log(timestamp.signature.armor({
+                showComment: true,
+                commentString: 'TimestampID=' + id + ' ; Hash=' + documentHash + '; Emitter=' + to0x(timestamp.publicKey.getFingerprint()),
+              } as Partial<Config> as  Config));
+            } catch (error) {
+              const msg = error instanceof Error ? error.message : String(error);
+              cmdLogger.error({ id, error: msg }, 'Failed to verify timestamp by ID - skipping');
+            }
+          }
+        }
         process.exit(0);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
