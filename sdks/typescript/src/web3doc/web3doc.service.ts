@@ -260,7 +260,7 @@ export class Web3DocService implements IWeb3DocService {
      * @returns A promise that resolves to an array of timestamp IDs associated with the provided document hash.
      */
     public async findTimestampsByHash(hash: Uint8Array): Promise<bigint[]> {
-        const timestamps = await this.web3doc.searchTimestampLogs(undefined, undefined, [toHex(hash)], 'earliest', 'latest');
+        const timestamps = await this.web3doc.getTimestampLogsByHash(toHex(hash));
         return timestamps.map(t => t.id);
     }
 

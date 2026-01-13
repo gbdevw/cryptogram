@@ -104,7 +104,7 @@ async function deployTestEnvironment(): Promise<TestEnvironment> {
   const walletClient = anvil.getWalletClient();
 
   const web3pgp = new Web3PGP(web3pgpAddress, publicClient, walletClient);
-  const web3pgpService = new Web3PGPService(web3pgpAddress, publicClient);
+  const web3pgpService = new Web3PGPService(web3pgp);
   const web3doc = new Web3Doc(web3docAddress, web3pgp, publicClient, walletClient);
   
   console.log('✓ Web3PGP and Web3Doc SDKs initialized');
@@ -183,8 +183,7 @@ describe('Web3Doc Integration Tests', () => {
     test('should use Web3PGPService to retrieve registered keys', async () => {
       const publicClient = testEnv.anvil.getPublicClient();
       const web3pgpService = new Web3PGPService(
-        testEnv.web3pgpAddress,
-        publicClient
+        testEnv.web3pgp,
       );
 
       // The service should be able to query the contract
@@ -197,7 +196,7 @@ describe('Web3Doc Integration Tests', () => {
 
   describe('Document Timestamping', () => {
     test('should create a Web3DocService instance', async () => {
-      const web3pgpService = new Web3PGPService(testEnv.web3pgpAddress, testEnv.anvil.getPublicClient());
+      const web3pgpService = new Web3PGPService(testEnv.web3pgp);
       const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService);
 
       expect(web3docService).toBeDefined();
@@ -250,7 +249,7 @@ describe('Web3Doc Integration Tests', () => {
 
   describe('Web3DocService Interactions', () => {
     test('should instantiate Web3DocService with proper dependencies', async () => {
-      const web3pgpService = new Web3PGPService(testEnv.web3pgpAddress, testEnv.anvil.getPublicClient());
+      const web3pgpService = new Web3PGPService(testEnv.web3pgp);
       const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService);
 
       expect(web3docService).toBeDefined();
@@ -308,7 +307,7 @@ describe('Web3Doc Integration Tests', () => {
       const invalidAddress = '0x0000000000000000000000000000000000000000';
 
       expect(() => {
-        new Web3Doc(invalidAddress as `0x${string}`, testEnv.anvil.getPublicClient());
+        new Web3Doc(invalidAddress as Address, testEnv.web3pgp, testEnv.anvil.getPublicClient());
       }).not.toThrow();
     });
 
@@ -355,7 +354,7 @@ describe('Web3Doc Integration Tests', () => {
 
   describe('Service Configuration', () => {
     test('should accept Web3DocServiceOptions', async () => {
-      const web3pgpService = new Web3PGPService(testEnv.web3pgpAddress, testEnv.anvil.getPublicClient());
+      const web3pgpService = new Web3PGPService(testEnv.web3pgp);
       const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService, {
         concurrencyLimit: 10,
       });
@@ -364,7 +363,7 @@ describe('Web3Doc Integration Tests', () => {
     });
 
     test('should apply default concurrency limit', async () => {
-      const web3pgpService = new Web3PGPService(testEnv.web3pgpAddress, testEnv.anvil.getPublicClient());
+      const web3pgpService = new Web3PGPService(testEnv.web3pgp);
       const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService);
 
       expect(web3docService).toBeDefined();
@@ -381,7 +380,7 @@ describe('Web3Doc Integration Tests', () => {
     });
 
     test('should handle service with proper dependencies', async () => {
-      const web3pgpService = new Web3PGPService(testEnv.web3pgpAddress, testEnv.anvil.getPublicClient());
+      const web3pgpService = new Web3PGPService(testEnv.web3pgp);
       const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService);
 
       // Service should have access to both contracts
@@ -390,7 +389,7 @@ describe('Web3Doc Integration Tests', () => {
     });
 
     test('should allow querying both contracts through service', async () => {
-      const web3pgpService = new Web3PGPService(testEnv.web3pgpAddress, testEnv.anvil.getPublicClient());
+      const web3pgpService = new Web3PGPService(testEnv.web3pgp);
       const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService);
 
       // Should be able to access both contract fees
