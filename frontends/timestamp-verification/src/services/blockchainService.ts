@@ -3,8 +3,7 @@ import { Web3Doc, Web3PGP, Web3PGPService, Web3DocService } from '@cryptogram/de
 import { getCurrentChainConfig } from '../config/chains'
 
 /**
- * Manages the cascade initialization of blockchain clients and services
- * Handles updates when publicClient changes
+ * Manages the initialization of blockchain clients and services
  */
 class BlockchainServiceManager {
   private web3Doc: Web3Doc | null = null
@@ -14,7 +13,6 @@ class BlockchainServiceManager {
 
   /**
    * Initialize all services based on publicClient
-   * Call this when publicClient is available or changes
    */
   async initialize(publicClient: PublicClient): Promise<void> {
     try {
@@ -23,11 +21,10 @@ class BlockchainServiceManager {
       const web3DocAddress = chainConfig.web3docContractAddress as `0x${string}`
 
       // Step 2: Create Web3PGP client first (low level, needed by Web3Doc)
-      // Note: We'll get the Web3PGP address from Web3Doc after creating it
-      // For now, create a temporary Web3Doc to get the Web3PGP address
+      // Get the Web3PGP address from Web3Doc
       const tempWeb3Doc = new Web3Doc(
         web3DocAddress,
-        undefined as any, // Temporary, will be replaced
+        undefined as any,
         publicClient as any
       )
       const web3PGPAddress = await tempWeb3Doc.getWeb3PGPAddress()
@@ -62,20 +59,6 @@ class BlockchainServiceManager {
   }
 
   /**
-   * Update publicClient in all clients (when WAGMI client changes)
-   */
-  updatePublicClient(publicClient: PublicClient): void {
-    if (!this.web3Doc || !this.web3PGP || !this.web3DocService) {
-      throw new Error('Services not initialized. Call initialize() first.')
-    }
-
-    this.web3Doc.client = publicClient as any
-    this.web3PGP.client = publicClient as any
-
-    console.log('Public client updated in all services')
-  }
-
-  /**
    * Get Web3DocService (high level)
    */
   getWeb3DocService(): Web3DocService {
@@ -106,7 +89,7 @@ class BlockchainServiceManager {
   }
 
   /**
-   * Reset all services (useful for testing or chain switching)
+   * Reset all services (useful for testing)
    */
   reset(): void {
     this.web3Doc = null

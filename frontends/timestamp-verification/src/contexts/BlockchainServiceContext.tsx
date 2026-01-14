@@ -1,5 +1,6 @@
 import { createContext, useContext, ReactNode, useEffect, useState } from 'react'
-import { usePublicClient } from 'wagmi'
+import { getPublicClient } from 'wagmi/actions'
+import { config } from '../wagmi'
 import { blockchainServiceManager } from '../services/blockchainService'
 
 interface BlockchainServiceContextType {
@@ -14,42 +15,45 @@ const BlockchainServiceContext = createContext<BlockchainServiceContextType | un
  * Provider that manages blockchain service initialization and updates
  */
 export const BlockchainServiceProvider = ({ children }: { children: ReactNode }) => {
-  const publicClientWagmi = usePublicClient()
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
     const initializeServices = async () => {
-      if (!publicClientWagmi) {
-        setIsLoading(false)
-        return
-      }
-
       try {
+        console.log('BlockchainServiceProvider: Starting initialization')
         setIsLoading(true)
         setError(null)
 
+        // Get public client from WAGMI config
+        const publicClient = getPublicClient(config)
+        console.log('BlockchainServiceProvider: Public client obtained from WAGMI:', publicClient)
+
+        if (!publicClient) {
+          throw new Error('Failed to get public client from WAGMI config')
+        }
+
         if (!blockchainServiceManager.isInitialized()) {
           // First initialization
-          await blockchainServiceManager.initialize(publicClientWagmi as any)
-        } else {
-          // Update existing services
-          blockchainServiceManager.updatePublicClient(publicClientWagmi as any)
+          console.log('BlockchainServiceProvider: First initialization, calling blockchainServiceManager.initialize()')
+          await blockchainServiceManager.initialize(publicClient as any)
+          console.log('BlockchainServiceProvider: Initialization completed successfully')
         }
 
         setIsInitialized(true)
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Unknown error')
         setError(error)
-        console.error('Failed to initialize blockchain services:', error)
+        console.error('BlockchainServiceProvider: Failed to initialize blockchain services:', error)
+        console.error('BlockchainServiceProvider: Error stack:', error.stack)
       } finally {
         setIsLoading(false)
       }
     }
 
     initializeServices()
-  }, [publicClientWagmi])
+  }, [])
 
   return (
     <BlockchainServiceContext.Provider value={{ isInitialized, isLoading, error }}>

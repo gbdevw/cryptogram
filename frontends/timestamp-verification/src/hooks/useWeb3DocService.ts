@@ -6,19 +6,15 @@ import { useBlockchainServiceStatus } from '../contexts/BlockchainServiceContext
  * Hook to access Web3DocService
  * Ensures services are initialized before use
  */
-export const useWeb3DocService = (): Web3DocService => {
-  const { isInitialized, isLoading, error } = useBlockchainServiceStatus()
-
-  if (isLoading) {
-    throw new Promise(() => {}) // Suspend rendering while loading
-  }
+export const useWeb3DocService = (): Web3DocService | null => {
+  const { isInitialized, error } = useBlockchainServiceStatus()
 
   if (error) {
     throw error
   }
 
   if (!isInitialized) {
-    throw new Error('Blockchain services not initialized')
+    return null
   }
 
   return blockchainServiceManager.getWeb3DocService()
