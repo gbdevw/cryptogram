@@ -12,7 +12,8 @@
     "react": "latest",
     "react-dom": "latest",
     "viem": "latest",
-    "wagmi": "latest"
+    "wagmi": "latest",
+    "@cryptogram/dexes": "^1.0.0"
   },
   "devDependencies": {
     "@types/react": "latest",

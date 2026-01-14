@@ -5,6 +5,7 @@ import { WagmiProvider } from 'wagmi'
 
 import App from './App.tsx'
 import { config } from './wagmi.ts'
+import { BlockchainServiceProvider } from './contexts/BlockchainServiceContext'
 
 import './index.css'
 
@@ -14,7 +15,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <App />
+        <BlockchainServiceProvider>
+          <App />
+        </BlockchainServiceProvider>
       </QueryClientProvider>
     </WagmiProvider>
   </React.StrictMode>,
