@@ -53,7 +53,7 @@ export const TimestampVerifier = ({ idFromUrl }: TimestampVerifierProps) => {
                         console.log('Timestamp verified successfully:', timestamp.date, timestamp.tx)
                         validResults.push({
                             id,
-                            timestamp: Number(timestamp),
+                            timestamp: timestamp.date,
                             documentHash: hash,
                         })
                     }

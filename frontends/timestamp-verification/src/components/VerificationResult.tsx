@@ -47,7 +47,7 @@ export const SuccessResult = ({ results, fileName }: VerificationResultProps) =>
               ID: {result.id.toString()}
             </p>
             <p style={{ margin: '8px 0 0 0', color: '#6bb6ff', fontSize: '14px' }}>
-              Timestamp: {new Date(Number(result.timestamp) * 1000).toLocaleString()}
+              Timestamp: {result.timestamp.toLocaleString()}
             </p>
           </div>
         ))}

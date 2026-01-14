@@ -1,6 +1,6 @@
 export interface VerificationResult {
   id: bigint
-  timestamp: number
+  timestamp: Date
   documentHash: string
 }
 
