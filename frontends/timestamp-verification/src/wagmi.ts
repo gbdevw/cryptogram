@@ -1,11 +1,15 @@
 import { createConfig, http } from 'wagmi'
-import { mainnet, sepolia } from 'wagmi/chains'
+import { ink, inkSepolia } from 'wagmi/chains'
+import { getConfiguredChain } from './config/chains'
+
+const configuredChain = getConfiguredChain()
+const chains = configuredChain === 'ink' ? [ink] as const : [inkSepolia] as const
 
 export const config = createConfig({
-  chains: [mainnet, sepolia],
+  chains,
   transports: {
-    [mainnet.id]: http(),
-    [sepolia.id]: http(),
+    [ink.id]: http(),
+    [inkSepolia.id]: http(),
   },
 })
 
