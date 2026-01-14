@@ -7,13 +7,19 @@
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
+  "workspaces": [
+    "../../sdks/typescript"
+  ],
   "dependencies": {
+    "@cryptogram/dexes": "*",
     "@tanstack/react-query": "latest",
+    "openpgp": "^6.3.0",
+    "p-limit": "^7.2.0",
     "react": "latest",
     "react-dom": "latest",
+    "vercel": "^50.4.0",
     "viem": "latest",
-    "wagmi": "latest",
-    "@cryptogram/dexes": "^1.0.0"
+    "wagmi": "latest"
   },
   "devDependencies": {
     "@types/react": "latest",

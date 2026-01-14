@@ -51,8 +51,8 @@ function App() {
         }}
       >
         <h1 style={{ margin: '0', fontSize: '32px', fontWeight: '700' }}>DEXES</h1>
-        <p style={{ margin: '8px 0 0 0', fontSize: '14px', opacity: 0.9 }}>
-          Timestamp Verification System
+        <p style={{ margin: '8px 0 0 0', fontSize: '20px', fontWeight: '700' ,opacity: 0.9 }}>
+          Document Verification System
         </p>
       </div>
 
