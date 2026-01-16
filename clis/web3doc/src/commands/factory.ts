@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { Logger } from 'pino';
-import { IWeb3PGPService } from '@cryptogram/dexes';
+import { IWeb3PGPService } from '@jibidieuw/dexes';
 import { MergedConfig } from '../config/types';
 
 /**

@@ -13,8 +13,8 @@ import { Logger } from 'pino';
 
 import { ChainConfig, MergedConfig } from '../config/types';
 import { ConfigError } from '../errors';
-import { IWeb3DocService, Web3Doc, Web3DocService } from '@cryptogram/dexes';
-import { IWeb3PGPService } from '@cryptogram/dexes';
+import { IWeb3DocService, Web3Doc, Web3DocService } from '@jibidieuw/dexes';
+import { IWeb3PGPService } from '@jibidieuw/dexes';
 
 /**
  * Map of well-known Viem chain names to chain objects.

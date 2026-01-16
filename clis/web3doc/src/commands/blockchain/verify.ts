@@ -5,7 +5,7 @@ import { pipeline } from 'stream/promises';
 import { Command } from 'commander';
 import { Logger } from 'pino';
 import { keccak_256 } from '@noble/hashes/sha3';
-import { to0x, Web3DocService } from '@cryptogram/dexes';
+import { to0x, Web3DocService } from '@jibidieuw/dexes';
 import { toBytes, toHex } from 'viem';
 import { Config } from 'openpgp';
 

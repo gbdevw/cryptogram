@@ -2,7 +2,7 @@ import { createReadStream } from 'fs';
 import { stdin } from 'process';
 import { Command } from 'commander';
 import { Logger } from 'pino';
-import { to0x, Web3DocService } from '@cryptogram/dexes';
+import { to0x, Web3DocService } from '@jibidieuw/dexes';
 import * as openpgp from 'openpgp';
 import { hexToBytes, stringify } from 'viem';
 

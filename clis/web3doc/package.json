@@ -1,7 +1,7 @@
 {
   "name": "@jibidieuw/web3doc-cli",
-  "version": "0.0.0",
-  "description": "Command-line interface for managing documents on Ethereum through Web3Doc smart contracts",
+  "version": "0.0.1",
+  "description": "Command-line interface for timestamping and verifying documents on Ethereum through Web3Doc and Web3PGP smart contracts",
   "type": "commonjs",
   "main": "dist/index.js",
   "bin": {
@@ -58,7 +58,7 @@
     "yaml": "^2.3.0",
     "viem": "^2.21.0",
     "openpgp": "^6.1.0",
-    "@cryptogram/dexes": "@jibidieuw/dexes"
+    "@jibidieuw/dexes": "^0.0.1"
   },
   "devDependencies": {
     "typescript": "^5.3.0",
