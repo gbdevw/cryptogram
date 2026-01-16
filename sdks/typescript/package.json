@@ -1,6 +1,6 @@
 {
-  "name": "@cryptogram/dexes",
-  "version": "1.0.0",
+  "name": "@jibidieuw/dexes",
+  "version": "0.0.0",
   "description": "TypeScript SDK for managing OpenPGP keys on Ethereum through Web3PGP smart contracts",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

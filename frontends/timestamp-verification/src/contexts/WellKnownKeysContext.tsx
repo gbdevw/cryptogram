@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react'
 
 interface WellKnownKeysContextType {
   keys: `0x${string}`[]
@@ -12,13 +12,24 @@ const WellKnownKeysContext = createContext<WellKnownKeysContextType>({
   error: null,
 })
 
+let isInitialized = false
+
 export const WellKnownKeysProvider = ({ children }: { children: ReactNode }) => {
   const [keys, setKeys] = useState<`0x${string}`[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const initializationAttempted = useRef(false)
 
   useEffect(() => {
     const loadWellKnownKeys = async () => {
+      // Prevent multiple initialization attempts (handles React StrictMode)
+      if (isInitialized || initializationAttempted.current) {
+        setIsLoading(false)
+        return
+      }
+
+      initializationAttempted.current = true
+
       try {
         setIsLoading(true)
         setError(null)
@@ -31,6 +42,7 @@ export const WellKnownKeysProvider = ({ children }: { children: ReactNode }) => 
         const data = await response.json()
         const loadedKeys = (data.keys || []) as `0x${string}`[]
         setKeys(loadedKeys)
+        isInitialized = true
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Unknown error loading keys')
         setError(error)
