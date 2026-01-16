@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { Logger } from 'pino';
-import { IWeb3PGPService, to0x } from '@cryptogram/dexes';
+import { IWeb3PGPService, to0x } from '@jibidieuw/dexes';
 import { exitWithError } from '../factory';
 
 export interface GetPublicKeyDeps {

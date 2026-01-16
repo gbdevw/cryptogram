@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { Logger } from 'pino';
-import { IWeb3PGPService, to0x, toBytes32 } from '@cryptogram/dexes';
+import { IWeb3PGPService, to0x, toBytes32 } from '@jibidieuw/dexes';
 import { toHex } from 'viem';
 import { outputJson, exitWithError } from '../factory';
 

@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { Logger } from 'pino';
-import { IWeb3PGPService, Web3PGPServiceValidationError, Web3PGPEventLog, Web3PGPEvents } from '@cryptogram/dexes';
+import { IWeb3PGPService, Web3PGPServiceValidationError, Web3PGPEventLog, Web3PGPEvents } from '@jibidieuw/dexes';
 
 import { exitWithError } from '../factory';
 
