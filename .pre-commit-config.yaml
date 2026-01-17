@@ -8,6 +8,7 @@ repos:
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
+        exclude: ^examples/
   - repo: https://github.com/antonbabenko/pre-commit-terraform
     rev: v1.103.0
     hooks: []

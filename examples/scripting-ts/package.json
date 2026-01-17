@@ -4,7 +4,7 @@
   "description": "Example about how to use the Typescript SDK to create a script to automate interactions with DEXES",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/resources dist/",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
