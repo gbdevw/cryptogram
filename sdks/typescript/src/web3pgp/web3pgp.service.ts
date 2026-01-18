@@ -1048,7 +1048,7 @@ export class Web3PGPService implements IWeb3PGPService {
             if (skipCryptographicVerifications !== true) {
                 await OpenPGPUtils.verifyKey(pk, log.blockTimestamp);
             }
-            console.debug(`[Web3PGP - Service] Successfully extracted updated key ${pk.getFingerprint()} from KeyUpdatedLog event`);
+            console.debug(`[Web3PGP - Service] Successfully extracted key certification for ${pk.getFingerprint()} from KeyCertifiedLog event`);
             return pk.toPublic();
         } catch (err) {
             if (err instanceof Web3PGPServiceValidationError) {
@@ -1056,7 +1056,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 throw err;
             }
             // Wrap other errors
-            throw new Web3PGPServiceValidationError(`Failed to extract the public key form the OpenPGP message in the KeyUpdatedLog event: ${err}`);
+            throw new Web3PGPServiceValidationError(`Failed to extract the key certification form the OpenPGP message in the KeyCertifiedLog event: ${err}`);
         }
     }
 
@@ -1119,7 +1119,7 @@ export class Web3PGPService implements IWeb3PGPService {
             if (skipCryptographicVerifications !== true) {
                 await OpenPGPUtils.verifyKey(pk, log.blockTimestamp);
             }
-            console.debug(`[Web3PGP - Service] Successfully extracted updated key ${pk.getFingerprint()} from KeyUpdatedLog event`);
+            console.debug(`[Web3PGP - Service] Successfully extracted the key certification revocation for ${pk.getFingerprint()} from KeyCertificationRevokedLog event`);
             return pk.toPublic();
         } catch (err) {
             if (err instanceof Web3PGPServiceValidationError) {
@@ -1127,7 +1127,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 throw err;
             }
             // Wrap other errors
-            throw new Web3PGPServiceValidationError(`Failed to extract the public key form the OpenPGP message in the KeyUpdatedLog event: ${err}`);
+            throw new Web3PGPServiceValidationError(`Failed to extract the key certification revocation form the OpenPGP message in the KeyCertificationRevokedLog event: ${err}`);
         }
     }
 
