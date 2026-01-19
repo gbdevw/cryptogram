@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { keccak256 } from 'viem'
 import { VerificationSteps } from './VerificationSteps'
 
@@ -9,8 +9,10 @@ interface FileUploadProps {
 export const FileUpload = ({ onHashGenerated }: FileUploadProps) => {
     const [dragActive, setDragActive] = useState(false)
     const [fileName, setFileName] = useState<string>('')
+    const inputRef = useRef<HTMLInputElement>(null)
 
     const processFile = (file: File) => {
+        // Optionnel : Vérification de taille ici si besoin
         const reader = new FileReader()
         reader.onload = (e) => {
             const content = e.target?.result as ArrayBuffer
@@ -35,7 +37,6 @@ export const FileUpload = ({ onHashGenerated }: FileUploadProps) => {
         e.preventDefault()
         e.stopPropagation()
         setDragActive(false)
-
         const files = e.dataTransfer.files
         if (files && files[0]) {
             processFile(files[0])
@@ -50,13 +51,12 @@ export const FileUpload = ({ onHashGenerated }: FileUploadProps) => {
     }
 
     const handleZoneClick = () => {
-        const input = document.getElementById('fileInput') as HTMLInputElement
-        input?.click()
-    }
-
-    const handleZoneTouchEnd = (e: React.TouchEvent) => {
-        e.preventDefault()
-        handleZoneClick()
+        // Petite sécurité : on reset la valeur pour permettre
+        // de sélectionner le même fichier deux fois de suite si besoin
+        if (inputRef.current) {
+            inputRef.current.value = '' 
+            inputRef.current.click()
+        }
     }
 
     return (
@@ -67,7 +67,6 @@ export const FileUpload = ({ onHashGenerated }: FileUploadProps) => {
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
                 onClick={handleZoneClick}
-                onTouchEnd={handleZoneTouchEnd}
                 style={{
                     border: `2px dashed ${dragActive ? '#0066cc' : '#6bb6ff'}`,
                     borderRadius: '12px',
@@ -76,21 +75,38 @@ export const FileUpload = ({ onHashGenerated }: FileUploadProps) => {
                     backgroundColor: dragActive ? '#e6f2ff' : '#f0f8ff',
                     cursor: 'pointer',
                     transition: 'all 0.3s ease',
+                    touchAction: 'manipulation', // Important pour la réactivité mobile
+                    position: 'relative' // Nécessaire pour cacher l'input proprement
                 }}
             >
+                {/* CORRECTION MAJEURE : 
+                   1. Pas de display: none. On utilise une opacité 0 et une position absolue.
+                   2. Pas d'attribut 'accept' pour éviter les filtres de média agressifs sur mobile.
+                   3. capture={undefined} pour éviter d'ouvrir la caméra par défaut.
+                */}
                 <input
+                    ref={inputRef}
                     type="file"
-                    id="fileInput"
                     onChange={handleChange}
-                    accept="*/*"
-                    style={{ display: 'none' }}
+                    style={{ 
+                        position: 'absolute',
+                        width: '1px',
+                        height: '1px',
+                        padding: 0,
+                        margin: -1,
+                        overflow: 'hidden',
+                        clip: 'rect(0,0,0,0)',
+                        border: 0,
+                        whiteSpace: 'nowrap'
+                    }}
                 />
-                <div style={{ cursor: 'pointer', display: 'block' }}>
+                
+                <div style={{ pointerEvents: 'none' }}>
                     <p style={{ fontSize: '18px', color: '#0066cc', margin: '0 0 10px 0', fontWeight: '600' }}>
                         Drop your file here or click to upload
                     </p>
                     <p style={{ fontSize: '14px', color: '#0066cc', margin: '0' }}>
-                        {fileName || 'Select a file to verify its authenticity'}
+                        {fileName || 'Select any file (PDF, Doc, Video, etc.)'}
                     </p>
                 </div>
             </div>
