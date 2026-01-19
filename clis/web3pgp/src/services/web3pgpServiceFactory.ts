@@ -14,6 +14,7 @@ import { ChainConfig, MergedConfig } from '../config/types';
 import { ConfigError } from '../errors';
 import { Logger } from '../utils/logger';
 import { IWeb3PGPService, Web3PGP, Web3PGPService } from '@jibidieuw/dexes';
+import { buildFallbackTransport } from '../config/transport';
 
 /**
  * Map of well-known Viem chain names to chain objects.
@@ -153,7 +154,7 @@ function resolveRpcEndpoints(config: MergedConfig, logger: Logger): Array<{ url:
 /**
  * Create Viem PublicClient with RPC endpoint fallback chain.
  * Automatically retries failed RPC calls across all configured endpoints.
- * If gasLimit is configured, injects it into simulateContract to skip gas estimation.
+ * Applies per-endpoint batching and shared retry configuration from config.
  */
 function createPublicClientWithFallback(config: MergedConfig, logger: Logger): PublicClient {
   const { chain: chainConfig } = config.ethereum;
@@ -162,16 +163,17 @@ function createPublicClientWithFallback(config: MergedConfig, logger: Logger): P
   // Resolve RPC endpoints (user config > predefined defaults > error)
   const rpcEndpoints = resolveRpcEndpoints(config, logger);
 
-  // Sort endpoints by priority (lower priority value = higher priority)
-  const sortedEndpoints = [...rpcEndpoints].sort((a, b) => a.priority - b.priority);
-
   logger.debug(
-    { endpoints: sortedEndpoints.map(e => e.url) },
+    { 
+      endpoints: rpcEndpoints.map(e => e.url),
+      retryConfig: config.ethereum.rpc?.retry,
+      batchingConfigs: rpcEndpoints.map(e => ({ url: e.url, batching: (e as any).batching }))
+    },
     'Creating PublicClient with RPC fallback chain',
   );
 
-  // Create fallback transport with all endpoints
-  const fallbackTransport = fallback(sortedEndpoints.map(ep => http(ep.url)));
+  // Create fallback transport with batching and retry configuration
+  const fallbackTransport = buildFallbackTransport(rpcEndpoints, config.ethereum.rpc?.retry);
 
   const publicClient = createPublicClient({
     chain: chainObj,
@@ -184,6 +186,7 @@ function createPublicClientWithFallback(config: MergedConfig, logger: Logger): P
 /**
  * Create Viem WalletClient for write operations.
  * Only created if wallet.type is set and privateKey is configured.
+ * Uses fallback transport with batching and retry configuration for reliability.
  */
 function createWalletClientIfConfigured(
   config: MergedConfig,
@@ -211,22 +214,28 @@ function createWalletClientIfConfigured(
 
   logger.debug({ address: account.address }, 'Creating WalletClient with derived account');
 
-  // Create wallet client with chain and primary RPC endpoint
+  // Create wallet client with chain and fallback RPC configuration
   const chainObj = getChainForConfig(chainConfig);
 
   // Resolve RPC endpoints (user config > predefined defaults > error)
   const rpcEndpoints = resolveRpcEndpoints(config, logger);
 
-  // Use the primary endpoint for the wallet client
-  const sortedEndpoints = [...rpcEndpoints].sort((a, b) => a.priority - b.priority);
-  const primaryEndpoint = sortedEndpoints[0];
-  const primaryTransport = http(primaryEndpoint.url);
+  logger.debug(
+    { 
+      endpoints: rpcEndpoints.map(e => e.url),
+      retryConfig: config.ethereum.rpc?.retry
+    },
+    'Creating WalletClient with fallback transport',
+  );
+
+  // Use fallback transport with batching and retry for wallet client too
+  const fallbackTransport = buildFallbackTransport(rpcEndpoints, config.ethereum.rpc?.retry);
 
   // Create wallet client
   const walletClient = createWalletClient({
     account,
     chain: chainObj,
-    transport: primaryTransport,
+    transport: fallbackTransport,
   });
 
   return walletClient;
