@@ -31,8 +31,8 @@ export const TimestampVerifier = ({ idFromUrl }: TimestampVerifierProps) => {
             setResults([])
             setHasError(false)
             setFileName(fileName)
-            // Limit concurrent operations to 3
-            const limit = pLimit(3)
+            // Limit concurrent operations to 10
+            const limit = pLimit(10)
 
             let timestampIds: bigint[] = []
 

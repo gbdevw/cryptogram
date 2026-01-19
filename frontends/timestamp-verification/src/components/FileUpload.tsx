@@ -70,6 +70,7 @@ export const FileUpload = ({ onHashGenerated }: FileUploadProps) => {
                     type="file"
                     id="fileInput"
                     onChange={handleChange}
+                    accept="*/*"
                     style={{ display: 'none' }}
                 />
                 <label htmlFor="fileInput" style={{ cursor: 'pointer', display: 'block' }}>

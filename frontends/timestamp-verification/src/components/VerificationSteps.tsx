@@ -44,7 +44,7 @@ export const VerificationSteps = () => (
           </svg>
         </div>
         <div>
-          <h4 style={{ margin: '0 0 4px 0', fontSize: '16px', color: '#334155', fontWeight: '600' }}>1. Select Document</h4>
+          <h4 style={{ margin: '0 0 4px 0', fontSize: '16px', color: '#334155', fontWeight: '600' }}>1. Select a file to verify</h4>
           <p style={{ margin: 0, fontSize: '14px', color: '#64748b', lineHeight: '1.5' }}>
             Choose the original file you want to verify. We support any file format (PDF, Images, etc.).
           </p>
@@ -141,7 +141,7 @@ export const VerificationSteps = () => (
       <div>
         <h4 style={{ margin: '0 0 4px 0', fontSize: '15px', color: '#0c4a6e', fontWeight: '600' }}>Privacy Guarantee</h4>
         <p style={{ margin: 0, fontSize: '14px', color: '#075985', lineHeight: '1.5' }}>
-          Your document <strong>never leaves your device</strong>. The cryptographic fingerprint (hash) is calculated locally in your browser. We never upload your files to any server.
+          Your file <strong>never leaves your device</strong>. The cryptographic fingerprint (hash) is calculated locally in your browser. We never upload your files to any server.
         </p>
       </div>
     </div>
