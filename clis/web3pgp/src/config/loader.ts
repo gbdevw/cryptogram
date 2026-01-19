@@ -167,10 +167,10 @@ function mergeConfigs(...configs: Partial<MergedConfig>[]): MergedConfig {
           endpoints: config.ethereum.rpc.endpoints.map((endpoint) => ({
             url: endpoint.url,
             priority: endpoint.priority,
-            ...(endpoint.maxBlockRange !== undefined && { maxBlockRange: endpoint.maxBlockRange }),
             ...(endpoint.batching !== undefined && { batching: endpoint.batching }),
-            ...(endpoint.retry !== undefined && { retry: endpoint.retry }),
           })),
+          ...(config.ethereum.rpc.maxBlockRange !== undefined && { maxBlockRange: config.ethereum.rpc.maxBlockRange }),
+          ...(config.ethereum.rpc.retry !== undefined && { retry: config.ethereum.rpc.retry }),
         };
       }
       if (config.ethereum.wallet) {

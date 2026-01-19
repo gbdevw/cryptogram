@@ -23,6 +23,49 @@ ethereum:
   # Using Ink Sepolia testnet
   chain: ink-sepolia  # or use numeric ID: 763373
 
+  # RPC endpoint configuration
+  # Multiple endpoints with fallback support and per-endpoint batching configuration
+  rpc:
+    # Array of RPC endpoints with priority-based failover
+    # Lower priority number = higher priority (1 is highest)
+    endpoints:
+      # Primary RPC endpoint - Gelato
+      - url: https://rpc-gel-sepolia.inkonchain.com
+        priority: 1
+        batching:
+          size: 20         # Maximum requests per batch
+          waitMs: 100      # Maximum wait time before sending batch in milliseconds
+      
+      # Backup 1 - Tenderly
+      - url: https://rpc-ten-sepolia.inkonchain.com
+        priority: 2
+        batching:
+          size: 20
+          waitMs: 100
+      
+      # Backup 2 - QuickNode
+      - url: https://rpc-qnd-sepolia.inkonchain.com
+        priority: 3
+        batching:
+          size: 20
+          waitMs: 100
+      
+      # Backup 3 - dRPC
+      - url: https://ink-sepolia.drpc.org
+        priority: 4
+        batching:
+          size: 20
+          waitMs: 100
+
+    # Shared retry configuration (applied to all endpoints)
+    retry:
+      count: 3             # Number of retry attempts
+      delayMs: 200         # Delay between retries in milliseconds
+
+    # Maximum block range for eth_getLogs queries
+    # Use this value when querying logs to avoid exceeding provider limits
+    maxBlockRange: 10000
+
   # wallet: (OPTIONAL - required only for signing transactions)
   #   # Wallet configuration (currently only 'private-key' is supported)
   #   type: private-key
@@ -33,8 +76,8 @@ ethereum:
   #   # privateKey: "<YOUR_PRIVATE_KEY>"
 
 web3pgp:
-  # Web3PGP smart contract address (test deployment)
-  contract: "0x5FbDB2315678afccb333f8a9c60582f6e1a3fe4c"
+  # Web3PGP smart contract address (test deployment on Ink Sepolia)
+  contract: "0x72d02B94317ac899B34459a4e6685eFe12Ac17a8"
 
 monitoring:
   logging:
@@ -46,7 +89,8 @@ monitoring:
 # ============================================================================
 # You can override any configuration value using environment variables:
 #
-# DEXES_CHAIN_ID=763373
+# DEXES_CHAIN=ink-sepolia
+# DEXES_RPC_ENDPOINTS='[{"url":"...","priority":1,"batching":{"size":100,"waitMs":50}}]'
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
 # DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_LOG_LEVEL=debug
@@ -66,7 +110,23 @@ monitoring:
 ethereum:
   # Blockchain network configuration
   # Using Ink mainnet
-  chain: ink
+  chain: ink  # TODO: Update with production chain name/ID
+
+  # RPC endpoint configuration
+  rpc:
+    endpoints:
+      # TODO: Update with production RPC endpoints
+      - url: https://rpc.ink.inkonchain.com
+        priority: 1
+        batching:
+          size: 100
+          waitMs: 50
+
+    retry:
+      count: 3
+      delayMs: 500
+
+    maxBlockRange: 10000
 
   # wallet: (OPTIONAL - required only for signing transactions)
   #   # Wallet configuration (currently only 'private-key' is supported)
@@ -92,7 +152,8 @@ monitoring:
 # ============================================================================
 # You can override any configuration value using environment variables:
 #
-# DEXES_CHAIN_ID=<CHAIN_ID>
+# DEXES_CHAIN=ink
+# DEXES_RPC_ENDPOINTS='[{"url":"...","priority":1,"batching":{"size":100,"waitMs":50}}]'
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
 # DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_LOG_LEVEL=info

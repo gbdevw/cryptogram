@@ -2,7 +2,7 @@ import * as openpgp from 'openpgp';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Web3Doc, Web3DocService, Web3PGP, Web3PGPService, to0x } from '@jibidieuw/dexes';
-import { createWalletClient, fallback, http, createPublicClient, PublicClient, keccak256, toBytes, toHex } from 'viem'
+import { createPublicClient, createWalletClient, PublicClient, fallback, http, keccak256, toBytes, toHex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { inkSepolia } from 'viem/chains'
 
@@ -52,25 +52,35 @@ async function main() {
         throw new Error('Please set the PRIVATE_KEY environment variable to a valid private key.');
     }
     const account = privateKeyToAccount(to0x(privateKey));
-    const batchConfig = { batchSize: 100, wait: 50 }
-    const fallbackTransport = fallback(
-        [
-            // 1. Gelato (Primary)
-            http('https://rpc-gel-sepolia.inkonchain.com', { batch: batchConfig }),
-            // 2. Tenderly (Backup 1)
-            http('https://rpc-ten-sepolia.inkonchain.com', { batch: batchConfig }),
-            // 3. QuickNode (Backup 2)
-            http('https://rpc-qnd-sepolia.inkonchain.com', { batch: batchConfig }),
-            // 4. dRPC (Backup 3 - with stricter batch settings for safety)
-            http('https://ink-sepolia.drpc.org', { batch: batchConfig }),
-        ],
-        {
-            // rank: false (default) - Use simple round-robin without continuous health checks
-            // This prevents unnecessary net_listening calls
-            retryCount: 3,
-            retryDelay: 500,
-        }
-    )
+    
+    // Configure RPC endpoints with batching and retry settings
+    // Each endpoint can have its own batching configuration
+    // Retry configuration is applied at the fallback level (shared across all endpoints)
+    const endpoints = [
+        { url: 'https://rpc-gel-sepolia.inkonchain.com', priority: 1, batching: { size: 100, waitMs: 50 } },
+        { url: 'https://rpc-ten-sepolia.inkonchain.com', priority: 2, batching: { size: 100, waitMs: 50 } },
+        { url: 'https://rpc-qnd-sepolia.inkonchain.com', priority: 3, batching: { size: 100, waitMs: 50 } },
+        { url: 'https://ink-sepolia.drpc.org', priority: 4, batching: { size: 100, waitMs: 50 } },
+    ];
+    
+    // Sort endpoints by priority and build HTTP transports with batching
+    const sortedEndpoints = [...endpoints].sort((a, b) => a.priority - b.priority);
+    const httpTransports = sortedEndpoints.map(endpoint => 
+        http(endpoint.url, {
+            batch: {
+                batchSize: endpoint.batching?.size ?? 100,
+                wait: endpoint.batching?.waitMs ?? 50,
+            }
+        })
+    );
+    
+    // Configure fallback with shared retry settings
+    const retryConfig = { count: 3, delayMs: 500 };
+    const fallbackTransport = fallback(httpTransports, {
+        retryCount: retryConfig.count,
+        retryDelay: retryConfig.delayMs,
+    });
+    
     const publicClient = createPublicClient({
         chain: inkSepolia,
         transport: fallbackTransport,
