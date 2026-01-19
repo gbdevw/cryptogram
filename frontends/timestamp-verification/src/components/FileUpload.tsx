@@ -49,6 +49,16 @@ export const FileUpload = ({ onHashGenerated }: FileUploadProps) => {
         }
     }
 
+    const handleZoneClick = () => {
+        const input = document.getElementById('fileInput') as HTMLInputElement
+        input?.click()
+    }
+
+    const handleZoneTouchEnd = (e: React.TouchEvent) => {
+        e.preventDefault()
+        handleZoneClick()
+    }
+
     return (
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
             <div
@@ -56,6 +66,8 @@ export const FileUpload = ({ onHashGenerated }: FileUploadProps) => {
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
+                onClick={handleZoneClick}
+                onTouchEnd={handleZoneTouchEnd}
                 style={{
                     border: `2px dashed ${dragActive ? '#0066cc' : '#6bb6ff'}`,
                     borderRadius: '12px',
@@ -73,14 +85,14 @@ export const FileUpload = ({ onHashGenerated }: FileUploadProps) => {
                     accept="*/*"
                     style={{ display: 'none' }}
                 />
-                <label htmlFor="fileInput" style={{ cursor: 'pointer', display: 'block' }}>
+                <div style={{ cursor: 'pointer', display: 'block' }}>
                     <p style={{ fontSize: '18px', color: '#0066cc', margin: '0 0 10px 0', fontWeight: '600' }}>
                         Drop your file here or click to upload
                     </p>
                     <p style={{ fontSize: '14px', color: '#0066cc', margin: '0' }}>
                         {fileName || 'Select a file to verify its authenticity'}
                     </p>
-                </label>
+                </div>
             </div>
             <VerificationSteps />
         </div>
