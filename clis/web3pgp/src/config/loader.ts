@@ -163,7 +163,15 @@ function mergeConfigs(...configs: Partial<MergedConfig>[]): MergedConfig {
         result.ethereum.chain = config.ethereum.chain;
       }
       if (config.ethereum.rpc?.endpoints) {
-        result.ethereum.rpc = { endpoints: config.ethereum.rpc.endpoints };
+        result.ethereum.rpc = {
+          endpoints: config.ethereum.rpc.endpoints.map((endpoint) => ({
+            url: endpoint.url,
+            priority: endpoint.priority,
+            ...(endpoint.maxBlockRange !== undefined && { maxBlockRange: endpoint.maxBlockRange }),
+            ...(endpoint.batching !== undefined && { batching: endpoint.batching }),
+            ...(endpoint.retry !== undefined && { retry: endpoint.retry }),
+          })),
+        };
       }
       if (config.ethereum.wallet) {
         // Wallet can be completely replaced if provided

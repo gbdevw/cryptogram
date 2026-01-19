@@ -72,6 +72,42 @@ export function validateYamlStructure(data: unknown): void {
     if (!('priority' in (ep as Record<string, unknown>))) {
       throw new ConfigError(`Missing required field: ethereum.rpc.endpoints[${i}].priority`);
     }
+
+    // Validate optional maxBlockRange if present
+    const epObj = ep as Record<string, unknown>;
+    if ('maxBlockRange' in epObj && epObj.maxBlockRange !== undefined) {
+      if (typeof epObj.maxBlockRange !== 'number') {
+        throw new ConfigError(`ethereum.rpc.endpoints[${i}].maxBlockRange must be a number`);
+      }
+    }
+
+    // Validate optional batching config if present
+    if ('batching' in epObj && epObj.batching !== undefined) {
+      if (typeof epObj.batching !== 'object' || epObj.batching === null) {
+        throw new ConfigError(`ethereum.rpc.endpoints[${i}].batching must be an object`);
+      }
+      const batchingCfg = epObj.batching as Record<string, unknown>;
+      if ('size' in batchingCfg && typeof batchingCfg.size !== 'number') {
+        throw new ConfigError(`ethereum.rpc.endpoints[${i}].batching.size must be a number`);
+      }
+      if ('waitMs' in batchingCfg && typeof batchingCfg.waitMs !== 'number') {
+        throw new ConfigError(`ethereum.rpc.endpoints[${i}].batching.waitMs must be a number`);
+      }
+    }
+
+    // Validate optional retry config if present
+    if ('retry' in epObj && epObj.retry !== undefined) {
+      if (typeof epObj.retry !== 'object' || epObj.retry === null) {
+        throw new ConfigError(`ethereum.rpc.endpoints[${i}].retry must be an object`);
+      }
+      const retryCfg = epObj.retry as Record<string, unknown>;
+      if ('count' in retryCfg && typeof retryCfg.count !== 'number') {
+        throw new ConfigError(`ethereum.rpc.endpoints[${i}].retry.count must be a number`);
+      }
+      if ('delayMs' in retryCfg && typeof retryCfg.delayMs !== 'number') {
+        throw new ConfigError(`ethereum.rpc.endpoints[${i}].retry.delayMs must be a number`);
+      }
+    }
   }
   }
 
