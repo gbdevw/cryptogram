@@ -1,20 +1,9 @@
-import { MergedConfig, WalletType } from './types';
-
+import { TESTNET_CONFIG } from './testnet';
+import { MergedConfig } from './types';
+  
 /**
- * Default configuration for Web3PGP CLI
- * Uses Ink Sepolia testnet as the default network
+ * Default configuration for Web3PGP CLI.
+ * 
+ * Uses the testnet configuration as the default.
  */
-export const DEFAULT_CONFIG: MergedConfig = {
-  ethereum: {
-    chain: 'ink-sepolia',
-    rpc: {
-      endpoints: [
-        { url: 'https://rpc-gel-sepolia.inkonchain.com', priority: 1 },
-        { url: 'https://rpc-qnd-sepolia.inkonchain.com', priority: 2 },
-      ],
-    },
-    wallet: { type: WalletType.PrivateKey },
-  },
-  web3pgp: { contract: '0x72d02B94317ac899B34459a4e6685eFe12Ac17a8' as const },
-  monitoring: { logging: { level: 'info' } },
-};
+export const DEFAULT_CONFIG: MergedConfig = TESTNET_CONFIG;
