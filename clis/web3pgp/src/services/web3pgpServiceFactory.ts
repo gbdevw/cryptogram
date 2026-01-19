@@ -4,13 +4,11 @@ import {
   WalletClient,
   createPublicClient,
   createWalletClient,
-  fallback,
-  http,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet, sepolia, foundry, ink, inkSepolia } from 'viem/chains';
 
-import { ChainConfig, MergedConfig } from '../config/types';
+import { ChainConfig, MergedConfig, RpcEndpoint } from '../config/types';
 import { ConfigError } from '../errors';
 import { Logger } from '../utils/logger';
 import { IWeb3PGPService, Web3PGP, Web3PGPService } from '@jibidieuw/dexes';
@@ -98,10 +96,10 @@ function getChainForConfig(chainConfig: ChainConfig): Chain {
  *
  * @param config - Merged configuration
  * @param logger - Logger instance to use for logging
- * @returns Sorted RPC endpoints by priority
+ * @returns RPC endpoints with batching and retry configuration
  * @throws ConfigError if no endpoints can be resolved
  */
-function resolveRpcEndpoints(config: MergedConfig, logger: Logger): Array<{ url: string; priority: number }> {
+function resolveRpcEndpoints(config: MergedConfig, logger: Logger): RpcEndpoint[] {
   const { chain, rpc } = config.ethereum;
 
   // Priority 1: User-provided endpoints
@@ -117,7 +115,7 @@ function resolveRpcEndpoints(config: MergedConfig, logger: Logger): Array<{ url:
   if (typeof chain === 'string') {
     const chainObj = CHAIN_MAP[chain];
     if (chainObj?.rpcUrls?.default?.http && chainObj.rpcUrls.default.http.length > 0) {
-      const predefinedEndpoints = chainObj.rpcUrls.default.http.map((url, index) => ({
+      const predefinedEndpoints: RpcEndpoint[] = chainObj.rpcUrls.default.http.map((url, index) => ({
         url,
         priority: index,
       }));
@@ -131,7 +129,7 @@ function resolveRpcEndpoints(config: MergedConfig, logger: Logger): Array<{ url:
     // For numeric chain IDs, check if we have a predefined chain
     const chainObj = CHAIN_ID_MAP[chain];
     if (chainObj?.rpcUrls?.default?.http && chainObj.rpcUrls.default.http.length > 0) {
-      const predefinedEndpoints = chainObj.rpcUrls.default.http.map((url, index) => ({
+      const predefinedEndpoints: RpcEndpoint[] = chainObj.rpcUrls.default.http.map((url, index) => ({
         url,
         priority: index,
       }));
@@ -167,7 +165,7 @@ function createPublicClientWithFallback(config: MergedConfig, logger: Logger): P
     { 
       endpoints: rpcEndpoints.map(e => e.url),
       retryConfig: config.ethereum.rpc?.retry,
-      batchingConfigs: rpcEndpoints.map(e => ({ url: e.url, batching: (e as any).batching }))
+      batchingConfigs: rpcEndpoints.map(e => ({ url: e.url, batching: e.batching })),
     },
     'Creating PublicClient with RPC fallback chain',
   );
