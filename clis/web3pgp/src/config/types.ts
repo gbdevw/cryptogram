@@ -16,16 +16,12 @@ export enum WalletType {
  * RPC endpoint configuration
  * @property url - The RPC endpoint URL
  * @property priority - Priority for selecting this endpoint (lower is higher priority)
- * @property maxBlockRange - Optional maximum block range allowed by the RPC endpoint for eth_getLogs requests
  * @property batching - Optional batching configuration
- * @property retry - Optional retry configuration
  */
 export interface RpcEndpoint {
   url: string;
   priority: number;
-  maxBlockRange?: number;
   batching? : BatchingConfig;
-  retry? : RetryConfig;
 }
 
 /**
@@ -65,6 +61,8 @@ export interface EthereumConfig {
   chain: ChainConfig; // Well-known Viem chain name OR custom numeric chainId
   rpc?: {
     endpoints: RpcEndpoint[];
+    maxBlockRange?: number;
+    retry?: RetryConfig;
   };
   wallet?: {
     type: WalletType;
