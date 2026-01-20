@@ -12,6 +12,8 @@ Configuration can be provided through:
 Configuration follows a 3-tier precedence (lowest to highest):
 - Defaults < Config File < Environment Variables < CLI Flags
 
+> **Note**: For detailed information about RPC configuration, transport layers, and batching/retry strategies, see [TRANSPORT.md](TRANSPORT.md).
+
 ---
 
 ## Configuration Table
@@ -19,11 +21,14 @@ Configuration follows a 3-tier precedence (lowest to highest):
 | Configuration Key | Description | Default Value | Environment Variable |
 |---|---|---|---|
 | `ethereum.chain` | Blockchain network to connect to. Supports well-known Viem chains (`mainnet`, `sepolia`, `anvil`, `ink-sepolia`) or custom numeric chain IDs. | `ink-sepolia` | `DEXES_CHAIN` |
-| `ethereum.rpc.endpoints[].url` | RPC endpoint URL for blockchain communication. Can specify multiple endpoints with fallback support. | `https://rpc-gel-sepolia.inkonchain.com` (priority 1)<br/>`https://rpc-qnd-sepolia.inkonchain.com` (priority 2) | `DEXES_RPC_URL` (single endpoint)<br/>`DEXES_RPC_ENDPOINTS` (JSON array) |
-| `ethereum.rpc.endpoints[].priority` | Priority order for RPC endpoints. Lower number = higher priority. Used for fallback when endpoints fail. | `1, 2` | N/A (set via `DEXES_RPC_ENDPOINTS` JSON) |
+| `ethereum.rpc.endpoints[]` | Array of RPC endpoints for blockchain communication with fallback support. Each endpoint has URL, priority, and optional batching config. | 4 Ink Sepolia endpoints (priorities 1-4) | `DEXES_RPC_ENDPOINTS` (JSON array) |
+| `ethereum.rpc.endpoints[].url` | RPC endpoint URL. | `https://rpc-gel-sepolia.inkonchain.com`, `https://rpc-ten-sepolia.inkonchain.com`, `https://rpc-qnd-sepolia.inkonchain.com`, `https://ink-sepolia.drpc.org` | Set via `DEXES_RPC_ENDPOINTS` |
+| `ethereum.rpc.endpoints[].priority` | Priority order for RPC endpoints. Lower number = higher priority. Used for fallback when endpoints fail. | `1, 2, 3, 4` | Set via `DEXES_RPC_ENDPOINTS` JSON |
+| `ethereum.rpc.endpoints[].batching` | Optional batching configuration for RPC requests (size and wait time). | `{ size: 20, waitMs: 100 }` | Set via `DEXES_RPC_ENDPOINTS` JSON |
+| `ethereum.rpc.maxBlockRange` | Maximum block range for `eth_getLogs` queries to avoid provider limits. | `10000` | N/A |
+| `ethereum.rpc.retry` | Retry configuration for failed RPC requests (count and delay with exponential backoff). | `{ count: 3, delayMs: 200 }` | N/A |
 | `ethereum.wallet.type` | Wallet type for signing transactions. Currently supports `private-key` for private key-based signing. | `private-key` | N/A (automatic) |
 | `ethereum.wallet.privateKey` | Private key for wallet signing (0x-prefixed 32-byte hex). **SECRET** - Do not commit to version control. | Not set | `DEXES_WALLET_PRIVATE_KEY` |
-| `ethereum.gasLimit` | Optional explicit gas limit override for transactions. If undefined, Viem estimates automatically. Useful for testing. | Not set | N/A |
 | `web3pgp.contract` | Smart contract address for Web3PGP operations. Ethereum address format (0x-prefixed 40 hex characters). | `0x72d02B94317ac899B34459a4e6685eFe12Ac17a8` | `DEXES_WEB3PGP_CONTRACT` |
 | `monitoring.logging.level` | Logging level for CLI output. Valid values: `debug`, `info`, `warn`, `error`. | `info` | `DEXES_LOG_LEVEL` |
 
@@ -50,17 +55,19 @@ export DEXES_LOG_LEVEL=debug
 web3pgp get 0x1234...
 ```
 
-### Multiple RPC Endpoints
+### Multiple RPC Endpoints with Batching
 
-Configure multiple RPC endpoints with fallback using JSON:
+Configure multiple RPC endpoints with fallback and batching using JSON:
 
 ```bash
 export DEXES_RPC_ENDPOINTS='[
-  {"url":"https://endpoint1.example.com","priority":1},
-  {"url":"https://endpoint2.example.com","priority":2},
-  {"url":"https://endpoint3.example.com","priority":3}
+  {"url":"https://endpoint1.example.com","priority":1,"batching":{"size":20,"waitMs":100}},
+  {"url":"https://endpoint2.example.com","priority":2,"batching":{"size":20,"waitMs":100}},
+  {"url":"https://endpoint3.example.com","priority":3,"batching":{"size":20,"waitMs":100}}
 ]'
 ```
+
+For more details on batching and retry strategies, see [TRANSPORT.md](TRANSPORT.md).
 
 ### YAML Config File
 
@@ -71,12 +78,31 @@ ethereum:
   chain: ink-sepolia
   rpc:
     endpoints:
-      - url: https://rpc-gel-sepolia.inkonchain.com
-        priority: 1
-      - url: https://rpc-qnd-sepolia.inkonchain.com
+        batching:
+          size: 20
+          waitMs: 100
+      - url: https://rpc-ten-sepolia.inkonchain.com
         priority: 2
+        batching:
+          size: 20
+          waitMs: 100
+      - url: https://rpc-qnd-sepolia.inkonchain.com
+        priority: 3
+        batching:
+          size: 20
+          waitMs: 100
+      - url: https://ink-sepolia.drpc.org
+        priority: 4
+        batching:
+          size: 20
+          waitMs: 100
+    maxBlockRange: 10000
+    retry:
+      count: 3
+      delayMs: 200
   wallet:
     type: private-key
+    privateKey: "0x..." # pragma: allowlist secrete-key
     privateKey: "0x..." # pragma: allowlist secret
   gasLimit: null
 
@@ -94,7 +120,19 @@ monitoring:
 web3pgp --config /path/to/custom/config.yaml get 0x1234...
 ```
 
+---RPC Configuration
+
+For advanced RPC configuration including batching, retry strategies, and transport layer details, refer to [TRANSPORT.md](TRANSPORT.md).
+
+Key concepts:
+- **Batching**: Group multiple RPC requests together to improve performance
+- **Retries**: Automatic retry with exponential backoff for failed requests
+- **Fallback**: Automatic failover to next priority endpoint when one fails
+- **Max Block Range**: Limit block range for `eth_getLogs` to respect provider constraints
+
 ---
+
+## 
 
 ## Logging Levels
 
