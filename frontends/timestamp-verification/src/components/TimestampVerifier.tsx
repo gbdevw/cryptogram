@@ -82,8 +82,8 @@ export const TimestampVerifier = ({ idFromUrl }: TimestampVerifierProps) => {
                         console.log(`Valid timestamp retrieved: ID = ${id.toString()}, Date = ${timestamp.date}, TX = ${timestamp.tx}, Hash = ${toHex(timestamp.documentHash)}, Emitter = ${timestamp.publicKey.getFingerprint()}`)
                         console.log('Verifying the timestamp matches the provided hash:', hash)
                         if (toHex(timestamp.documentHash) !== hash) {
-                            console.error('Document hash does not match the provided file hash')
-                            return { status: 'rejected' as const, id, error: 'Document hash does not match the provided file hash' }
+                            console.error('File hash does not match the provided file hash')
+                            return { status: 'rejected' as const, id, error: 'File hash does not match the provided file hash' }
                         } else {
                             // Verify the public key that has signed the timestamp is either well-known or trusted
                             console.log('Verifying the trust of the public key that signed the timestamp:', timestamp.publicKey.getFingerprint())
