@@ -6,7 +6,6 @@ import { BYTES32_ZERO, to0x, toBytes32 } from '../utils/0xstr';
 import { OpenPGPUtils } from '../utils/openpgp';
 import { KeyCertificationRevokedLog, KeyCertifiedLog, KeyRegisteredLog, KeyRevokedLog, KeyUpdatedLog, OwnershipProvedLog, SubkeyAddedLog, Web3PGPEventLog, Web3PGPEvents } from './types/types';
 import pLimit from 'p-limit';
-import { PacketList } from 'openpgp';
 
 /*****************************************************************************************************************/
 /* CUSTOM ERRORS                                                                                                 */
