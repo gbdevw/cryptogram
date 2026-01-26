@@ -48,7 +48,7 @@ export const SuccessResult = ({ results, fileName }: VerificationResultProps) =>
                 }}
             >
                 <h2 style={{ color: '#1f2937', margin: '0 0 12px 0', fontSize: '24px' }}>
-                    Document Verified
+                    File Verified
                 </h2>
                 <p style={{ color: '#4b5563', margin: '0', fontSize: '16px', lineHeight: '1.5' }}>
                     <strong>"{fileName}"</strong> has been verified as authentic and certified by a
@@ -149,7 +149,7 @@ export const ErrorResult = ({ fileName }: { fileName: string }) => {
                 }}
             >
                 <h2 style={{ color: '#1f2937', margin: '0 0 15px 0', fontSize: '24px' }}>
-                    Unknown Document
+                    Unknown File
                 </h2>
 
                 <p style={{ color: '#4b5563', margin: '0 0 24px 0', fontSize: '16px', lineHeight: '1.5' }}>
@@ -166,7 +166,7 @@ export const ErrorResult = ({ fileName }: { fileName: string }) => {
                     border: '1px solid #f3f4f6'
                 }}>
                     <strong style={{ color: '#374151', display: 'block', marginBottom: '4px' }}>Why is this happening?</strong>
-                    This usually means the document has never been recorded by a trusted entity in the registry or it has been modified (even slightly).
+                    This usually means the fiile has never been recorded by a trusted entity in the registry or it has been modified (even slightly).
                 </div>
             </div>
         </div>
