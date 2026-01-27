@@ -1,4 +1,4 @@
-export function RevokePage() {
+function RevokePage() {
   return (
     <div>
       <h2>Revoke Public Key</h2>
@@ -7,3 +7,5 @@ export function RevokePage() {
     </div>
   )
 }
+
+export default RevokePage

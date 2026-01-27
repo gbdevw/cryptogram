@@ -1,4 +1,4 @@
-export function RegisterPage() {
+function RegisterPage() {
   return (
     <div>
       <h2>Register Public Key</h2>
@@ -7,3 +7,5 @@ export function RegisterPage() {
     </div>
   )
 }
+
+export default RegisterPage

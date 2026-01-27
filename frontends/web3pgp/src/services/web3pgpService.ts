@@ -21,7 +21,7 @@ class Web3PGPServiceManager {
       const chainConfig = getCurrentChainConfig()
       const web3pgpAddress = chainConfig.web3pgpContractAddress as `0x${string}`
 
-      if (!web3pgpAddress || web3pgpAddress === '') {
+      if (!web3pgpAddress || web3pgpAddress.length === 0) {
         throw new Error(`Web3PGP contract address not configured for this chain`)
       }
 
