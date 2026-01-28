@@ -22,7 +22,7 @@ export function SubkeysList({ publicKey }: SubkeysListProps) {
   const [subkeyStatuses, setSubkeyStatuses] = useState<SubkeyStatus[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [copiedFingerprint, setCopiedFingerprint] = useState<string | null>(null)
-  const [isExpanded, setIsExpanded] = useState(true)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const handleCopyFingerprint = async (fingerprint: string) => {
     try {

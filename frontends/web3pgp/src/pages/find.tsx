@@ -57,10 +57,15 @@ function FindPage() {
           max-width: 900px;
           margin: 0 auto;
           padding: 2rem 1rem;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
         }
 
         .page-header {
           margin-bottom: 2.5rem;
+          flex-shrink: 0;
         }
 
         .page-title {
@@ -81,6 +86,9 @@ function FindPage() {
           display: flex;
           flex-direction: column;
           gap: 1.5rem;
+          flex: 1;
+          overflow: hidden;
+          min-height: 0;
         }
 
         .loading-state {

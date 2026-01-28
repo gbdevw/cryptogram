@@ -36,6 +36,8 @@ export function PublicKeyDisplay({
           <KeyFingerprint publicKey={publicKey} />
           <UserIDsList publicKey={publicKey} />
           <SubkeysList publicKey={publicKey} />
+        </div>
+        <div className="action-buttons-container">
           <KeyActionButtons
             publicKey={publicKey}
             onSuccess={handleActionSuccess}
@@ -46,6 +48,10 @@ export function PublicKeyDisplay({
       <style jsx>{`
         .public-key-display {
           animation: fadeIn 0.3s ease-out;
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          min-height: 0;
         }
 
         .key-info-section {
@@ -56,7 +62,8 @@ export function PublicKeyDisplay({
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           display: flex;
           flex-direction: column;
-          max-height: calc(100vh - 300px);
+          flex: 1;
+          min-height: 0;
         }
 
         .scrollable-content {
@@ -88,6 +95,15 @@ export function PublicKeyDisplay({
           font-size: 1.25rem;
           font-weight: 700;
           color: var(--text-primary, #1f2937);
+          flex-shrink: 0;
+        }
+
+        .action-buttons-container {
+          display: flex;
+          gap: 1rem;
+          margin-top: auto;
+          padding-top: 1.5rem;
+          flex-shrink: 0;
         }
 
         @keyframes fadeIn {

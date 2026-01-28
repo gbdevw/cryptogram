@@ -31,16 +31,41 @@ export function ErrorMessage({ errorType, onDismiss }: ErrorMessageProps) {
 
   return (
     <div className={`error-message error-${errorType}`}>
+      <div className="error-icon-wrapper">
+        <svg
+          className="error-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      </div>
       <div className="error-content">
-        <div className="error-header">
-          <span className="error-icon">⚠️</span>
-          <h3 className="error-title">{title}</h3>
-        </div>
+        <h3 className="error-title">{title}</h3>
         <p className="error-text">{message}</p>
       </div>
       {onDismiss && (
         <button className="error-dismiss" onClick={onDismiss} title="Dismiss">
-          ✕
+          <svg
+            className="dismiss-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
       )}
 
@@ -48,12 +73,30 @@ export function ErrorMessage({ errorType, onDismiss }: ErrorMessageProps) {
         .error-message {
           display: flex;
           align-items: flex-start;
-          gap: 1rem;
-          padding: 1rem;
+          gap: 1.5rem;
+          padding: 1.5rem;
           border-radius: 0.5rem;
           margin-bottom: 1.5rem;
           border-left: 4px solid var(--error-color, #ef4444);
           background-color: var(--error-bg, #fef2f2);
+        }
+
+        .error-icon-wrapper {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 3rem;
+          height: 3rem;
+          border-radius: 50%;
+          background-color: var(--error-icon-bg, #fee2e2);
+        }
+
+        .error-icon {
+          width: 1.75rem;
+          height: 1.75rem;
+          color: var(--error-color, #ef4444);
+          flex-shrink: 0;
         }
 
         .error-content {
@@ -61,22 +104,12 @@ export function ErrorMessage({ errorType, onDismiss }: ErrorMessageProps) {
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
-        }
-
-        .error-header {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-        }
-
-        .error-icon {
-          font-size: 1.25rem;
-          flex-shrink: 0;
+          padding-top: 0.25rem;
         }
 
         .error-title {
           margin: 0;
-          font-size: 0.95rem;
+          font-size: 1rem;
           font-weight: 600;
           color: var(--error-dark, #7f1d1d);
         }
@@ -94,10 +127,17 @@ export function ErrorMessage({ errorType, onDismiss }: ErrorMessageProps) {
           border: none;
           color: var(--error-color, #ef4444);
           cursor: pointer;
-          padding: 0.25rem;
-          font-size: 1.25rem;
+          padding: 0.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           transition: opacity 0.2s;
           opacity: 0.7;
+        }
+
+        .dismiss-icon {
+          width: 1.25rem;
+          height: 1.25rem;
         }
 
         .error-dismiss:hover {
@@ -106,20 +146,22 @@ export function ErrorMessage({ errorType, onDismiss }: ErrorMessageProps) {
 
         @media (max-width: 640px) {
           .error-message {
-            gap: 0.75rem;
+            gap: 1rem;
+            padding: 1rem;
           }
 
-          .error-header {
-            flex-direction: column;
-            align-items: flex-start;
+          .error-icon-wrapper {
+            width: 2.5rem;
+            height: 2.5rem;
           }
 
           .error-icon {
-            margin-top: 0.25rem;
+            width: 1.5rem;
+            height: 1.5rem;
           }
 
           .error-title {
-            font-size: 0.9rem;
+            font-size: 0.95rem;
           }
 
           .error-text {

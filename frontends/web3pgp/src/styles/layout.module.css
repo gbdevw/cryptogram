@@ -1,7 +1,8 @@
 .layout {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background-color: #f5f5f5;
 }
 
@@ -40,6 +41,7 @@
   width: 100%;
   gap: 2rem;
   padding: 2rem;
+  overflow: hidden;
 }
 
 /* Left Sidebar */
@@ -112,6 +114,9 @@
   padding: 2rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   min-height: 400px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Footer / Bottom Banner */
@@ -119,8 +124,8 @@
   background: #333;
   color: white;
   padding: 1.5rem 2rem;
-  margin-top: auto;
   border-top: 1px solid #555;
+  flex-shrink: 0;
 }
 
 .footerContent {
