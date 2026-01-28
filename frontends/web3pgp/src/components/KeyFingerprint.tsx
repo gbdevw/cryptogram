@@ -3,6 +3,7 @@ import { PublicKey } from 'openpgp'
 
 interface KeyFingerprintProps {
   publicKey: PublicKey
+  isRegistered?: boolean
 }
 
 type KeyStatus = 'valid' | 'revoked' | 'expired'
@@ -11,8 +12,9 @@ type KeyStatus = 'valid' | 'revoked' | 'expired'
  * Displays the primary key fingerprint in a formatted, readable way
  * Formats as uppercase hex with spaces every 4 characters
  * Also displays the key status (valid, revoked, or expired)
+ * Optionally displays REGISTERED badge if the key is registered on blockchain
  */
-export function KeyFingerprint({ publicKey }: KeyFingerprintProps) {
+export function KeyFingerprint({ publicKey, isRegistered }: KeyFingerprintProps) {
   // Get the fingerprint from the key
   const fingerprint = publicKey.getFingerprint().toUpperCase()
 
@@ -82,13 +84,18 @@ export function KeyFingerprint({ publicKey }: KeyFingerprintProps) {
 
       <div className="status-field">
         <span className="status-label">Status:</span>
-        {isLoadingStatus ? (
-          <span className="status-value loading">Loading...</span>
-        ) : (
-          <span className={`status-value status-${status}`}>
-            {status.toUpperCase()}
-          </span>
-        )}
+        <div className="status-badges">
+          {isRegistered && (
+            <span className="status-value status-registered">REGISTERED</span>
+          )}
+          {isLoadingStatus ? (
+            <span className="status-value loading">Loading...</span>
+          ) : (
+            <span className={`status-value status-${status}`}>
+              {status.toUpperCase()}
+            </span>
+          )}
+        </div>
       </div>
 
       <style jsx>{`
@@ -172,6 +179,13 @@ export function KeyFingerprint({ publicKey }: KeyFingerprintProps) {
           min-width: 50px;
         }
 
+        .status-badges {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
         .status-value {
           font-weight: 600;
           font-size: 0.9rem;
@@ -181,6 +195,11 @@ export function KeyFingerprint({ publicKey }: KeyFingerprintProps) {
         }
 
         .status-value.status-valid {
+          background-color: #dcfce7;
+          color: #166534;
+        }
+
+        .status-value.status-registered {
           background-color: #dcfce7;
           color: #166534;
         }
