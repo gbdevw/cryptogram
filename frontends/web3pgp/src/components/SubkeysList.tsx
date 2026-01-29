@@ -93,13 +93,10 @@ export function SubkeysList({ publicKey }: SubkeysListProps) {
   if (!subkeys || subkeys.length === 0) {
     return (
       <div className="subkeys-section">
-        <button
-          className="section-header"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          <span className="section-title">Subkeys</span>
-          <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▶</span>
-        </button>
+        <div className="section-header" onClick={() => setIsExpanded(!isExpanded)} style={{ cursor: 'pointer' }}>
+          <span className="section-title">Subkeys (0)</span>
+          <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▼</span>
+        </div>
         {isExpanded && (
           <p className="no-data">No subkeys associated with this key.</p>
         )}
@@ -110,13 +107,14 @@ export function SubkeysList({ publicKey }: SubkeysListProps) {
   if (isLoading) {
     return (
       <div className="subkeys-section">
-        <button
+        <div
           className="section-header"
           onClick={() => setIsExpanded(!isExpanded)}
+          style={{ cursor: 'pointer' }}
         >
           <span className="section-title">Subkeys ({subkeys.length})</span>
-          <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▶</span>
-        </button>
+          <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▼</span>
+        </div>
         {isExpanded && (
           <p className="no-data">Loading subkey status...</p>
         )}
@@ -126,13 +124,14 @@ export function SubkeysList({ publicKey }: SubkeysListProps) {
 
   return (
     <div className="subkeys-section">
-      <button
+      <div
         className="section-header"
         onClick={() => setIsExpanded(!isExpanded)}
+        style={{ cursor: 'pointer' }}
       >
         <span className="section-title">Subkeys ({subkeys.length})</span>
-        <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▶</span>
-      </button>
+        <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▼</span>
+      </div>
       {isExpanded && (
         <div className="subkeys-list">
           {subkeyStatuses.map((status, index) => {
