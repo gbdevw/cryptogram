@@ -68,7 +68,7 @@ export class OpenPGPUtils {
      * @returns A sanitized subkey certificate ready for blockchain storage
      * @throws - Error if the specified subkey fingerprint is not found
      */
-    static async sanitizeSubkey(key: openpgp.Key, fingerprint: `0x${string}`): Promise<openpgp.Key> {
+    static async sanitizeSubkey(key: openpgp.Key, fingerprint: `0x${string}`): Promise<openpgp.PublicKey> {
         
         // Bugfix: Create a copy of the public key to avoid modifying the original key (toPublic does not return a new instance)
         const clonedKey = await openpgp.readKey({ binaryKey: key.toPublic().write() }); ;
