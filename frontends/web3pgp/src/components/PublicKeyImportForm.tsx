@@ -147,11 +147,9 @@ export function PublicKeyImportForm({
   return (
     <div className="public-key-import-form">
       <div className="form-header">
-        <h2 className="form-title">Register Public Key</h2>
+        <h2 className="form-title">Register Public Keys</h2>
         <p className="form-description">
-          Import your OpenPGP public key to register it on the blockchain. You
-          can either paste your armored key below or upload a file containing
-          your public key.
+          Import your OpenPGP public key to register it in the Web3PGP registry.
         </p>
       </div>
 
@@ -159,7 +157,7 @@ export function PublicKeyImportForm({
         {/* Textarea for pasting armored key */}
         <div className="form-section">
           <label htmlFor="armored-key-input" className="section-label">
-            Paste Armored Public Key
+            Paste an armored public key
           </label>
           <textarea
             id="armored-key-input"
@@ -199,7 +197,7 @@ efghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZa
 
         {/* File upload section */}
         <div className="form-section file-upload-section">
-          <label className="section-label">Or Import from File</label>
+          <label className="section-label">Or import your public key from a file</label>
           <input
             ref={fileInputRef}
             type="file"

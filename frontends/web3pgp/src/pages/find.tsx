@@ -20,7 +20,7 @@ function FindPage() {
   return (
     <div className="find-page">
       <div className="page-header">
-        <h1 className="page-title">Find Public Key</h1>
+        <h1 className="page-title">Find Public Keys</h1>
         <p className="page-description">
           Search for public keys in Web3PGP registry by using their unique ID (fingerprint).
         </p>
