@@ -4,6 +4,7 @@ import { PublicKey } from 'openpgp'
 interface RegistrationActionButtonsProps {
   publicKey: PublicKey
   primaryKeyRegistered: boolean
+  primaryIsRevoked?: boolean
   selectedSubkeyFingerprint: string | null
   selectableSubkeysAvailable: boolean
   onRegisterPrimaryKey: () => Promise<void>
@@ -19,6 +20,7 @@ interface RegistrationActionButtonsProps {
 export function RegistrationActionButtons({
   publicKey,
   primaryKeyRegistered,
+  primaryIsRevoked = false,
   selectedSubkeyFingerprint,
   selectableSubkeysAvailable,
   onRegisterPrimaryKey,
@@ -139,7 +141,8 @@ export function RegistrationActionButtons({
           <button
             className={`action-button primary ${localSuccess ? 'success' : ''}`}
             onClick={handleRegisterPrimaryKey}
-            disabled={isButtonLoading || localSuccess}
+            disabled={isButtonLoading || localSuccess || primaryIsRevoked}
+            title={primaryIsRevoked ? 'Cannot register a revoked key' : undefined}
           >
             {isButtonLoading ? (
               <>

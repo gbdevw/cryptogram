@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { PublicKey } from 'openpgp'
 import { KeyFingerprint } from './KeyFingerprint'
 import { UserIDsList } from './UserIDsList'
@@ -37,9 +37,63 @@ export function RegistrationDisplay({
     reset: resetRegistrationState,
   } = useRegisterPublicKey()
 
-  const [selectedSubkeyFingerprint, setSelectedSubkeyFingerprint] = React.useState<
+  const [selectedSubkeyFingerprint, setSelectedSubkeyFingerprint] = useState<
     string | null
   >(null)
+  
+  // Local copy of primary key registration status for optimistic UI updates
+  const [localPrimaryRegistered, setLocalPrimaryRegistered] = useState<boolean | null>(null)
+  
+  // Local copy of subkey registration status for optimistic UI updates
+  const [localSubkeyRegistrationStatus, setLocalSubkeyRegistrationStatus] = useState<
+    Map<string, boolean>
+  >(new Map())
+  
+  // Track invalid subkeys (revoked or expired)
+  const [invalidSubkeys, setInvalidSubkeys] = useState<Set<string>>(new Set())
+
+  // Detect invalid subkeys when key or verification status changes
+  useEffect(() => {
+    const detectInvalidSubkeys = async () => {
+      const invalid = new Set<string>()
+      for (const [fingerprint, status] of subkeyVerificationStatus) {
+        if (status === 'revoked' || status === 'expired') {
+          invalid.add(fingerprint)
+        }
+      }
+      setInvalidSubkeys(invalid)
+    }
+    detectInvalidSubkeys()
+  }, [subkeyVerificationStatus])
+
+  // Merge blockchain state with primary key optimistic updates
+  // Only update if blockchain confirms registration, never unflag it
+  useEffect(() => {
+    if (primaryRegistered === true) {
+      setLocalPrimaryRegistered(true)
+    }
+  }, [primaryRegistered])
+
+  // Merge blockchain state with optimistic updates for subkeys
+  // Only update if blockchain confirms MORE registrations, never fewer
+  useEffect(() => {
+    setLocalSubkeyRegistrationStatus((prev) => {
+      const merged = new Map(prev)
+      // Only add entries that are now confirmed on blockchain
+      // Never remove entries (keeps optimistic updates)
+      for (const [fingerprint, isRegistered] of subkeyRegistrationStatus) {
+        if (isRegistered) {
+          merged.set(fingerprint, true)
+        }
+      }
+      return merged
+    })
+  }, [subkeyRegistrationStatus])
+
+  // Compute selectable subkeys by filtering out registered ones
+  const effectiveSelectableSubkeys = selectableSubkeys.filter(
+    (fingerprint) => !localSubkeyRegistrationStatus.get(fingerprint)
+  )
 
   // Check registration status on mount
   useEffect(() => {
@@ -48,14 +102,48 @@ export function RegistrationDisplay({
 
   /**
    * Handle primary key registration
+   * Cleans invalid subkeys and marks primary key and valid subkeys as registered
    */
   const handleRegisterPrimaryKey = async () => {
     try {
-      await registerPrimaryKey(publicKey)
-      // Re-check registration status after successful registration
-      setTimeout(() => {
-        checkRegistrationStatus(publicKey)
-      }, 1000)
+      let keyToRegister = publicKey
+      
+      // If there are invalid subkeys, clone the key and remove them
+      if (invalidSubkeys.size > 0) {
+        // Import openpgp for key cloning
+        const openpgp = await import('openpgp')
+        
+        // Clone the key to avoid modifying the original
+        const clonedKey = await openpgp.readKey({ 
+          binaryKey: publicKey.toPublic().write() 
+        })
+        
+        // Remove invalid subkeys from the clone
+        clonedKey.subkeys = clonedKey.subkeys.filter(
+          (subkey) => !invalidSubkeys.has(subkey.getFingerprint().toUpperCase())
+        )
+        
+        keyToRegister = clonedKey
+      }
+      
+      await registerPrimaryKey(keyToRegister)
+      
+      // Optimistically mark primary key as registered
+      setLocalPrimaryRegistered(true)
+      
+      // Optimistically mark all VALID subkeys as registered
+      const subkeys = publicKey.getSubkeys()
+      setLocalSubkeyRegistrationStatus((prev) => {
+        const updated = new Map(prev)
+        for (const subkey of subkeys) {
+          const fingerprint = subkey.getFingerprint().toUpperCase()
+          // Only mark valid subkeys as registered (skip invalid ones)
+          if (!invalidSubkeys.has(fingerprint)) {
+            updated.set(fingerprint, true)
+          }
+        }
+        return updated
+      })
     } catch (error) {
       console.error('Error registering primary key:', error)
       throw error
@@ -64,15 +152,21 @@ export function RegistrationDisplay({
 
   /**
    * Handle subkey registration
+   * Updates UI optimistically and displays badges immediately
    */
   const handleRegisterSubkey = async (fingerprint: string) => {
     try {
       await registerSubkey(publicKey, fingerprint)
-      // Clear selection and re-check status
+      
+      // Optimistically update local status immediately for instant UI feedback
+      setLocalSubkeyRegistrationStatus((prev) => {
+        const updated = new Map(prev)
+        updated.set(fingerprint, true)
+        return updated
+      })
+      
+      // Clear selection
       setSelectedSubkeyFingerprint(null)
-      setTimeout(() => {
-        checkRegistrationStatus(publicKey)
-      }, 1000)
     } catch (error) {
       console.error('Error registering subkey:', error)
       throw error
@@ -81,6 +175,14 @@ export function RegistrationDisplay({
 
   const isLoading = isCheckingStatus || isRegistering
   const error = statusError || registrationError
+  
+  // Show warning if:
+  // - Primary key is not registered yet
+  // - There are invalid (revoked/expired) subkeys
+  // - There are valid subkeys that can be registered
+  const hasValidSubkeys = selectableSubkeys.length > 0
+  const hasInvalidSubkeys = invalidSubkeys.size > 0
+  const shouldShowWarning = !localPrimaryRegistered && !primaryRegistered && hasInvalidSubkeys && hasValidSubkeys
 
   return (
     <div className="registration-display">
@@ -90,7 +192,7 @@ export function RegistrationDisplay({
           {/* Primary Key Fingerprint with registration status */}
           <KeyFingerprint
             publicKey={publicKey}
-            isRegistered={primaryRegistered ?? undefined}
+            isRegistered={localPrimaryRegistered ?? primaryRegistered ?? undefined}
           />
 
           {/* User IDs */}
@@ -104,22 +206,35 @@ export function RegistrationDisplay({
           ) : (
             <SubkeysListWithRegistration
               publicKey={publicKey}
-              registrationStatus={subkeyRegistrationStatus}
+              registrationStatus={localSubkeyRegistrationStatus}
               verificationStatus={subkeyVerificationStatus}
-              selectableSubkeys={selectableSubkeys}
+              selectableSubkeys={effectiveSelectableSubkeys}
               selectedSubkeyFingerprint={selectedSubkeyFingerprint}
               onSubkeySelect={setSelectedSubkeyFingerprint}
-              primaryKeyRegistered={primaryRegistered ?? false}
+              primaryKeyRegistered={localPrimaryRegistered ?? primaryRegistered ?? false}
             />
           )}
         </div>
 
+        {/* Warning message for revoked/expired subkeys */}
+        {shouldShowWarning && (
+          <div className="warning-message">
+            <svg className="warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <p>Some subkeys are revoked or expired. Only the primary key and valid subkeys will be registered.</p>
+          </div>
+        )}
+
         {/* Action buttons */}
         <RegistrationActionButtons
           publicKey={publicKey}
-          primaryKeyRegistered={primaryRegistered ?? false}
+          primaryKeyRegistered={localPrimaryRegistered ?? primaryRegistered ?? false}
+          primaryIsRevoked={primaryIsRevoked ?? false}
           selectedSubkeyFingerprint={selectedSubkeyFingerprint}
-          selectableSubkeysAvailable={selectableSubkeys.length > 0}
+          selectableSubkeysAvailable={effectiveSelectableSubkeys.length > 0}
           onRegisterPrimaryKey={handleRegisterPrimaryKey}
           onRegisterSubkey={handleRegisterSubkey}
           isLoading={isRegistering}
@@ -202,6 +317,32 @@ export function RegistrationDisplay({
           margin: 0;
           font-size: 1rem;
           color: var(--text-secondary, #6b7280);
+        }
+
+        .warning-message {
+          display: flex;
+          align-items: flex-start;
+          gap: 1rem;
+          padding: 1rem;
+          background-color: #fef3c7;
+          border: 1px solid #fcd34d;
+          border-radius: 0.375rem;
+          margin-bottom: 1rem;
+        }
+
+        .warning-icon {
+          flex-shrink: 0;
+          width: 1.5rem;
+          height: 1.5rem;
+          color: #d97706;
+          margin-top: 0.125rem;
+        }
+
+        .warning-message p {
+          margin: 0;
+          font-size: 0.95rem;
+          color: #92400e;
+          line-height: 1.5;
         }
 
         @keyframes spin {

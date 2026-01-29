@@ -164,8 +164,15 @@ export function PublicKeyImportForm({
           <textarea
             id="armored-key-input"
             className={`key-textarea ${hasError ? 'error' : ''}`}
-            placeholder={`Paste your PGP public key here. It should start with:
------BEGIN PGP PUBLIC KEY BLOCK-----`}
+            placeholder={`-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEaX1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop
+qrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk
+lmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefg
+hijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
+efghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZa
+
+-----END PGP PUBLIC KEY BLOCK-----`}
             value={pastedKey}
             onChange={(e) => handlePastedKeyChange(e.target.value)}
             disabled={isLoading}
@@ -362,7 +369,7 @@ export function PublicKeyImportForm({
           justify-content: center;
           gap: 0.75rem;
           padding: 1rem 1.5rem;
-          background-color: var(--primary-color, #0ea5e9);
+          background-color: #667eea;
           color: white;
           border: none;
           border-radius: 0.5rem;
@@ -373,9 +380,9 @@ export function PublicKeyImportForm({
         }
 
         .import-button:hover:not(:disabled) {
-          background-color: var(--primary-hover, #0284c7);
+          background-color: #5568d3;
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         }
 
         .import-button:active:not(:disabled) {
@@ -383,7 +390,7 @@ export function PublicKeyImportForm({
         }
 
         .import-button:disabled {
-          background-color: var(--primary-color, #0ea5e9);
+          background-color: #667eea;
           opacity: 0.6;
           cursor: not-allowed;
         }
