@@ -69,11 +69,15 @@ export class OpenPGPUtils {
      * @throws - Error if the specified subkey fingerprint is not found
      */
     static async sanitizeSubkey(key: openpgp.Key, fingerprint: `0x${string}`): Promise<openpgp.Key> {
+        
+        // Bugfix: Create a copy of the public key to avoid modifying the original key (toPublic does not return a new instance)
+        const clonedKey = await openpgp.readKey({ binaryKey: key.toPublic().write() }); ;
+
         // Convert and validate fingerprint format
         const targetFingerprint = toBytes32(to0x(fingerprint));
 
         // Create a copy of the public key
-        const publicKey = key.toPublic();
+        const publicKey = clonedKey.toPublic();
 
         // Find target subkey
         const targetSubkey = publicKey.subkeys.find(
