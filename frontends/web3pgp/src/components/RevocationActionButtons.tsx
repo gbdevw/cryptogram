@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { PublicKey } from 'openpgp'
+import { KeyMetadata } from '../types/revocation'
 
 interface RevocationActionButtonsProps {
-  publicKey: PublicKey
-  revokedPrimaryKey: boolean | null
-  revokedSubkeys: string[]
+  keyMetadata: KeyMetadata | null
   selectedSubkeyFingerprint: string | null
   onPublishRevocation: () => Promise<void>
+  onSuccessComplete?: () => void
   isLoading?: boolean
   error?: string | null
+  hasAllRevokedOnBlockchain?: boolean
 }
 
 /**
@@ -16,13 +16,13 @@ interface RevocationActionButtonsProps {
  * Handles transaction feedback and state management
  */
 export function RevocationActionButtons({
-  publicKey,
-  revokedPrimaryKey,
-  revokedSubkeys,
+  keyMetadata,
   selectedSubkeyFingerprint,
   onPublishRevocation,
+  onSuccessComplete,
   isLoading = false,
   error = null,
+  hasAllRevokedOnBlockchain = false,
 }: RevocationActionButtonsProps) {
   const [localError, setLocalError] = useState<string | null>(null)
   const [localSuccess, setLocalSuccess] = useState(false)
@@ -54,8 +54,11 @@ export function RevocationActionButtons({
     try {
       await onPublishRevocation()
       setLocalSuccess(true)
-      // Clear success message after 3 seconds
-      successTimeoutRef.current = setTimeout(() => setLocalSuccess(false), 3000)
+      // Clear success message after 3 seconds and call success callback
+      successTimeoutRef.current = setTimeout(() => {
+        setLocalSuccess(false)
+        onSuccessComplete?.()
+      }, 3000)
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to publish revocation'
@@ -66,32 +69,52 @@ export function RevocationActionButtons({
     }
   }
 
+  if (!keyMetadata) {
+    return null
+  }
+
   const isButtonLoading = isLoading || isProcessing
 
-  // Determine button state and text
+  // Determine button state and text based on revocation state
   let buttonLabel = ''
   let isDisabled = false
   let buttonVariant: 'primary' | 'disabled' = 'primary'
 
-  if (revokedPrimaryKey) {
-    // Primary key is revoked
-    buttonLabel =
-      revokedSubkeys.length > 0
-        ? 'Publish revocation certificate for key and subkeys'
-        : 'Publish revocation certificate for key'
-    isDisabled = false
-  } else if (revokedSubkeys.length === 0) {
-    // No revoked items
-    buttonLabel = 'No keys to revoke'
+  if (hasAllRevokedOnBlockchain) {
+    // Already revoked on blockchain
+    buttonLabel = 'Already revoked on blockchain'
     isDisabled = true
     buttonVariant = 'disabled'
+  } else if (keyMetadata.primaryKeyRevocationState === 'to-revoke') {
+    // Primary key is marked for revocation
+    const toRevokeSubkeys = keyMetadata.subkeys.filter(
+      (sk) => sk.revocationState === 'to-revoke'
+    )
+    buttonLabel =
+      toRevokeSubkeys.length > 0
+        ? 'Publish revocation for key and its subkeys'
+        : 'Publish revocation for key'
+    isDisabled = false
   } else {
-    // Has revoked subkeys but primary is not revoked
-    if (selectedSubkeyFingerprint) {
-      buttonLabel = 'Publish revocation certificate for this subkey'
+    // No primary key revocation, check subkeys
+    const toRevokeSubkeys = keyMetadata.subkeys.filter(
+      (sk) =>
+        sk.revocationState === 'to-revoke' &&
+        sk.registrationState === 'registered'
+    )
+
+    if (toRevokeSubkeys.length === 0) {
+      // No revokable items
+      buttonLabel = 'No items to revoke'
+      isDisabled = true
+      buttonVariant = 'disabled'
+    } else if (selectedSubkeyFingerprint) {
+      // Subkey selected
+      buttonLabel = 'Publish revocation for this subkey'
       isDisabled = false
     } else {
-      buttonLabel = 'Select a revoked subkey to continue'
+      // Subkeys available but not selected
+      buttonLabel = 'Select a subkey to revoke'
       isDisabled = true
       buttonVariant = 'disabled'
     }
@@ -120,27 +143,9 @@ export function RevocationActionButtons({
         </div>
       )}
 
-      {/* Error message */}
-      {hasError && (
-        <div className="error-container">
-          <svg
-            className="error-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <p className="error-message">{localError}</p>
-        </div>
-      )}
-
       {/* Action button */}
       <button
-        className={`action-button ${buttonVariant}`}
+        className={`action-button ${buttonVariant} ${localSuccess ? 'success' : ''}`}
         onClick={handlePublishRevocation}
         disabled={isDisabled || isButtonLoading}
       >
@@ -148,6 +153,19 @@ export function RevocationActionButtons({
           <>
             <span className="spinner"></span>
             <span>Publishing revocation...</span>
+          </>
+        ) : localSuccess ? (
+          <>
+            <svg
+              className="button-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Revocation published</span>
           </>
         ) : (
           <>
@@ -261,6 +279,16 @@ export function RevocationActionButtons({
           background-color: var(--border-color, #e5e7eb);
           color: var(--text-disabled, #9ca3af);
           cursor: not-allowed;
+        }
+
+        .action-button.success {
+          background-color: #22c55e;
+          border-color: #16a34a;
+          color: white;
+        }
+
+        .action-button.success:hover {
+          background-color: #16a34a;
         }
 
         .button-icon {

@@ -128,6 +128,7 @@ function RevokePage() {
           display: flex;
           flex-direction: column;
           overflow: hidden;
+          padding-top: 4rem;
         }
 
         .back-button {

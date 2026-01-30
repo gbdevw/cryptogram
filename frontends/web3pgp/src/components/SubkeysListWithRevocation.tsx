@@ -1,24 +1,24 @@
-import React from 'react'
-import { PublicKey } from 'openpgp'
+import React, { useState } from 'react'
+import { KeyMetadata } from '../types/revocation'
 
 interface SubkeysListWithRevocationProps {
-  publicKey: PublicKey
-  revokedSubkeys: string[]
+  keyMetadata: KeyMetadata
   selectedSubkeyFingerprint: string | null
   onSubkeySelect: (fingerprint: string | null) => void
 }
 
 /**
  * Displays a list of subkeys with revocation status
- * Users can select revoked subkeys for revocation
+ * Shows: To Revoke, Already Revoked, Unregistered, Valid states
+ * Users can select "To Revoke" subkeys for revocation
  */
 export function SubkeysListWithRevocation({
-  publicKey,
-  revokedSubkeys,
+  keyMetadata,
   selectedSubkeyFingerprint,
   onSubkeySelect,
 }: SubkeysListWithRevocationProps) {
-  const subkeys = publicKey.getSubkeys()
+  const [isExpanded, setIsExpanded] = useState(true)
+  const { subkeys } = keyMetadata
 
   if (subkeys.length === 0) {
     return (
@@ -30,38 +30,78 @@ export function SubkeysListWithRevocation({
     )
   }
 
+  // Count subkeys by revocation state
+  const toRevokeCount = subkeys.filter(
+    (sk) => sk.revocationState === 'to-revoke'
+  ).length
+  const alreadyRevokedCount = subkeys.filter(
+    (sk) => sk.revocationState === 'already-revoked'
+  ).length
+  const unregisteredCount = subkeys.filter(
+    (sk) => sk.registrationState === 'unregistered'
+  ).length
+
   return (
     <div className="subkeys-list">
-      <div className="subkeys-header">
-        <h3 className="subkeys-title">Subkeys</h3>
-        <p className="subkeys-hint">
-          {revokedSubkeys.length === 0
-            ? 'No revoked subkeys'
-            : `${revokedSubkeys.length} revoked subkey${revokedSubkeys.length !== 1 ? 's' : ''}`}
-        </p>
-      </div>
+      <button
+        className="subkeys-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="subkeys-header-content">
+          <svg
+            className={`collapse-icon ${!isExpanded ? 'collapsed' : ''}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+          <h3 className="subkeys-title">Subkeys ({subkeys.length})</h3>
+          <p className="subkeys-hint">
+            {toRevokeCount > 0 && `${toRevokeCount} to revoke`}
+            {alreadyRevokedCount > 0 &&
+              `${toRevokeCount > 0 ? ', ' : ''}${alreadyRevokedCount} already revoked`}
+            {unregisteredCount > 0 &&
+              `${toRevokeCount > 0 || alreadyRevokedCount > 0 ? ', ' : ''}${unregisteredCount} unregistered`}
+            {toRevokeCount === 0 &&
+              alreadyRevokedCount === 0 &&
+              unregisteredCount === 0 &&
+              'All valid'}
+          </p>
+        </div>
+      </button>
 
+      {isExpanded && (
       <div className="subkeys-container">
         {subkeys.map((subkey) => {
-          const fingerprint = subkey.getFingerprint().toUpperCase()
-          const isRevoked = revokedSubkeys.includes(fingerprint)
+          const fingerprint = subkey.fingerprint
           const isSelected = selectedSubkeyFingerprint === fingerprint
+          const isSelectable = subkey.revocationState === 'to-revoke'
 
           return (
             <div
               key={fingerprint}
-              className={`subkey-item ${isRevoked ? 'revoked' : 'valid'} ${
-                isSelected ? 'selected' : ''
-              }`}
+              className={`subkey-item 
+                ${subkey.revocationState === 'to-revoke' ? 'to-revoke' : ''} 
+                ${subkey.revocationState === 'already-revoked' ? 'already-revoked' : ''} 
+                ${subkey.registrationState === 'unregistered' ? 'unregistered' : ''} 
+                ${subkey.revocationState === 'valid' && subkey.registrationState === 'registered' ? 'valid-registered' : ''}
+                ${isSelectable ? '' : 'disabled'} 
+                ${isSelected ? 'selected' : ''}
+              `}
               onClick={() => {
-                if (isRevoked) {
+                if (isSelectable) {
                   onSubkeySelect(isSelected ? null : fingerprint)
                 }
               }}
-              role={isRevoked ? 'button' : 'presentation'}
-              tabIndex={isRevoked ? 0 : -1}
+              role={isSelectable ? 'button' : 'presentation'}
+              tabIndex={isSelectable ? 0 : -1}
               onKeyPress={(e) => {
-                if (isRevoked && (e.key === 'Enter' || e.key === ' ')) {
+                if (
+                  isSelectable &&
+                  (e.key === 'Enter' || e.key === ' ')
+                ) {
                   onSubkeySelect(isSelected ? null : fingerprint)
                 }
               }}
@@ -70,33 +110,29 @@ export function SubkeysListWithRevocation({
                 <div className="subkey-info">
                   <p className="subkey-fingerprint">{fingerprint}</p>
                   <div className="subkey-meta">
-                    <span className="subkey-type">
-                      SUBKEY
-                    </span>
-                    {isRevoked && (
-                      <span className="subkey-status revoked-badge">
-                        Revoked
+                    {subkey.registrationState === 'registered' && (
+                      <span className="subkey-status registered-badge">
+                        REGISTERED
+                      </span>
+                    )}
+                    {subkey.revocationState === 'to-revoke' && (
+                      <span className="subkey-status to-revoke-badge">
+                        TO REVOKE
+                      </span>
+                    )}
+                    {subkey.revocationState === 'already-revoked' && (
+                      <span className="subkey-status already-revoked-badge">
+                        ALREADY REVOKED
                       </span>
                     )}
                   </div>
                 </div>
-                {isRevoked && (
-                  <div className="subkey-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => {}}
-                      disabled={false}
-                      className="checkbox-input"
-                      aria-label={`Select subkey ${fingerprint}`}
-                    />
-                  </div>
-                )}
               </div>
             </div>
           )
         })}
       </div>
+      )}
 
       <style jsx>{`
         .subkeys-list {
@@ -110,10 +146,41 @@ export function SubkeysListWithRevocation({
         }
 
         .subkeys-header {
+          background: none;
+          border: none;
+          padding: 0;
+          cursor: pointer;
           display: flex;
-          flex-direction: column;
-          gap: 0.25rem;
+          align-items: flex-start;
+          width: 100%;
+          color: inherit;
+          font-family: inherit;
+          transition: opacity 0.2s;
           margin-bottom: 0.5rem;
+        }
+
+        .subkeys-header:hover {
+          opacity: 0.7;
+        }
+
+        .subkeys-header-content {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.75rem;
+          width: 100%;
+        }
+
+        .collapse-icon {
+          flex-shrink: 0;
+          width: 1.25rem;
+          height: 1.25rem;
+          color: var(--text-secondary, #6b7280);
+          transition: transform 0.2s;
+          margin-top: 0.1rem;
+        }
+
+        .collapse-icon.collapsed {
+          transform: rotate(180deg);
         }
 
         .subkeys-title {
@@ -146,26 +213,46 @@ export function SubkeysListWithRevocation({
           transition: all 0.2s;
         }
 
-        .subkey-item.valid {
-          opacity: 0.6;
-          cursor: not-allowed;
+        .subkey-item.to-revoke {
+          cursor: pointer;
+          border-color: #fed7aa;
+          background-color: #fffbf0;
         }
 
-        .subkey-item.revoked {
-          cursor: pointer;
+        .subkey-item.to-revoke:hover {
+          background-color: #fef3c7;
+          border-color: #f59e0b;
+        }
+
+        .subkey-item.to-revoke.selected {
+          background-color: #fef3c7;
+          border-color: #d97706;
+          box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+        }
+
+        .subkey-item.already-revoked {
+          opacity: 0.7;
+          cursor: not-allowed;
           border-color: #fca5a5;
           background-color: #fffbfb;
         }
 
-        .subkey-item.revoked:hover {
-          background-color: #fef2f2;
-          border-color: #f87171;
+        .subkey-item.valid-registered {
+          opacity: 0.6;
+          cursor: not-allowed;
+          border-color: var(--border-color, #e5e7eb);
+          background-color: var(--bg-secondary, #f9fafb);
         }
 
-        .subkey-item.revoked.selected {
-          background-color: #fef2f2;
-          border-color: #dc2626;
-          box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+        .subkey-item.unregistered {
+          opacity: 0.6;
+          cursor: not-allowed;
+          border-color: var(--border-color, #e5e7eb);
+          background-color: var(--bg-secondary, #f9fafb);
+        }
+
+        .subkey-item.disabled {
+          cursor: not-allowed;
         }
 
         .subkey-item:focus-within {
@@ -205,35 +292,29 @@ export function SubkeysListWithRevocation({
           flex-wrap: wrap;
         }
 
-        .subkey-type {
-          font-size: 0.75rem;
-          font-weight: 500;
-          padding: 0.25rem 0.5rem;
-          background-color: var(--border-color, #e5e7eb);
-          color: var(--text-secondary, #6b7280);
-          border-radius: 0.25rem;
-          text-transform: uppercase;
-        }
-
-        .revoked-badge {
+        .subkey-status {
           font-size: 0.75rem;
           font-weight: 600;
           padding: 0.25rem 0.75rem;
-          background-color: #fee2e2;
-          color: #991b1b;
           border-radius: 0.25rem;
         }
 
-        .subkey-checkbox {
-          flex-shrink: 0;
+        .to-revoke-badge {
+          background-color: #fef3c7;
+          color: #92400e;
         }
 
-        .checkbox-input {
-          width: 1.25rem;
-          height: 1.25rem;
-          cursor: pointer;
-          accent-color: #dc2626;
+        .already-revoked-badge {
+          background-color: #fee2e2;
+          color: #991b1b;
         }
+
+        .registered-badge {
+          background-color: #dcfce7;
+          color: #166534;
+        }
+
+
 
         .empty-state {
           text-align: center;

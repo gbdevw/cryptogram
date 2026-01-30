@@ -4,8 +4,9 @@ import { KeyFingerprint } from './KeyFingerprint'
 import { UserIDsList } from './UserIDsList'
 import { SubkeysListWithRevocation } from './SubkeysListWithRevocation'
 import { RevocationActionButtons } from './RevocationActionButtons'
-import { usePublicKeyRevocationStatus } from '../hooks/usePublicKeyRevocationStatus'
+import { useProcessRevokeKey } from '../hooks/useProcessRevokeKey'
 import { useRevokePublicKey } from '../hooks/useRevokePublicKey'
+import { KeyMetadata } from '../types/revocation'
 
 interface RevocationDisplayProps {
   publicKey: PublicKey
@@ -13,18 +14,17 @@ interface RevocationDisplayProps {
 
 /**
  * Displays public key information and handles revocation workflows
- * Shows revoked keys/subkeys and provides options to publish revocation
+ * Processes key against blockchain version, merges them, and shows revocation status
  */
 export function RevocationDisplay({
   publicKey,
 }: RevocationDisplayProps) {
   const {
-    revokedPrimaryKey,
-    revokedSubkeys,
-    isLoading: isCheckingStatus,
-    error: statusError,
-    checkRevocationStatus,
-  } = usePublicKeyRevocationStatus()
+    result: processResult,
+    isLoading: isProcessing,
+    error: processError,
+    processKey,
+  } = useProcessRevokeKey()
 
   const {
     isLoading: isRevoking,
@@ -37,23 +37,31 @@ export function RevocationDisplay({
   const [selectedSubkeyFingerprint, setSelectedSubkeyFingerprint] = useState<
     string | null
   >(null)
+  const [dismissedError, setDismissedError] = useState(false)
+  const [localMetadata, setLocalMetadata] = useState<KeyMetadata | null>(null)
 
-  // Check revocation status on mount
+  // Use local metadata if available, otherwise use processed metadata
+  const displayMetadata = localMetadata || processResult?.metadata
+
+  // Process the key on mount
   useEffect(() => {
-    checkRevocationStatus(publicKey)
-  }, [publicKey, checkRevocationStatus])
+    processKey(publicKey)
+  }, [publicKey, processKey])
 
   /**
    * Handle primary key revocation
    */
   const handlePublishRevocation = async () => {
+    if (!processResult?.metadata) return
+
     try {
-      if (revokedPrimaryKey) {
-        // Revoke primary key (and any revoked subkeys)
-        await revokePrimaryKey(publicKey)
+      const { metadata } = processResult
+      if (metadata.primaryKeyRevocationState === 'to-revoke') {
+        // Revoke primary key
+        await revokePrimaryKey(metadata.mergedKey)
       } else if (selectedSubkeyFingerprint) {
         // Revoke selected subkey
-        await revokeSubkey(publicKey, selectedSubkeyFingerprint)
+        await revokeSubkey(metadata.mergedKey, selectedSubkeyFingerprint)
         // Clear selection after successful revocation
         setSelectedSubkeyFingerprint(null)
       }
@@ -63,11 +71,77 @@ export function RevocationDisplay({
     }
   }
 
-  const isLoading = isCheckingStatus || isRevoking
-  const error = statusError || revocationError
+  /**
+   * Handle successful revocation - update metadata locally
+   */
+  const handleRevocationSuccess = () => {
+    const metadata = displayMetadata
+    if (!metadata) return
 
-  const hasRevocations =
-    (revokedPrimaryKey || revokedSubkeys.length > 0)
+    // If primary key was revoked, update all to already-revoked
+    if (metadata.primaryKeyRevocationState === 'to-revoke') {
+      const updatedMetadata: KeyMetadata = {
+        ...metadata,
+        primaryKeyRevocationState: 'already-revoked',
+        subkeys: metadata.subkeys.map(sk => ({
+          ...sk,
+          revocationState: 'already-revoked' as const,
+        })),
+      }
+      setLocalMetadata(updatedMetadata)
+    } else if (selectedSubkeyFingerprint) {
+      // If subkey was revoked, update only that subkey
+      const updatedMetadata: KeyMetadata = {
+        ...metadata,
+        subkeys: metadata.subkeys.map(sk =>
+          sk.fingerprint === selectedSubkeyFingerprint
+            ? { ...sk, revocationState: 'already-revoked' as const }
+            : sk
+        ),
+      }
+      setLocalMetadata(updatedMetadata)
+    }
+  }
+
+  const isLoading = isProcessing || isRevoking
+  const error = processError || revocationError
+  
+  // Parse revocation error message
+  const getErrorMessage = (errorText: string | null): string | null => {
+    if (!errorText) return null
+    
+    if (errorText.includes('User rejected the request')) {
+      return 'Transaction cancelled by user'
+    }
+    
+    // Generic error message for other errors
+    return 'Failed to publish revocation. Please try again.'
+  }
+  
+  const displayError = getErrorMessage(error)
+  const metadata = displayMetadata
+  const hasAllRevokedOnBlockchain = processResult?.hasAllRevokedOnBlockchain ?? false
+
+  // Log actual error to console for debugging
+  if (error && !isLoading) {
+    console.error('Revocation error:', error)
+  }
+
+  // Reset dismissed state when error changes
+  React.useEffect(() => {
+    setDismissedError(false)
+  }, [error])
+
+  // Show loading state while processing
+  if (!metadata || isProcessing) {
+    return (
+      <div className="revocation-display">
+        <div className="key-info-section">
+          <p className="loading-text">Processing the key...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="revocation-display">
@@ -76,31 +150,24 @@ export function RevocationDisplay({
         <div className="scrollable-content">
           {/* Primary Key Fingerprint */}
           <KeyFingerprint
-            publicKey={publicKey}
-            isRegistered={revokedPrimaryKey ? undefined : undefined}
+            publicKey={metadata?.mergedKey ?? publicKey}
+            isRegistered={metadata?.primaryKeyRegistered}
           />
 
           {/* User IDs */}
-          <UserIDsList publicKey={publicKey} />
+          <UserIDsList publicKey={metadata?.mergedKey ?? publicKey} />
 
           {/* Subkeys with revocation status */}
-          {isCheckingStatus ? (
-            <div className="loading-state">
-              <p className="loading-text">Checking revocation status...</p>
-            </div>
-          ) : (
-            <SubkeysListWithRevocation
-              publicKey={publicKey}
-              revokedSubkeys={revokedSubkeys}
-              selectedSubkeyFingerprint={selectedSubkeyFingerprint}
-              onSubkeySelect={setSelectedSubkeyFingerprint}
-            />
-          )}
+          <SubkeysListWithRevocation
+            keyMetadata={metadata}
+            selectedSubkeyFingerprint={selectedSubkeyFingerprint}
+            onSubkeySelect={setSelectedSubkeyFingerprint}
+          />
         </div>
 
-        {/* No revoked items message */}
-        {!hasRevocations && !isCheckingStatus && (
-          <div className="info-message">
+        {/* All revoked on blockchain message */}
+        {hasAllRevokedOnBlockchain && !isLoading && (
+          <div className="info-message success-message">
             <svg
               className="info-icon"
               viewBox="0 0 24 24"
@@ -109,22 +176,78 @@ export function RevocationDisplay({
               strokeWidth="2"
             >
               <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
+              <polyline points="16 12 12 8 8 12"></polyline>
             </svg>
-            <p>This key has no revoked items to publish.</p>
+            <p>This key is already revoked on the blockchain. No action needed.</p>
+          </div>
+        )}
+
+        {/* No revoked items message */}
+        {metadata &&
+          !hasAllRevokedOnBlockchain &&
+          metadata.primaryKeyRevocationState === 'valid' &&
+          metadata.subkeys.every((sk) => sk.revocationState === 'valid') &&
+          !isLoading && (
+            <div className="info-message">
+              <svg
+                className="info-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              <p>This key has no revoked items to publish.</p>
+            </div>
+          )}
+
+        {/* Error message - shown above action buttons */}
+        {displayError && !isLoading && !dismissedError && (
+          <div className="error-banner">
+            <div className="error-content">
+              <svg
+                className="error-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <p>{displayError}</p>
+            </div>
+            <button
+              className="error-dismiss-btn"
+              onClick={() => setDismissedError(true)}
+              aria-label="Dismiss error"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
           </div>
         )}
 
         {/* Action buttons */}
         <RevocationActionButtons
-          publicKey={publicKey}
-          revokedPrimaryKey={revokedPrimaryKey ?? false}
-          revokedSubkeys={revokedSubkeys}
+          keyMetadata={displayMetadata ?? null}
           selectedSubkeyFingerprint={selectedSubkeyFingerprint}
           onPublishRevocation={handlePublishRevocation}
+          onSuccessComplete={handleRevocationSuccess}
           isLoading={isRevoking}
           error={revocationError}
+          hasAllRevokedOnBlockchain={hasAllRevokedOnBlockchain}
         />
       </div>
 
@@ -181,29 +304,13 @@ export function RevocationDisplay({
           flex-shrink: 0;
         }
 
-        .loading-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 1rem;
-          padding: 2rem 1rem;
-          text-align: center;
-        }
-
-        .loading-spinner {
-          width: 2.5rem;
-          height: 2.5rem;
-          border: 3px solid var(--spinner-bg, #e5e7eb);
-          border-top-color: var(--primary-color, #0ea5e9);
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-
         .loading-text {
           margin: 0;
           font-size: 1rem;
           color: var(--text-secondary, #6b7280);
         }
+
+
 
         .info-message {
           display: flex;
@@ -214,6 +321,19 @@ export function RevocationDisplay({
           border: 1px solid #bfdbfe;
           border-radius: 0.375rem;
           margin-bottom: 1rem;
+        }
+
+        .info-message.success-message {
+          background-color: #dcfce7;
+          border-color: #bbf7d0;
+        }
+
+        .info-message.success-message .info-icon {
+          color: #166534;
+        }
+
+        .info-message.success-message p {
+          color: #15803d;
         }
 
         .info-icon {
@@ -229,6 +349,65 @@ export function RevocationDisplay({
           font-size: 0.95rem;
           color: #0c4a6e;
           line-height: 1.5;
+        }
+
+        .error-banner {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 1rem;
+          padding: 1rem;
+          background-color: #fee2e2;
+          border: 1px solid #fca5a5;
+          border-radius: 0.375rem;
+          margin-bottom: 1rem;
+        }
+
+        .error-content {
+          display: flex;
+          align-items: flex-start;
+          gap: 1rem;
+          flex: 1;
+        }
+
+        .error-banner .error-icon {
+          flex-shrink: 0;
+          width: 1.5rem;
+          height: 1.5rem;
+          color: #991b1b;
+          margin-top: 0.125rem;
+        }
+
+        .error-banner p {
+          margin: 0;
+          font-size: 0.95rem;
+          color: #7f1d1d;
+          line-height: 1.5;
+        }
+
+        .error-dismiss-btn {
+          flex-shrink: 0;
+          background: none;
+          border: none;
+          color: #991b1b;
+          cursor: pointer;
+          padding: 0.25rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 1.5rem;
+          height: 1.5rem;
+        }
+
+        .error-dismiss-btn svg {
+          width: 1.25rem;
+          height: 1.25rem;
+        }
+
+        .error-dismiss-btn:hover {
+          color: #7f1d1d;
+          background-color: rgba(155, 27, 27, 0.1);
+          border-radius: 0.25rem;
         }
 
         @keyframes spin {
