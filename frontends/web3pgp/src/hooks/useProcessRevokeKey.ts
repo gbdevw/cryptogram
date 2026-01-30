@@ -190,6 +190,10 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
           if (primaryKeyRevocationState === 'to-revoke') {
             revocationState = 'to-revoke'
           }
+          // If primary key is "already-revoked", all subkeys are also "already-revoked"
+          else if (primaryKeyRevocationState === 'already-revoked') {
+            revocationState = 'already-revoked'
+          }
 
           subkeys.push({
             fingerprint: subkeyFingerprint,
@@ -319,6 +323,10 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
           // If primary key is "to-revoke", all subkeys are also "to-revoke"
           if (primaryKeyRevocationState === 'to-revoke') {
             revocationState = 'to-revoke'
+          }
+          // If primary key is "already-revoked", all subkeys are also "already-revoked"
+          else if (primaryKeyRevocationState === 'already-revoked') {
+            revocationState = 'already-revoked'
           }
 
           subkeys.push({
