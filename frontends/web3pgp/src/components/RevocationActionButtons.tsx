@@ -126,22 +126,7 @@ export function RevocationActionButtons({
   return (
     <div className="revocation-action-buttons">
       {/* Success message */}
-      {showSuccess && (
-        <div className="success-container">
-          <svg
-            className="success-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-          <p className="success-message">
-            ✓ Revocation published successfully
-          </p>
-        </div>
-      )}
+      {showSuccess }
 
       {/* Action button */}
       <button
