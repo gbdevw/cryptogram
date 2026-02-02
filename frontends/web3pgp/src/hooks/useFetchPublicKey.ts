@@ -1,22 +1,24 @@
 import { useState, useCallback } from 'react'
 import { PublicKey } from 'openpgp'
-import { useWeb3PGPService } from './useWeb3PGPService'
+import { useWeb3PGPServiceReady } from './useWeb3PGPServiceReady'
 import { to0x } from '@jibidieuw/dexes'
 
 interface UseFetchPublicKeyReturn {
   publicKey: PublicKey | null
   isLoading: boolean
   error: string | null
+  isServiceReady: boolean
+  serviceError: Error | null
   fetchPublicKey: (fingerprint: string) => Promise<void>
   reset: () => void
 }
 
 /**
  * Custom hook to fetch public keys from Web3PGP service
- * Handles fingerprint validation, loading states, and error management
+ * Handles fingerprint validation, loading states, error management, and service initialization
  */
 export function useFetchPublicKey(): UseFetchPublicKeyReturn {
-  const web3pgpService = useWeb3PGPService()
+  const { service: web3pgpService, isReady: isServiceReady, isLoading: isServiceLoading, error: serviceError } = useWeb3PGPServiceReady()
   const [publicKey, setPublicKey] = useState<PublicKey | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +45,12 @@ export function useFetchPublicKey(): UseFetchPublicKeyReturn {
    */
   const fetchPublicKey = useCallback(
     async (fingerprint: string) => {
+      // Check if service is ready
+      if (!isServiceReady || !web3pgpService) {
+        setError('service-error')
+        return
+      }
+
       // Reset state before fetching
       setPublicKey(null)
       setError(null)
@@ -60,18 +68,14 @@ export function useFetchPublicKey(): UseFetchPublicKeyReturn {
         // Call the Web3PGP service to fetch the public key
         const result = await web3pgpService.getPublicKey(to0x(normalizedFingerprint))
 
-        // Check if key was found
-        if (!result) {
-          setError('not-found')
-          setPublicKey(null)
-        } else {
-          setPublicKey(result)
-          setError(null)
-        }
+        setPublicKey(result)
+        setError(null)
       } catch (err) {
         // Determine error type
         if (err instanceof Error && err.message === 'invalid-input') {
           setError('invalid-input')
+        } else if (err instanceof Error && err.message.includes('is not registered on-chain')) {
+          setError('not-found')
         } else {
           // Log the actual error for debugging
           console.error('Failed to fetch public key:', err)
@@ -82,7 +86,7 @@ export function useFetchPublicKey(): UseFetchPublicKeyReturn {
         setIsLoading(false)
       }
     },
-    [web3pgpService]
+    [web3pgpService, isServiceReady]
   )
 
   /**
@@ -98,6 +102,8 @@ export function useFetchPublicKey(): UseFetchPublicKeyReturn {
     publicKey,
     isLoading,
     error,
+    isServiceReady,
+    serviceError,
     fetchPublicKey,
     reset,
   }

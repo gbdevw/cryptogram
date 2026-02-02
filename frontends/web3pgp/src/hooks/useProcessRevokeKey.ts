@@ -8,12 +8,14 @@ import {
   ProcessRevokeKeyResult,
   UserIDMetadata,
 } from '../types/revocation'
-import { web3pgpServiceManager } from '../services/web3pgpService'
+import { useWeb3PGPServiceReady } from './useWeb3PGPServiceReady'
 
 interface UseProcessRevokeKeyReturn {
   result: ProcessRevokeKeyResult | null
   isLoading: boolean
   error: string | null
+  isServiceReady: boolean
+  serviceError: Error | null
   processKey: (providedKey: PublicKey) => Promise<void>
   processKeyWithCertificate: (
     certificate: string,
@@ -27,6 +29,7 @@ interface UseProcessRevokeKeyReturn {
  * Handles both direct key import and standalone certificate workflows
  */
 export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
+  const { service: web3pgpService, isReady: isServiceReady, error: serviceError } = useWeb3PGPServiceReady()
   const [result, setResult] = useState<ProcessRevokeKeyResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -167,12 +170,15 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
    */
   const processKey = useCallback(
     async (providedKey: PublicKey) => {
+      if (!isServiceReady || !web3pgpService) {
+        setError('Web3PGP service not initialized')
+        return
+      }
+
       setIsLoading(true)
       setError(null)
 
       try {
-        const service = web3pgpServiceManager.getWeb3PGPService()
-
         // Step 1: Get primary key fingerprint
         const primaryFingerprint = providedKey
           .getFingerprint()
@@ -182,7 +188,7 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
         // Step 2: Download key from blockchain
         let downloadedKey: PublicKey | null = null
         try {
-          downloadedKey = await service.getPublicKey(hexFingerprint)
+          downloadedKey = await web3pgpService.getPublicKey(hexFingerprint)
         } catch (err) {
           // Key not found on blockchain - still process but mark as unregistered
           console.warn('Key not found on blockchain:', err)
@@ -313,7 +319,7 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
         setIsLoading(false)
       }
     },
-    []
+    [isServiceReady, web3pgpService]
   )
 
   /**
@@ -321,17 +327,20 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
    */
   const processKeyWithCertificate = useCallback(
     async (certificate: string, fingerprint: string) => {
+      if (!isServiceReady || !web3pgpService) {
+        setError('Web3PGP service not initialized')
+        return
+      }
+
       setIsLoading(true)
       setError(null)
 
       try {
-        const service = web3pgpServiceManager.getWeb3PGPService()
-
         // Step 1: Download key from blockchain using provided fingerprint
         const hexFingerprint = to0x(fingerprint)
         let downloadedKey: PublicKey
         try {
-          downloadedKey = await service.getPublicKey(hexFingerprint)
+          downloadedKey = await web3pgpService.getPublicKey(hexFingerprint)
         } catch (err) {
           throw new Error(
             `Failed to download key with fingerprint ${fingerprint}: ${err instanceof Error ? err.message : 'Unknown error'}`
@@ -463,7 +472,7 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
         setIsLoading(false)
       }
     },
-    []
+    [isServiceReady, web3pgpService]
   )
 
   const reset = useCallback(() => {
@@ -476,6 +485,8 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
     result,
     isLoading,
     error,
+    isServiceReady,
+    serviceError,
     processKey,
     processKeyWithCertificate,
     reset,

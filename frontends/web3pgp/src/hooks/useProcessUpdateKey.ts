@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { PublicKey } from 'openpgp'
 import { to0x } from '@jibidieuw/dexes'
-import { web3pgpServiceManager } from '../services/web3pgpService'
+import { useWeb3PGPServiceReady } from './useWeb3PGPServiceReady'
 import { RevocationState } from '../types/revocation'
 
 export interface UpdateUserMetadata {
@@ -26,6 +26,8 @@ interface UseProcessUpdateKeyReturn {
   result: UpdateKeyMetadata | null
   isLoading: boolean
   error: string | null
+  isServiceReady: boolean
+  serviceError: Error | null
   processKey: (providedKey: PublicKey) => Promise<void>
   reset: () => void
 }
@@ -35,6 +37,7 @@ interface UseProcessUpdateKeyReturn {
  * Fetches the registered key from blockchain and merges it with the provided key
  */
 export function useProcessUpdateKey(): UseProcessUpdateKeyReturn {
+  const { service: web3pgpService, isReady: isServiceReady, error: serviceError } = useWeb3PGPServiceReady()
   const [result, setResult] = useState<UpdateKeyMetadata | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,17 +112,16 @@ export function useProcessUpdateKey(): UseProcessUpdateKeyReturn {
    */
   const processKey = useCallback(
     async (providedKey: PublicKey) => {
+      if (!isServiceReady || !web3pgpService) {
+        setError('Web3PGP service not initialized')
+        return
+      }
+
       setIsLoading(true)
       setError(null)
       setResult(null)
 
       try {
-        // Get the Web3PGP service
-        const service = web3pgpServiceManager.getWeb3PGPService()
-        if (!service) {
-          throw new Error('Web3PGP service not initialized')
-        }
-
         // Extract fingerprint from provided key
         const fingerprint = `0x${providedKey.getFingerprint()}` as `0x${string}`
 
@@ -130,7 +132,7 @@ export function useProcessUpdateKey(): UseProcessUpdateKeyReturn {
         // Fetch the registered key from blockchain
         let downloadedKey: PublicKey
         try {
-          downloadedKey = await service.getPublicKey(fingerprint)
+          downloadedKey = await web3pgpService.getPublicKey(fingerprint)
         } catch (err) {
           throw new Error(
             `The key with fingerprint ${fingerprint} was not found in the Web3PGP registry. Please register the public key first.`
@@ -188,7 +190,7 @@ export function useProcessUpdateKey(): UseProcessUpdateKeyReturn {
         setIsLoading(false)
       }
     },
-    []
+    [isServiceReady, web3pgpService]
   )
 
   const reset = useCallback(() => {
@@ -201,6 +203,8 @@ export function useProcessUpdateKey(): UseProcessUpdateKeyReturn {
     result,
     isLoading,
     error,
+    isServiceReady,
+    serviceError,
     processKey,
     reset,
   }

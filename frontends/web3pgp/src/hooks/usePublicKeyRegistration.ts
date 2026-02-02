@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { PublicKey } from 'openpgp'
 import * as openpgp from 'openpgp'
-import { useWeb3PGPService } from './useWeb3PGPService'
+import { useWeb3PGPServiceReady } from './useWeb3PGPServiceReady'
 import { to0x } from '@jibidieuw/dexes'
 
 type SubkeyStatus = 'valid' | 'revoked' | 'expired'
@@ -14,6 +14,8 @@ interface UsePublicKeyRegistrationReturn {
   selectableSubkeys: string[]
   isLoading: boolean
   error: string | null
+  isServiceReady: boolean
+  serviceError: Error | null
   checkRegistrationStatus: (publicKey: PublicKey) => Promise<void>
   refresh: () => Promise<void>
 }
@@ -23,7 +25,7 @@ interface UsePublicKeyRegistrationReturn {
  * on the blockchain, following the Find page verification patterns
  */
 export function usePublicKeyRegistration(): UsePublicKeyRegistrationReturn {
-  const web3pgpService = useWeb3PGPService()
+  const { service: web3pgpService, isReady: isServiceReady, error: serviceError } = useWeb3PGPServiceReady()
 
   const [primaryRegistered, setPrimaryRegistered] = useState<boolean | null>(
     null
@@ -180,6 +182,8 @@ export function usePublicKeyRegistration(): UsePublicKeyRegistrationReturn {
     selectableSubkeys,
     isLoading,
     error,
+    isServiceReady,
+    serviceError,
     checkRegistrationStatus,
     refresh,
   }

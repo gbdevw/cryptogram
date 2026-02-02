@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { PublicKey } from 'openpgp'
 import { TransactionReceipt } from 'viem'
-import { useWeb3PGPService } from './useWeb3PGPService'
+import { useWeb3PGPServiceReady } from './useWeb3PGPServiceReady'
 import { useAccount } from 'wagmi'
 import { to0x } from '@jibidieuw/dexes'
 
@@ -10,6 +10,8 @@ interface UseRegisterPublicKeyReturn {
   error: string | null
   success: boolean
   transactionHash: string | null
+  isServiceReady: boolean
+  serviceError: Error | null
   registerPrimaryKey: (publicKey: PublicKey) => Promise<void>
   registerSubkey: (publicKey: PublicKey, subkeyFingerprint: string) => Promise<void>
   reset: () => void
@@ -20,7 +22,7 @@ interface UseRegisterPublicKeyReturn {
  * Manages wallet connection validation, transaction execution, and state
  */
 export function useRegisterPublicKey(): UseRegisterPublicKeyReturn {
-  const web3pgpService = useWeb3PGPService()
+  const { service: web3pgpService, isReady: isServiceReady, error: serviceError } = useWeb3PGPServiceReady()
   const { isConnected } = useAccount()
 
   const [isLoading, setIsLoading] = useState(false)
@@ -162,6 +164,8 @@ export function useRegisterPublicKey(): UseRegisterPublicKeyReturn {
     error,
     success,
     transactionHash,
+    isServiceReady,
+    serviceError,
     registerPrimaryKey,
     registerSubkey,
     reset,

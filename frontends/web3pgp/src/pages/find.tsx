@@ -5,7 +5,7 @@ import { ErrorMessage } from '../components/ErrorMessage'
 import { useFetchPublicKey } from '../hooks/useFetchPublicKey'
 
 function FindPage() {
-  const { publicKey, isLoading, error, fetchPublicKey, reset } = useFetchPublicKey()
+  const { publicKey, isLoading, error, isServiceReady, serviceError, fetchPublicKey, reset } = useFetchPublicKey()
   const [showError, setShowError] = useState(true)
 
   const handleSearch = async (fingerprint: string) => {
@@ -15,6 +15,46 @@ function FindPage() {
 
   const handleDismissError = () => {
     setShowError(false)
+  }
+
+  // Show loading state while service is initializing
+  if (!isServiceReady && isLoading) {
+    return (
+      <div className="find-page">
+        <div className="page-header">
+          <h1 className="page-title">Find Public Keys</h1>
+          <p className="page-description">
+            Search for public keys in the Web3PGP registry by using their unique ID (fingerprint).
+          </p>
+        </div>
+        <div className="page-content">
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Initializing Web3PGP service...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error if service initialization failed
+  if (!isServiceReady && serviceError) {
+    return (
+      <div className="find-page">
+        <div className="page-header">
+          <h1 className="page-title">Find Public Keys</h1>
+          <p className="page-description">
+            Search for public keys in the Web3PGP registry by using their unique ID (fingerprint).
+          </p>
+        </div>
+        <div className="page-content">
+          <ErrorMessage
+            errorType="service-error"
+            onDismiss={handleDismissError}
+          />
+        </div>
+      </div>
+    )
   }
 
   return (
