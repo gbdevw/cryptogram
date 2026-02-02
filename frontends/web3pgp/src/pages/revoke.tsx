@@ -128,7 +128,6 @@ function RevokePage() {
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          padding-top: 4rem;
         }
 
         .back-button {
@@ -144,39 +143,34 @@ function RevokePage() {
           border: 1px solid var(--border-color, #e5e7eb);
           border-radius: 0.5rem;
           font-size: 0.95rem;
-          font-weight: 500;
+          font-weight: 600;
           color: var(--text-primary, #1f2937);
           cursor: pointer;
           transition: all 0.2s;
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
         .back-button:hover {
           background-color: var(--bg-secondary, #f9fafb);
-          border-color: var(--text-primary, #1f2937);
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          border-color: var(--border-hover, #d1d5db);
         }
 
         .back-button:active {
-          transform: scale(0.98);
+          transform: scale(0.95);
         }
 
         .back-button svg {
-          width: 1rem;
-          height: 1rem;
+          width: 1.25rem;
+          height: 1.25rem;
         }
 
         @media (max-width: 640px) {
           .back-button {
-            top: 0.75rem;
-            right: 0.75rem;
-            padding: 0.375rem 0.75rem;
-            font-size: 0.875rem;
+            padding: 0.5rem;
+            font-size: 0.9rem;
           }
 
-          .back-button svg {
-            width: 0.875rem;
-            height: 0.875rem;
+          .back-button span {
+            display: none;
           }
         }
       `}</style>

@@ -153,7 +153,7 @@ export function UpdateKeyInput({
   return (
     <div className="update-key-input">
       <div className="form-header">
-        <h2 className="form-title">Update Your OpenPGP Key</h2>
+        <h2 className="form-title">Update a Public Key</h2>
         <p className="form-description">
           Manage your public key. Update its expiration date, its attached identities or modify its settings.
         </p>
@@ -203,7 +203,7 @@ efghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZa
 
         {/* File upload section */}
         <div className="form-section file-upload-section">
-          <label className="section-label">Or upload your public key from a file</label>
+          <label className="section-label">Or import your public key from a file</label>
           <input
             ref={fileInputRef}
             type="file"

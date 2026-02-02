@@ -235,6 +235,7 @@ mDMEaX1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop
 qrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk
 lmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefg
 hijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
+efghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZa
 
 -----END PGP PUBLIC KEY BLOCK-----`}
             value={pastedContent}
@@ -325,8 +326,8 @@ hijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
         }
 
         .form-title {
-          margin: 0 0 1rem 0;
-          font-size: 1.875rem;
+          margin: 0 0 0.75rem 0;
+          font-size: 2rem;
           font-weight: 700;
           color: var(--text-primary, #1f2937);
         }
@@ -343,6 +344,8 @@ hijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
           flex-direction: column;
           gap: 2rem;
           flex: 1;
+          overflow: hidden;
+          min-height: 0;
         }
 
         .form-section {
@@ -358,66 +361,66 @@ hijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
         }
 
         .content-textarea {
-          width: 100%;
-          height: 211px;
+          min-height: 200px;
           padding: 1rem;
           border: 2px solid var(--border-color, #e5e7eb);
           border-radius: 0.5rem;
-          font-family: 'Courier New', monospace;
-          font-size: 0.875rem;
-          line-height: 1.5;
-          color: var(--text-primary, #1f2937);
           background-color: white;
-          transition: border-color 0.2s, background-color 0.2s;
+          font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+          font-size: 0.9rem;
+          color: var(--text-primary, #1f2937);
           resize: vertical;
+          transition: all 0.2s;
         }
 
         .content-textarea:focus {
           outline: none;
           border-color: var(--primary-color, #0ea5e9);
-          background-color: #f0f9ff;
+          box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
         }
 
         .content-textarea:disabled {
           background-color: var(--bg-secondary, #f9fafb);
-          color: var(--text-disabled, #9ca3af);
           cursor: not-allowed;
+          opacity: 0.6;
         }
 
         .content-textarea.error {
-          border-color: #ef4444;
-          background-color: #fef2f2;
+          border-color: var(--error-color, #ef4444);
+        }
+
+        .content-textarea.error:focus {
+          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
         }
 
         .error-container {
           display: flex;
           align-items: flex-start;
-          gap: 0.75rem;
+          gap: 1rem;
           padding: 1rem;
-          background-color: #fef2f2;
-          border: 1px solid #fecaca;
-          border-radius: 0.375rem;
+          background-color: var(--error-bg, #fef2f2);
+          border: 1px solid var(--error-color, #ef4444);
+          border-radius: 0.5rem;
         }
 
         .error-icon {
           flex-shrink: 0;
-          width: 1.25rem;
-          height: 1.25rem;
-          color: #dc2626;
+          width: 1.5rem;
+          height: 1.5rem;
+          color: var(--error-color, #ef4444);
           margin-top: 0.125rem;
         }
 
         .error-message {
           margin: 0;
-          font-size: 0.95rem;
-          color: #991b1b;
-          line-height: 1.5;
+          font-size: 0.9rem;
+          color: var(--error-text, #991b1b);
         }
 
         .file-upload-section {
           padding: 1.5rem;
           background-color: var(--bg-secondary, #f9fafb);
-          border: 2px dashed var(--border-color, #e5e7eb);
+          border: 2px dashed var(--border-color, #d1d5db);
           border-radius: 0.5rem;
         }
 
@@ -484,19 +487,26 @@ hijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
 
         @media (max-width: 640px) {
           .revoke-certificate-input {
-            padding: 1rem;
+            padding: 1rem 0.5rem;
+          }
+
+          .form-header {
+            margin-bottom: 1.5rem;
           }
 
           .form-title {
             font-size: 1.5rem;
-          }
-
-          .form-description {
-            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
           }
 
           .content-textarea {
-            height: 200px;
+            min-height: 150px;
+            font-size: 0.85rem;
+          }
+
+          .import-button {
+            padding: 0.875rem 1.25rem;
+            font-size: 0.95rem;
           }
         }
       `}</style>
