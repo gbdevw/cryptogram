@@ -6,6 +6,7 @@ interface UpdateActionButtonsProps {
   isLoading?: boolean
   error?: string | null
   isKeyRevoked?: boolean
+  isKeyExpired?: boolean
 }
 
 /**
@@ -18,6 +19,7 @@ export function UpdateActionButtons({
   isLoading = false,
   error = null,
   isKeyRevoked = false,
+  isKeyExpired = false,
 }: UpdateActionButtonsProps) {
   const [localError, setLocalError] = useState<string | null>(null)
   const [localSuccess, setLocalSuccess] = useState(false)
@@ -120,10 +122,10 @@ export function UpdateActionButtons({
       {/* Buttons */}
       <div className="buttons-container">
         <button
-          className={`action-button primary ${localSuccess ? 'success' : ''} ${isKeyRevoked ? 'disabled' : ''}`}
+          className={`action-button primary ${localSuccess ? 'success' : ''} ${isKeyRevoked || isKeyExpired ? 'disabled' : ''}`}
           onClick={handleUpdate}
-          disabled={isButtonLoading || localSuccess || isKeyRevoked}
-          title={isKeyRevoked ? 'Cannot update a revoked key' : 'Update key on blockchain'}
+          disabled={isButtonLoading || localSuccess || isKeyRevoked || isKeyExpired}
+          title={isKeyRevoked ? 'Cannot update a revoked key' : isKeyExpired ? 'Cannot update an expired key' : 'Update key on blockchain'}
         >
           {isButtonLoading ? (
             <>
@@ -259,12 +261,14 @@ export function UpdateActionButtons({
         }
 
         .action-button.primary {
-          background-color: #3b82f6;
+          background-color: #667eea;
           color: white;
         }
 
         .action-button.primary:hover:not(:disabled) {
-          background-color: #2563eb;
+          background-color: #5568d3;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         }
 
         .action-button.primary:active:not(:disabled) {

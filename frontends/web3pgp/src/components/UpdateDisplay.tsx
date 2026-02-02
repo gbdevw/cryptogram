@@ -63,6 +63,9 @@ export function UpdateDisplay({ metadata }: UpdateDisplayProps) {
     setDismissedError(false)
   }, [updateError])
 
+  // Check if the key is expired
+  const isKeyExpired = metadata.expirationDate ? new Date() > metadata.expirationDate : false
+
   return (
     <div className="update-display">
       <div className="key-info-section">
@@ -73,6 +76,7 @@ export function UpdateDisplay({ metadata }: UpdateDisplayProps) {
             publicKey={metadata.mergedKey}
             isRegistered={metadata.primaryKeyRegistered}
             primaryKeyRevocationState={metadata.primaryKeyRevocationState}
+            expirationDate={metadata.expirationDate}
           />
 
           {/* Expiration Date */}
@@ -99,6 +103,7 @@ export function UpdateDisplay({ metadata }: UpdateDisplayProps) {
             dismissedError || !updateError ? null : updateError
           }
           isKeyRevoked={metadata.primaryKeyRevocationState === 'already-revoked'}
+          isKeyExpired={isKeyExpired}
         />
       </div>
 

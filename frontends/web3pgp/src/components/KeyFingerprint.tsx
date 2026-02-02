@@ -6,6 +6,7 @@ interface KeyFingerprintProps {
   publicKey: PublicKey
   isRegistered?: boolean
   primaryKeyRevocationState?: RevocationState
+  expirationDate?: Date | null
 }
 
 type KeyStatus = 'valid' | 'revoked' | 'to-revoke' | 'expired'
@@ -16,7 +17,7 @@ type KeyStatus = 'valid' | 'revoked' | 'to-revoke' | 'expired'
  * Also displays the key status (valid, revoked, or expired)
  * Optionally displays REGISTERED badge if the key is registered on blockchain
  */
-export function KeyFingerprint({ publicKey, isRegistered, primaryKeyRevocationState }: KeyFingerprintProps) {
+export function KeyFingerprint({ publicKey, isRegistered, primaryKeyRevocationState, expirationDate }: KeyFingerprintProps) {
   // Get the fingerprint from the key
   const fingerprint = publicKey.getFingerprint().toUpperCase()
 
@@ -28,6 +29,9 @@ export function KeyFingerprint({ publicKey, isRegistered, primaryKeyRevocationSt
 
   const [status, setStatus] = useState<KeyStatus>('valid')
   const [isLoadingStatus, setIsLoadingStatus] = useState(true)
+
+  // Check if the key is expired
+  const isExpired = expirationDate ? new Date() > expirationDate : false
   const [isCopyingFingerprint, setIsCopyingFingerprint] = useState(false)
 
   const handleCopyFingerprint = async () => {
@@ -45,6 +49,13 @@ export function KeyFingerprint({ publicKey, isRegistered, primaryKeyRevocationSt
   useEffect(() => {
     const checkKeyStatus = async () => {
       try {
+        // Check if expired first
+        if (isExpired) {
+          setStatus('expired')
+          setIsLoadingStatus(false)
+          return
+        }
+
         // If primaryKeyRevocationState is provided, use it instead of checking the key
         if (primaryKeyRevocationState) {
           if (primaryKeyRevocationState === 'to-revoke') {
@@ -73,7 +84,7 @@ export function KeyFingerprint({ publicKey, isRegistered, primaryKeyRevocationSt
     }
 
     checkKeyStatus()
-  }, [publicKey, primaryKeyRevocationState])
+  }, [publicKey, primaryKeyRevocationState, isExpired])
 
   return (
     <div className="key-fingerprint">
