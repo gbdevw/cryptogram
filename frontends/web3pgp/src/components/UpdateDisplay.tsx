@@ -104,54 +104,55 @@ export function UpdateDisplay({ metadata }: UpdateDisplayProps) {
 
       <style jsx>{`
         .update-display {
-          width: 100%;
-          height: 100%;
+          animation: fadeIn 0.3s ease-out;
           display: flex;
           flex-direction: column;
-          overflow: hidden;
-          background-color: var(--bg-primary, #ffffff);
+          flex: 1;
+          min-height: 0;
         }
 
         .key-info-section {
-          position: relative;
-          width: 100%;
-          height: 100%;
+          padding: 1.5rem;
+          background-color: white;
+          border-radius: 0.5rem;
+          border: 1px solid var(--border-color, #e5e7eb);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           display: flex;
           flex-direction: column;
-          overflow: hidden;
-          padding: 2rem;
-          padding-top: 1rem;
+          flex: 1;
+          min-height: 0;
+        }
+
+        .scrollable-content {
+          overflow-y: auto;
+          flex: 1;
+          padding-right: 0.5rem;
+        }
+
+        .scrollable-content::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .scrollable-content::-webkit-scrollbar-track {
+          background: var(--bg-secondary, #f9fafb);
+          border-radius: 4px;
+        }
+
+        .scrollable-content::-webkit-scrollbar-thumb {
+          background: var(--border-color, #d1d5db);
+          border-radius: 4px;
+        }
+
+        .scrollable-content::-webkit-scrollbar-thumb:hover {
+          background: #999;
         }
 
         .display-title {
           margin: 0 0 1.5rem 0;
-          font-size: 1.5rem;
+          font-size: 1.25rem;
           font-weight: 700;
           color: var(--text-primary, #1f2937);
-        }
-
-        .scrollable-content {
-          flex: 1;
-          overflow-y: auto;
-          padding-right: 0.5rem;
-          margin-right: -0.5rem;
-        }
-
-        .scrollable-content::-webkit-scrollbar {
-          width: 0.5rem;
-        }
-
-        .scrollable-content::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        .scrollable-content::-webkit-scrollbar-thumb {
-          background: var(--border-color, #e5e7eb);
-          border-radius: 0.25rem;
-        }
-
-        .scrollable-content::-webkit-scrollbar-thumb:hover {
-          background: var(--border-hover, #d1d5db);
+          flex-shrink: 0;
         }
 
         .expiration-field {
@@ -177,14 +178,25 @@ export function UpdateDisplay({ metadata }: UpdateDisplayProps) {
           font-size: 0.9rem;
         }
 
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
         @media (max-width: 640px) {
           .key-info-section {
             padding: 1rem;
           }
 
           .display-title {
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            margin-bottom: 1.25rem;
           }
 
           .expiration-field {

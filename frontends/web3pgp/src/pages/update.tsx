@@ -117,7 +117,6 @@ function UpdatePage() {
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          padding-top: 4rem;
         }
 
         .back-button {
@@ -133,7 +132,7 @@ function UpdatePage() {
           border: 1px solid var(--border-color, #e5e7eb);
           border-radius: 0.5rem;
           font-size: 0.95rem;
-          font-weight: 500;
+          font-weight: 600;
           color: var(--text-primary, #1f2937);
           cursor: pointer;
           transition: all 0.2s;
@@ -145,7 +144,7 @@ function UpdatePage() {
         }
 
         .back-button:active {
-          transform: scale(0.98);
+          transform: scale(0.95);
         }
 
         .back-button svg {
@@ -198,14 +197,12 @@ function UpdatePage() {
 
         @media (max-width: 640px) {
           .back-button {
-            top: 0.75rem;
-            right: 0.75rem;
-            padding: 0.5rem 0.75rem;
-            font-size: 0.85rem;
+            padding: 0.5rem;
+            font-size: 0.9rem;
           }
 
-          .loading-container {
-            padding: 1rem;
+          .back-button span {
+            display: none;
           }
         }
       `}</style>

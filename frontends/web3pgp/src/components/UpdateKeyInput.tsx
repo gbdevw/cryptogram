@@ -148,19 +148,46 @@ export function UpdateKeyInput({
 
   const isProcessing = isLoading || isValidating || isFileLoading
 
+  const hasError = !!localError
+
   return (
     <div className="update-key-input">
-      <div className="input-container">
+      <div className="form-header">
         <h2 className="form-title">Update Your OpenPGP Key</h2>
         <p className="form-description">
-          Paste your updated public key or upload a file to update your
-          registered key on the blockchain.
+          Manage your public key. Update its expiration date, its attached identities or modify its settings.
         </p>
+      </div>
+
+      <div className="form-content">
+        {/* Textarea for pasting key */}
+        <div className="form-section">
+          <label htmlFor="pasted-key" className="section-label">
+            Paste an armored public key
+          </label>
+          <textarea
+            id="pasted-key"
+            className={`key-textarea ${hasError ? 'error' : ''}`}
+            placeholder={`-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEaX1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop
+qrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk
+lmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefg
+hijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcd
+efghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZa
+
+-----END PGP PUBLIC KEY BLOCK-----`}
+            value={pastedKey}
+            onChange={(e) => handlePastedKeyChange(e.target.value)}
+            disabled={isProcessing}
+          />
+        </div>
 
         {/* Error message */}
-        {localError && (
-          <div className="error-message">
+        {hasError && (
+          <div className="error-container">
             <svg
+              className="error-icon"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -170,156 +197,114 @@ export function UpdateKeyInput({
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            <span>{localError}</span>
+            <p className="error-message">{localError}</p>
           </div>
         )}
 
-        {/* Textarea for pasting key */}
-        <div className="input-section">
-          <label htmlFor="pasted-key" className="input-label">
-            Paste Your Public Key
-          </label>
-          <textarea
-            id="pasted-key"
-            className="key-textarea"
-            placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----&#10;..."
-            value={pastedKey}
-            onChange={(e) => handlePastedKeyChange(e.target.value)}
+        {/* File upload section */}
+        <div className="form-section file-upload-section">
+          <label className="section-label">Or upload your public key from a file</label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".asc,.gpg,.txt"
+            onChange={handleFileSelect}
             disabled={isProcessing}
-            rows={12}
+            style={{ display: 'none' }}
           />
-          <p className="input-hint">
-            Paste your complete OpenPGP public key block in armored format
+          <button
+            className="import-button"
+            onClick={handleBrowseClick}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <>
+                <span className="spinner"></span>
+                <span>Reading file...</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="button-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <span>Import from File (.asc, .gpg, .txt)</span>
+              </>
+            )}
+          </button>
+          <p className="section-hint">
+            Supported formats: ASCII armored (.asc, .txt) or binary (.gpg)
           </p>
         </div>
-
-        {/* File input */}
-        <div className="input-section">
-          <label className="input-label">Or Upload a Key File</label>
-          <div className="file-upload-area">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".asc,.gpg,.txt"
-              onChange={handleFileSelect}
-              disabled={isProcessing}
-              className="file-input"
-            />
-            <button
-              className="browse-button"
-              onClick={handleBrowseClick}
-              disabled={isProcessing}
-              type="button"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              <span>Browse Files</span>
-            </button>
-            <p className="file-hint">
-              Supported formats: .asc, .gpg, .txt (max 1MB)
-            </p>
-          </div>
-        </div>
-
-        {/* Processing state */}
-        {isProcessing && (
-          <div className="processing-message">
-            <div className="spinner" />
-            <span>
-              {isFileLoading
-                ? 'Reading file...'
-                : isValidating
-                  ? 'Validating key...'
-                  : 'Processing...'}
-            </span>
-          </div>
-        )}
       </div>
 
       <style jsx>{`
         .update-key-input {
           width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 2rem;
-          background-color: var(--bg-primary, #ffffff);
-        }
-
-        .input-container {
-          width: 100%;
-          max-width: 600px;
+          max-width: 900px;
+          margin: 0 auto;
+          padding: 2rem 1rem;
+          flex: 1;
           display: flex;
           flex-direction: column;
-          gap: 1.5rem;
+          overflow: hidden;
+        }
+
+        .form-header {
+          margin-bottom: 2.5rem;
+          flex-shrink: 0;
         }
 
         .form-title {
-          margin: 0;
-          font-size: 1.75rem;
+          margin: 0 0 0.75rem 0;
+          font-size: 2rem;
           font-weight: 700;
           color: var(--text-primary, #1f2937);
         }
 
         .form-description {
           margin: 0;
-          font-size: 0.95rem;
+          font-size: 1rem;
           color: var(--text-secondary, #6b7280);
-          line-height: 1.5;
+          line-height: 1.6;
         }
 
-        .error-message {
+        .form-content {
           display: flex;
-          align-items: flex-start;
-          gap: 0.75rem;
-          padding: 1rem;
-          background-color: var(--error-bg, #fee2e2);
-          border: 1px solid #fecaca;
-          border-radius: 0.5rem;
-          color: var(--error-text, #991b1b);
+          flex-direction: column;
+          gap: 2rem;
+          flex: 1;
+          overflow: hidden;
+          min-height: 0;
         }
 
-        .error-message svg {
-          width: 1.25rem;
-          height: 1.25rem;
-          flex-shrink: 0;
-          margin-top: 0.125rem;
-        }
-
-        .error-message span {
-          font-size: 0.9rem;
-        }
-
-        .input-section {
+        .form-section {
           display: flex;
           flex-direction: column;
           gap: 0.75rem;
         }
 
-        .input-label {
-          font-weight: 600;
+        .section-label {
           font-size: 0.95rem;
+          font-weight: 600;
           color: var(--text-primary, #1f2937);
         }
 
         .key-textarea {
-          width: 100%;
+          min-height: 200px;
           padding: 1rem;
+          border: 2px solid var(--border-color, #e5e7eb);
+          border-radius: 0.5rem;
+          background-color: white;
           font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-          font-size: 0.85rem;
-          line-height: 1.5;
-          border: 1px solid var(--border-color, #e5e7eb);
-          border-radius: 0.375rem;
-          background-color: var(--bg-secondary, #f9fafb);
+          font-size: 0.9rem;
           color: var(--text-primary, #1f2937);
           resize: vertical;
           transition: all 0.2s;
@@ -327,98 +312,101 @@ export function UpdateKeyInput({
 
         .key-textarea:focus {
           outline: none;
-          border-color: #3b82f6;
-          background-color: var(--bg-primary, #ffffff);
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+          border-color: var(--primary-color, #0ea5e9);
+          box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
         }
 
         .key-textarea:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .input-hint {
-          margin: 0;
-          font-size: 0.85rem;
-          color: var(--text-tertiary, #9ca3af);
-        }
-
-        .file-upload-area {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-          padding: 1.5rem;
-          border: 2px dashed var(--border-color, #e5e7eb);
-          border-radius: 0.5rem;
           background-color: var(--bg-secondary, #f9fafb);
-          text-align: center;
+          cursor: not-allowed;
+          opacity: 0.6;
         }
 
-        .file-input {
-          display: none;
+        .key-textarea.error {
+          border-color: var(--error-color, #ef4444);
         }
 
-        .browse-button {
-          display: inline-flex;
+        .key-textarea.error:focus {
+          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+
+        .error-container {
+          display: flex;
+          align-items: flex-start;
+          gap: 1rem;
+          padding: 1rem;
+          background-color: var(--error-bg, #fef2f2);
+          border: 1px solid var(--error-color, #ef4444);
+          border-radius: 0.5rem;
+        }
+
+        .error-icon {
+          flex-shrink: 0;
+          width: 1.5rem;
+          height: 1.5rem;
+          color: var(--error-color, #ef4444);
+          margin-top: 0.125rem;
+        }
+
+        .error-message {
+          margin: 0;
+          font-size: 0.9rem;
+          color: var(--error-text, #991b1b);
+        }
+
+        .file-upload-section {
+          padding: 1.5rem;
+          background-color: var(--bg-secondary, #f9fafb);
+          border: 2px dashed var(--border-color, #d1d5db);
+          border-radius: 0.5rem;
+        }
+
+        .import-button {
+          display: flex;
           align-items: center;
           justify-content: center;
-          gap: 0.5rem;
-          padding: 0.75rem 1.5rem;
-          background-color: #3b82f6;
+          gap: 0.75rem;
+          padding: 1rem 1.5rem;
+          background-color: #667eea;
           color: white;
           border: none;
-          border-radius: 0.375rem;
+          border-radius: 0.5rem;
+          font-size: 1rem;
           font-weight: 600;
-          font-size: 0.95rem;
           cursor: pointer;
           transition: all 0.2s;
-          align-self: center;
         }
 
-        .browse-button:hover:not(:disabled) {
-          background-color: #2563eb;
+        .import-button:hover:not(:disabled) {
+          background-color: #5568d3;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         }
 
-        .browse-button:active:not(:disabled) {
-          transform: scale(0.98);
+        .import-button:active:not(:disabled) {
+          transform: translateY(0);
         }
 
-        .browse-button:disabled {
+        .import-button:disabled {
+          background-color: #667eea;
           opacity: 0.6;
           cursor: not-allowed;
         }
 
-        .browse-button svg {
+        .button-icon {
           width: 1.25rem;
           height: 1.25rem;
-        }
-
-        .file-hint {
-          margin: 0;
-          font-size: 0.85rem;
-          color: var(--text-tertiary, #9ca3af);
-        }
-
-        .processing-message {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.75rem;
-          padding: 1rem;
-          background-color: #eff6ff;
-          border: 1px solid #bfdbfe;
-          border-radius: 0.375rem;
-          color: #1e40af;
-          font-size: 0.9rem;
+          flex-shrink: 0;
         }
 
         .spinner {
-          width: 1rem;
-          height: 1rem;
-          border: 2px solid #1e40af;
-          border-top-color: transparent;
+          display: inline-block;
+          width: 1.25rem;
+          height: 1.25rem;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top-color: white;
           border-radius: 50%;
-          animation: spin 0.6s linear infinite;
+          animation: spin 0.8s linear infinite;
         }
 
         @keyframes spin {
@@ -427,21 +415,35 @@ export function UpdateKeyInput({
           }
         }
 
+        .section-hint {
+          margin: 0.5rem 0 0 0;
+          font-size: 0.85rem;
+          color: var(--text-secondary, #6b7280);
+          font-style: italic;
+        }
+
         @media (max-width: 640px) {
           .update-key-input {
-            padding: 1rem;
+            padding: 1rem 0.5rem;
+          }
+
+          .form-header {
+            margin-bottom: 1.5rem;
           }
 
           .form-title {
             font-size: 1.5rem;
+            margin-bottom: 0.5rem;
           }
 
           .key-textarea {
-            font-size: 0.8rem;
+            min-height: 150px;
+            font-size: 0.85rem;
           }
 
-          .file-upload-area {
-            padding: 1rem;
+          .import-button {
+            padding: 0.875rem 1.25rem;
+            font-size: 0.95rem;
           }
         }
       `}</style>
