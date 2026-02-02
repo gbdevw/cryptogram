@@ -37,27 +37,6 @@ export function UpdateDisplay({ metadata }: UpdateDisplayProps) {
     }
   }
 
-  /**
-   * Format expiration date
-   */
-  const getFormattedExpiration = (): string => {
-    if (!metadata.expirationDate) {
-      return 'Does not expire'
-    }
-
-    // Check if the date is valid
-    if (isNaN(metadata.expirationDate.getTime())) {
-      return 'Does not expire'
-    }
-
-    const now = new Date()
-    if (metadata.expirationDate < now) {
-      return `Expired on ${metadata.expirationDate.toISOString()}`
-    }
-
-    return metadata.expirationDate.toISOString()
-  }
-
   // Reset dismissed state when error changes
   React.useEffect(() => {
     setDismissedError(false)
@@ -78,14 +57,6 @@ export function UpdateDisplay({ metadata }: UpdateDisplayProps) {
             primaryKeyRevocationState={metadata.primaryKeyRevocationState}
             expirationDate={metadata.expirationDate}
           />
-
-          {/* Expiration Date */}
-          <div className="expiration-field">
-            <span className="expiration-label">Expiration:</span>
-            <span className="expiration-value">
-              {getFormattedExpiration()}
-            </span>
-          </div>
 
           {/* User IDs */}
           <UpdateUserIDsList users={metadata.users} />
@@ -160,29 +131,6 @@ export function UpdateDisplay({ metadata }: UpdateDisplayProps) {
           flex-shrink: 0;
         }
 
-        .expiration-field {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 0.75rem 1rem;
-          background-color: var(--bg-secondary, #f9fafb);
-          border: 1px solid var(--border-color, #e5e7eb);
-          border-radius: 0.375rem;
-          margin-bottom: 2rem;
-        }
-
-        .expiration-label {
-          font-weight: 600;
-          color: var(--text-secondary, #6b7280);
-          font-size: 0.9rem;
-          min-width: 90px;
-        }
-
-        .expiration-value {
-          color: var(--text-primary, #1f2937);
-          font-size: 0.9rem;
-        }
-
         @keyframes fadeIn {
           from {
             opacity: 0;
@@ -204,15 +152,6 @@ export function UpdateDisplay({ metadata }: UpdateDisplayProps) {
             margin-bottom: 1.25rem;
           }
 
-          .expiration-field {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 0.5rem;
-          }
-
-          .expiration-label {
-            min-width: auto;
-          }
         }
       `}</style>
     </div>
