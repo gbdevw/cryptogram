@@ -6,6 +6,7 @@ import {
   SubkeyMetadata,
   RevocationState,
   ProcessRevokeKeyResult,
+  UserIDMetadata,
 } from '../types/revocation'
 import { web3pgpServiceManager } from '../services/web3pgpService'
 
@@ -94,6 +95,71 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
       console.error('Error determining subkey revocation state:', err)
       return 'valid'
     }
+  }
+
+  /**
+   * Parse OpenPGP user ID format: "Name (Comment) <email@example.com>"
+   * Extracts name, email, and comment components
+   */
+  const parseUserID = (userID: string) => {
+    let name = userID
+    let email: string | undefined
+    let comment: string | undefined
+
+    // Extract email (text within angle brackets)
+    const emailMatch = userID.match(/<([^>]+)>/)
+    if (emailMatch) {
+      email = emailMatch[1]
+      name = userID.replace(emailMatch[0], '').trim()
+    }
+
+    // Extract comment (text within parentheses)
+    const commentMatch = name.match(/\(([^)]+)\)/)
+    if (commentMatch) {
+      comment = commentMatch[1]
+      name = name.replace(commentMatch[0], '').trim()
+    }
+
+    return { name, email, comment }
+  }
+
+  /**
+   * Extract user ID metadata from a public key
+   */
+  const extractUserMetadata = async (
+    key: PublicKey
+  ): Promise<UserIDMetadata[]> => {
+    const users: UserIDMetadata[] = []
+    const userIDStrings = key.getUserIDs()
+
+    for (let i = 0; i < userIDStrings.length; i++) {
+      const userID = userIDStrings[i]
+      const userObject = key.users[i]
+
+      if (!userID || !userObject) continue
+
+      // Try to verify the user ID
+      let status: 'valid' | 'revoked' = 'valid'
+      try {
+        // Call verify without arguments for user ID verification
+        await userObject.verify()
+      } catch (err) {
+        status = 'revoked'
+      }
+
+      // Parse user ID components
+      const parsed = parseUserID(userID)
+
+      users.push({
+        userID: userID.trim(),
+        name: parsed.name,
+        email: parsed.email || '',
+        comment: parsed.comment || '',
+        status,
+      })
+    }
+
+    return users
   }
 
   /**
@@ -202,7 +268,23 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
           })
         }
 
-        // Step 6: Determine if all items are already revoked on blockchain
+        // Step 6: Get expiration date
+        let expirationDate: Date | null = null
+        try {
+          const expirationTime = await mergedKey.getExpirationTime()
+          if (expirationTime && typeof expirationTime === 'number') {
+            expirationDate = new Date(expirationTime * 1000)
+          } else {
+            expirationDate = expirationTime as Date | null
+          }
+        } catch (err) {
+          console.warn('Failed to get key expiration date:', err)
+        }
+
+        // Step 7: Extract user metadata
+        const users = await extractUserMetadata(mergedKey)
+
+        // Step 8: Determine if all items are already revoked on blockchain
         const hasAllRevokedOnBlockchain =
           primaryKeyRevocationState === 'already-revoked'
 
@@ -211,6 +293,8 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
           primaryKeyFingerprint: primaryFingerprint,
           primaryKeyRegistered,
           primaryKeyRevocationState,
+          expirationDate,
+          users,
           subkeys,
           mergedKey,
           downloadedKey,
@@ -336,13 +420,31 @@ export function useProcessRevokeKey(): UseProcessRevokeKeyReturn {
           })
         }
 
+        // Get expiration date
+        let expirationDate: Date | null = null
+        try {
+          const expirationTime = await mergedKey.getExpirationTime()
+          if (expirationTime && typeof expirationTime === 'number') {
+            expirationDate = new Date(expirationTime * 1000)
+          } else {
+            expirationDate = expirationTime as Date | null
+          }
+        } catch (err) {
+          console.warn('Failed to get key expiration date:', err)
+        }
+
         const hasAllRevokedOnBlockchain =
           primaryKeyRevocationState === 'already-revoked'
+
+        // Extract user metadata
+        const users = await extractUserMetadata(mergedKey)
 
         const metadata: KeyMetadata = {
           primaryKeyFingerprint: primaryFingerprint,
           primaryKeyRegistered,
           primaryKeyRevocationState,
+          expirationDate,
+          users,
           subkeys,
           mergedKey,
           downloadedKey,

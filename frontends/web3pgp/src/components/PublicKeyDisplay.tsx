@@ -20,6 +20,25 @@ export function PublicKeyDisplay({
   onCopySuccess,
   onDownloadSuccess,
 }: PublicKeyDisplayProps) {
+  const [expirationDate, setExpirationDate] = React.useState<Date | null>(null)
+
+  // Extract expiration date on mount
+  React.useEffect(() => {
+    const extractExpirationDate = async () => {
+      try {
+        const expirationTime = await publicKey.getExpirationTime()
+        if (expirationTime && typeof expirationTime === 'number') {
+          setExpirationDate(new Date(expirationTime * 1000))
+        } else {
+          setExpirationDate(expirationTime as Date | null)
+        }
+      } catch (err) {
+        console.warn('Failed to get key expiration date:', err)
+      }
+    }
+    extractExpirationDate()
+  }, [publicKey])
+
   const handleActionSuccess = (action: 'copy' | 'download') => {
     if (action === 'copy') {
       onCopySuccess?.()
@@ -33,9 +52,9 @@ export function PublicKeyDisplay({
       <div className="key-info-section">
         <h2 className="display-title">Public Key Information</h2>
         <div className="scrollable-content">
-          <KeyFingerprint publicKey={publicKey} />
+          <KeyFingerprint publicKey={publicKey} expirationDate={expirationDate} />
           <UserIDsList publicKey={publicKey} />
-          <SubkeysList publicKey={publicKey} />
+          <SubkeysList publicKey={publicKey} primaryExpirationDate={expirationDate} />
         </div>
         <div className="action-buttons-container">
           <KeyActionButtons
@@ -104,6 +123,29 @@ export function PublicKeyDisplay({
           margin-top: auto;
           padding-top: 1.5rem;
           flex-shrink: 0;
+        }
+
+        .expiration-field {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1rem;
+          background-color: var(--bg-secondary, #f9fafb);
+          border: 1px solid var(--border-color, #e5e7eb);
+          border-radius: 0.375rem;
+          margin-bottom: 2rem;
+        }
+
+        .expiration-label {
+          font-weight: 600;
+          color: var(--text-secondary, #6b7280);
+          font-size: 0.9rem;
+          min-width: 90px;
+        }
+
+        .expiration-value {
+          color: var(--text-primary, #1f2937);
+          font-size: 0.9rem;
         }
 
         @keyframes fadeIn {

@@ -184,6 +184,27 @@ export function RegistrationDisplay({
   const hasInvalidSubkeys = invalidSubkeys.size > 0
   const shouldShowWarning = !localPrimaryRegistered && !primaryRegistered && hasInvalidSubkeys && hasValidSubkeys
 
+  /**
+   * Extract and format expiration date from public key
+   */
+  const [expirationDate, setExpirationDate] = React.useState<Date | null>(null)
+
+  React.useEffect(() => {
+    const extractExpirationDate = async () => {
+      try {
+        const expirationTime = await publicKey.getExpirationTime()
+        if (expirationTime && typeof expirationTime === 'number') {
+          setExpirationDate(new Date(expirationTime * 1000))
+        } else {
+          setExpirationDate(expirationTime as Date | null)
+        }
+      } catch (err) {
+        console.warn('Failed to get key expiration date:', err)
+      }
+    }
+    extractExpirationDate()
+  }, [publicKey])
+
   return (
     <div className="registration-display">
       <div className="key-info-section">
@@ -193,6 +214,7 @@ export function RegistrationDisplay({
           <KeyFingerprint
             publicKey={publicKey}
             isRegistered={localPrimaryRegistered ?? primaryRegistered ?? undefined}
+            expirationDate={expirationDate}
           />
 
           {/* User IDs */}
@@ -212,6 +234,7 @@ export function RegistrationDisplay({
               selectedSubkeyFingerprint={selectedSubkeyFingerprint}
               onSubkeySelect={setSelectedSubkeyFingerprint}
               primaryKeyRegistered={localPrimaryRegistered ?? primaryRegistered ?? false}
+              primaryExpirationDate={expirationDate}
             />
           )}
         </div>
@@ -344,6 +367,28 @@ export function RegistrationDisplay({
           color: #92400e;
           line-height: 1.5;
         }
+        .expiration-field {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1rem;
+          background-color: var(--bg-secondary, #f9fafb);
+          border: 1px solid var(--border-color, #e5e7eb);
+          border-radius: 0.375rem;
+          margin-bottom: 2rem;
+        }
+
+        .expiration-label {
+          font-weight: 600;
+          color: var(--text-secondary, #6b7280);
+          font-size: 0.9rem;
+          min-width: 90px;
+        }
+
+        .expiration-value {
+          color: var(--text-primary, #1f2937);
+          font-size: 0.9rem;
+        }
 
         @keyframes spin {
           to {
@@ -370,6 +415,16 @@ export function RegistrationDisplay({
           .display-title {
             font-size: 1.1rem;
             margin-bottom: 1.25rem;
+          }
+
+          .expiration-field {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+          }
+
+          .expiration-label {
+            min-width: auto;
           }
         }
       `}</style>

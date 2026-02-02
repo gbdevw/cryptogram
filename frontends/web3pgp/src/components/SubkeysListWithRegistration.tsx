@@ -11,6 +11,7 @@ interface SubkeysListWithRegistrationProps {
   selectedSubkeyFingerprint?: string | null
   onSubkeySelect?: (fingerprint: string | null) => void
   primaryKeyRegistered?: boolean
+  primaryExpirationDate?: Date | null
 }
 
 interface SubkeyDisplayData {
@@ -34,6 +35,7 @@ export function SubkeysListWithRegistration({
   selectedSubkeyFingerprint = null,
   onSubkeySelect,
   primaryKeyRegistered = false,
+  primaryExpirationDate = null,
 }: SubkeysListWithRegistrationProps) {
   // Memoize subkeys to prevent new array references on each render
   const subkeys = useMemo(() => publicKey.getSubkeys(), [publicKey])
@@ -41,6 +43,9 @@ export function SubkeysListWithRegistration({
   const [isLoading, setIsLoading] = useState(!!verificationStatus && verificationStatus.size === 0)
   const [copiedFingerprint, setCopiedFingerprint] = useState<string | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
+
+  // Check if primary key is expired
+  const primaryKeyExpired = primaryExpirationDate ? new Date() > primaryExpirationDate : false
 
   const handleCopyFingerprint = async (fingerprint: string) => {
     try {
@@ -84,13 +89,13 @@ export function SubkeysListWithRegistration({
 
           // Use provided verification status or check individually
           let isRevoked = primaryKeyRevoked
-          let isExpired = false
+          let isExpired = primaryKeyExpired // If primary is expired, subkey is also expired
 
           if (verificationStatus && verificationStatus.has(fingerprint)) {
             const status = verificationStatus.get(fingerprint)
             isRevoked = status === 'revoked' || primaryKeyRevoked
-            isExpired = status === 'expired'
-          } else if (!primaryKeyRevoked) {
+            isExpired = status === 'expired' || primaryKeyExpired
+          } else if (!primaryKeyRevoked && !primaryKeyExpired) {
             // Fallback: check individual subkey status
             try {
               await subkey.verify()
@@ -125,7 +130,7 @@ export function SubkeysListWithRegistration({
     }
 
     buildDisplayData()
-  }, [publicKey, subkeys, registrationStatus, verificationStatus, selectableSubkeys])
+  }, [publicKey, subkeys, registrationStatus, verificationStatus, selectableSubkeys, primaryKeyExpired])
 
   if (!subkeys || subkeys.length === 0) {
     return (

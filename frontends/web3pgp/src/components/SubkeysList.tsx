@@ -3,6 +3,7 @@ import { PublicKey } from 'openpgp'
 
 interface SubkeysListProps {
   publicKey: PublicKey
+  primaryExpirationDate?: Date | null
 }
 
 interface SubkeyStatus {
@@ -16,13 +17,16 @@ interface SubkeyStatus {
  * Displays all subkeys associated with the public key
  * Shows fingerprint and revocation/expiration status
  */
-export function SubkeysList({ publicKey }: SubkeysListProps) {
+export function SubkeysList({ publicKey, primaryExpirationDate }: SubkeysListProps) {
   // Memoize subkeys to prevent new array references on each render
   const subkeys = useMemo(() => publicKey.getSubkeys(), [publicKey])
   const [subkeyStatuses, setSubkeyStatuses] = useState<SubkeyStatus[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [copiedFingerprint, setCopiedFingerprint] = useState<string | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
+
+  // Check if primary key is expired
+  const primaryKeyExpired = primaryExpirationDate ? new Date() > primaryExpirationDate : false
 
   const handleCopyFingerprint = async (fingerprint: string) => {
     try {
@@ -56,10 +60,10 @@ export function SubkeysList({ publicKey }: SubkeysListProps) {
             fingerprint.match(/.{1,4}/g)?.join(' ').trim() || fingerprint
 
           let isRevoked = primaryKeyRevoked
-          let isExpired = false
+          let isExpired = primaryKeyExpired // If primary is expired, subkey is also expired
 
-          // If primary key is not revoked, check individual subkey status
-          if (!primaryKeyRevoked) {
+          // If primary key is not revoked and not expired, check individual subkey status
+          if (!primaryKeyRevoked && !primaryKeyExpired) {
             try {
               await subkey.verify()
             } catch (error) {
@@ -88,7 +92,7 @@ export function SubkeysList({ publicKey }: SubkeysListProps) {
     }
 
     checkKeyStatus()
-  }, [publicKey, subkeys])
+  }, [publicKey, subkeys, primaryKeyExpired])
 
   if (!subkeys || subkeys.length === 0) {
     return (

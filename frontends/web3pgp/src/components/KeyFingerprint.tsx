@@ -34,6 +34,27 @@ export function KeyFingerprint({ publicKey, isRegistered, primaryKeyRevocationSt
   const isExpired = expirationDate ? new Date() > expirationDate : false
   const [isCopyingFingerprint, setIsCopyingFingerprint] = useState(false)
 
+  /**
+   * Format expiration date for display
+   */
+  const getFormattedExpiration = (): string => {
+    if (!expirationDate) {
+      return 'Does not expire'
+    }
+
+    // Check if the date is valid
+    if (isNaN(expirationDate.getTime())) {
+      return 'Does not expire'
+    }
+
+    const now = new Date()
+    if (expirationDate < now) {
+      return `Expired on ${expirationDate.toISOString()}`
+    }
+
+    return expirationDate.toISOString()
+  }
+
   const handleCopyFingerprint = async () => {
     try {
       await navigator.clipboard.writeText(fingerprint)
@@ -123,6 +144,14 @@ export function KeyFingerprint({ publicKey, isRegistered, primaryKeyRevocationSt
             </span>
           )}
         </div>
+      </div>
+
+      {/* Expiration Date */}
+      <div className="expiration-field">
+        <span className="expiration-label">Expiration:</span>
+        <span className="expiration-value">
+          {getFormattedExpiration()}
+        </span>
       </div>
 
       <style jsx>{`
@@ -251,6 +280,29 @@ export function KeyFingerprint({ publicKey, isRegistered, primaryKeyRevocationSt
           color: var(--text-secondary, #6b7280);
           font-style: italic;
           padding: 0;
+        }
+
+        .expiration-field {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1rem;
+          background-color: var(--bg-secondary, #f9fafb);
+          border: 1px solid var(--border-color, #e5e7eb);
+          border-radius: 0.375rem;
+          margin-top: 0.5rem;
+        }
+
+        .expiration-label {
+          font-weight: 600;
+          color: var(--text-secondary, #6b7280);
+          font-size: 0.9rem;
+          min-width: 90px;
+        }
+
+        .expiration-value {
+          color: var(--text-primary, #1f2937);
+          font-size: 0.9rem;
         }
 
         @media (max-width: 640px) {

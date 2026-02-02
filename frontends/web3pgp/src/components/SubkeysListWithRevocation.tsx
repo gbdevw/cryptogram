@@ -18,7 +18,10 @@ export function SubkeysListWithRevocation({
   onSubkeySelect,
 }: SubkeysListWithRevocationProps) {
   const [isExpanded, setIsExpanded] = useState(true)
-  const { subkeys } = keyMetadata
+  const { subkeys, expirationDate } = keyMetadata
+
+  // Check if primary key is expired
+  const primaryKeyExpired = expirationDate ? new Date() > expirationDate : false
 
   if (subkeys.length === 0) {
     return (
@@ -115,9 +118,9 @@ export function SubkeysListWithRevocation({
                         REGISTERED
                       </span>
                     )}
-                    {subkey.revocationState === 'to-revoke' && (
+                    {(subkey.revocationState === 'to-revoke' || primaryKeyExpired) && (
                       <span className="subkey-status to-revoke-badge">
-                        TO REVOKE
+                        {primaryKeyExpired ? 'EXPIRED' : 'TO REVOKE'}
                       </span>
                     )}
                     {subkey.revocationState === 'already-revoked' && (

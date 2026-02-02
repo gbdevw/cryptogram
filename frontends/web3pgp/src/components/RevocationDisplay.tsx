@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { PublicKey } from 'openpgp'
 import { KeyFingerprint } from './KeyFingerprint'
-import { UserIDsList } from './UserIDsList'
+import { RevocationUserIDsList } from './RevocationUserIDsList'
 import { SubkeysListWithRevocation } from './SubkeysListWithRevocation'
 import { RevocationActionButtons } from './RevocationActionButtons'
 import { useProcessRevokeKey } from '../hooks/useProcessRevokeKey'
@@ -117,9 +117,11 @@ export function RevocationDisplay({
     // Generic error message for other errors
     return 'Failed to publish revocation. Please try again.'
   }
+
+  // Check if the key is expired
+  const isKeyExpired = displayMetadata?.expirationDate ? new Date() > displayMetadata.expirationDate : false
   
   const displayError = getErrorMessage(error)
-  const metadata = displayMetadata
   const hasAllRevokedOnBlockchain = processResult?.hasAllRevokedOnBlockchain ?? false
 
   // Log actual error to console for debugging
@@ -133,7 +135,7 @@ export function RevocationDisplay({
   }, [error])
 
   // Show loading state while processing
-  if (!metadata || isProcessing) {
+  if (!displayMetadata || isProcessing) {
     return (
       <div className="revocation-display">
         <div className="key-info-section">
@@ -150,17 +152,20 @@ export function RevocationDisplay({
         <div className="scrollable-content">
           {/* Primary Key Fingerprint */}
           <KeyFingerprint
-            publicKey={metadata?.mergedKey ?? publicKey}
-            isRegistered={metadata?.primaryKeyRegistered}
-            primaryKeyRevocationState={metadata?.primaryKeyRevocationState}
+            publicKey={displayMetadata?.mergedKey ?? publicKey}
+            isRegistered={displayMetadata?.primaryKeyRegistered}
+            primaryKeyRevocationState={displayMetadata?.primaryKeyRevocationState}
+            expirationDate={displayMetadata?.expirationDate}
           />
 
           {/* User IDs */}
-          <UserIDsList publicKey={metadata?.mergedKey ?? publicKey} />
+          {displayMetadata?.users && (
+            <RevocationUserIDsList users={displayMetadata.users} />
+          )}
 
           {/* Subkeys with revocation status */}
           <SubkeysListWithRevocation
-            keyMetadata={metadata}
+            keyMetadata={displayMetadata}
             selectedSubkeyFingerprint={selectedSubkeyFingerprint}
             onSubkeySelect={setSelectedSubkeyFingerprint}
           />
@@ -184,10 +189,10 @@ export function RevocationDisplay({
         )}
 
         {/* No revoked items message */}
-        {metadata &&
+        {displayMetadata &&
           !hasAllRevokedOnBlockchain &&
-          metadata.primaryKeyRevocationState === 'valid' &&
-          metadata.subkeys.every((sk) => sk.revocationState === 'valid') &&
+          displayMetadata.primaryKeyRevocationState === 'valid' &&
+          displayMetadata.subkeys.every((sk) => sk.revocationState === 'valid') &&
           !isLoading && (
             <div className="info-message">
               <svg

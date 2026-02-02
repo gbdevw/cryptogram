@@ -1,104 +1,18 @@
-import React, { useState, useEffect } from 'react'
-import { PublicKey } from 'openpgp'
+import React, { useState } from 'react'
+import { UserIDMetadata } from '../types/revocation'
 
-interface UserIDsListProps {
-  publicKey: PublicKey
-}
-
-interface ParsedUserID {
-  name: string
-  email?: string
-  comment?: string
-  full: string
-  status: 'valid' | 'revoked'
+interface RegistrationUserIDsListProps {
+  users: UserIDMetadata[]
 }
 
 /**
- * Parse OpenPGP user ID format: "Name (Comment) <email@example.com>"
+ * Displays the list of user IDs for the registration workflow with their statuses
+ * Shows name, email, and comment for each user ID (if present)
+ * Displays verification status: VALID or REVOKED
  */
-function parseUserID(userID: string): Omit<ParsedUserID, 'status'> {
-  let name = userID
-  let email: string | undefined
-  let comment: string | undefined
-
-  // Extract email (text within angle brackets)
-  const emailMatch = userID.match(/<([^>]+)>/)
-  if (emailMatch) {
-    email = emailMatch[1]
-    name = userID.replace(emailMatch[0], '').trim()
-  }
-
-  // Extract comment (text within parentheses)
-  const commentMatch = name.match(/\(([^)]+)\)/)
-  if (commentMatch) {
-    comment = commentMatch[1]
-    name = name.replace(commentMatch[0], '').trim()
-  }
-
-  return { name, email, comment, full: userID }
-}
-
-/**
- * Displays all user IDs associated with the public key
- * Each user ID typically contains name, email, and optional comment
- * Verifies and displays status: VALID or REVOKED
- */
-export function UserIDsList({ publicKey }: UserIDsListProps) {
-  const userIDs = publicKey.getUserIDs()
-  const [parsedUserIDs, setParsedUserIDs] = useState<ParsedUserID[]>([])
+export function RegistrationUserIDsList({ users }: RegistrationUserIDsListProps) {
   const [copiedUserID, setCopiedUserID] = useState<string | null>(null)
   const [isExpanded, setIsExpanded] = useState(true)
-  const [isVerifying, setIsVerifying] = useState(true)
-
-  // Extract and verify user IDs on mount
-  useEffect(() => {
-    const extractUserData = async () => {
-      setIsVerifying(true)
-      const users: ParsedUserID[] = []
-      const ids = publicKey.getUserIDs()
-      
-      if (!ids || ids.length === 0) {
-        setParsedUserIDs([])
-        setIsVerifying(false)
-        return
-      }
-
-      try {
-        for (let i = 0; i < ids.length; i++) {
-          const userID = ids[i]
-          const userObject = publicKey.users[i]
-
-          if (!userID || !userObject) continue
-
-          // Try to verify the user ID
-          let status: 'valid' | 'revoked' = 'valid'
-          try {
-            // Call verify without arguments for user ID verification
-            await userObject.verify()
-          } catch (err) {
-            status = 'revoked'
-          }
-
-          // Parse user ID components
-          const parsed = parseUserID(userID)
-          users.push({
-            ...parsed,
-            status,
-          })
-        }
-
-        setParsedUserIDs(users)
-      } catch (err) {
-        console.error('Error extracting user IDs:', err)
-        // Set empty array but don't block rendering
-        setParsedUserIDs([])
-      } finally {
-        setIsVerifying(false)
-      }
-    }
-
-    extractUserData()
-  }, [publicKey])
 
   const handleCopyUserID = async (userID: string) => {
     try {
@@ -112,7 +26,7 @@ export function UserIDsList({ publicKey }: UserIDsListProps) {
     }
   }
 
-  if (!userIDs || userIDs.length === 0 || isVerifying) {
+  if (users.length === 0) {
     return (
       <div className="user-ids-section">
         <button
@@ -122,10 +36,7 @@ export function UserIDsList({ publicKey }: UserIDsListProps) {
           <span className="section-title">User IDs</span>
           <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▶</span>
         </button>
-        {isExpanded && isVerifying && (
-          <p className="no-data">Verifying user IDs...</p>
-        )}
-        {isExpanded && !isVerifying && (!userIDs || userIDs.length === 0) && (
+        {isExpanded && (
           <p className="no-data">No user IDs associated with this key.</p>
         )}
       </div>
@@ -138,49 +49,69 @@ export function UserIDsList({ publicKey }: UserIDsListProps) {
         className="section-header"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <span className="section-title">User IDs ({userIDs.length})</span>
+        <span className="section-title">User IDs ({users.length})</span>
         <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▶</span>
       </button>
       {isExpanded && (
         <div className="user-ids-list">
-          {parsedUserIDs.map((parsed, index) => {
-            return (
-              <div key={index} className="user-id-item">
+          {users.map((user, index) => (
+            <div key={index} className="user-id-item">
               <div className="user-id-content">
-                {parsed.name && (
+                {user.name && (
                   <div className="user-id-field">
                     <span className="field-label">Name:</span>
-                    <span className="field-value">{parsed.name}</span>
+                    <span className="field-value">{user.name}</span>
                   </div>
                 )}
-                {parsed.email && (
+                {user.email && (
                   <div className="user-id-field">
                     <span className="field-label">Email:</span>
-                    <span className="field-value">{parsed.email}</span>
+                    <span className="field-value">{user.email}</span>
                   </div>
                 )}
-                {parsed.comment && (
+                {user.comment && (
                   <div className="user-id-field">
                     <span className="field-label">Comment:</span>
-                    <span className="field-value">{parsed.comment}</span>
+                    <span className="field-value">{user.comment}</span>
+                  </div>
+                )}
+                {!user.name && !user.email && !user.comment && (
+                  <div className="user-id-field">
+                    <span className="field-value">{user.userID}</span>
                   </div>
                 )}
               </div>
               <div className="user-id-actions">
-                <span className={`status-badge status-${parsed.status}`}>
-                  {parsed.status.toUpperCase()}
+                <span className={`status-badge status-${user.status}`}>
+                  {user.status.toUpperCase()}
                 </span>
                 <button
                   className="copy-user-id-button"
-                  onClick={() => handleCopyUserID(parsed.full)}
+                  onClick={() => handleCopyUserID(user.userID)}
                   title="Copy user ID"
                 >
-                  {copiedUserID === parsed.full ? (
-                    <svg className="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {copiedUserID === user.userID ? (
+                    <svg
+                      className="copy-icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
                   ) : (
-                    <svg className="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      className="copy-icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
                       <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                     </svg>
@@ -188,8 +119,7 @@ export function UserIDsList({ publicKey }: UserIDsListProps) {
                 </button>
               </div>
             </div>
-          )
-        })}
+          ))}
         </div>
       )}
 
@@ -326,7 +256,8 @@ export function UserIDsList({ publicKey }: UserIDsListProps) {
           padding: 0.5rem;
           cursor: pointer;
           font-size: 0.9rem;
-          transition: all 0.2s;          display: inline-flex;
+          transition: all 0.2s;
+          display: inline-flex;
           align-items: center;
           justify-content: center;
           width: 2.25rem;
@@ -336,7 +267,8 @@ export function UserIDsList({ publicKey }: UserIDsListProps) {
 
         .copy-icon {
           width: 1.125rem;
-          height: 1.125rem;        }
+          height: 1.125rem;
+        }
 
         .copy-user-id-button:hover {
           background-color: var(--bg-hover, #f3f4f6);
@@ -354,12 +286,13 @@ export function UserIDsList({ publicKey }: UserIDsListProps) {
             gap: 0.5rem;
           }
 
-          .copy-user-id-button {
-            align-self: flex-start;
+          .user-id-actions {
+            width: 100%;
+            justify-content: space-between;
           }
 
-          .user-id-text {
-            font-size: 0.85rem;
+          .copy-user-id-button {
+            align-self: flex-end;
           }
         }
       `}</style>

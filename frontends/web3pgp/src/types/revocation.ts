@@ -16,6 +16,22 @@ export type RegistrationState =
   | 'unregistered'      // Not present in downloaded
 
 /**
+ * User ID verification status
+ */
+export type UserIDStatus = 'valid' | 'revoked'
+
+/**
+ * Metadata for a user ID
+ */
+export interface UserIDMetadata {
+  userID: string
+  name: string
+  email: string
+  comment: string
+  status: UserIDStatus
+}
+
+/**
  * Metadata for a subkey
  */
 export interface SubkeyMetadata {
@@ -31,6 +47,8 @@ export interface KeyMetadata {
   primaryKeyFingerprint: string
   primaryKeyRegistered: boolean
   primaryKeyRevocationState: RevocationState
+  expirationDate: Date | null
+  users: UserIDMetadata[]
   subkeys: SubkeyMetadata[]
   mergedKey: PublicKey
   downloadedKey: PublicKey | null
