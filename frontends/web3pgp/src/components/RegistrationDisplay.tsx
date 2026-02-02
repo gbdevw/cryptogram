@@ -251,6 +251,25 @@ export function RegistrationDisplay({
           </div>
         )}
 
+        {/* Identity & Privacy Warning */}
+        <div className="identity-privacy-warning">
+          <svg className="warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <div className="warning-content">
+            <h3 className="warning-title">Identity & Privacy Warning</h3>
+            <p className="warning-text">
+              All data in your public key (name, email, comments) will be permanently published on the Web3PGP registry. This information is public, immutable, and cannot be deleted. If you wish to remain anonymous, consider using a pseudonym or a dedicated email address before proceeding.
+            </p>
+            <h3 className="warning-title warning-title-secondary">User Responsibility</h3>
+            <p className="warning-text">
+              You are solely responsible for the data you publish. Once confirmed on the blockchain, this information is globally accessible forever and cannot be modified or removed by anyone, including the Web3PGP team.
+            </p>
+          </div>
+        </div>
+
         {/* Action buttons */}
         <RegistrationActionButtons
           publicKey={publicKey}
@@ -367,6 +386,53 @@ export function RegistrationDisplay({
           color: #92400e;
           line-height: 1.5;
         }
+
+        .identity-privacy-warning {
+          display: flex;
+          gap: 1rem;
+          padding: 1.25rem;
+          background-color: #fef3c7;
+          border: 1px solid #fde68a;
+          border-radius: 0.375rem;
+          margin-bottom: 1.5rem;
+          align-items: flex-start;
+        }
+
+        .identity-privacy-warning .warning-icon {
+          flex-shrink: 0;
+          width: 1.5rem;
+          height: 1.5rem;
+          color: #d97706;
+          margin-top: 0.125rem;
+        }
+
+        .warning-content {
+          flex: 1;
+        }
+
+        .warning-title {
+          margin: 0 0 0.5rem 0;
+          font-size: 1rem;
+          font-weight: 700;
+          color: #92400e;
+        }
+
+        .warning-title-secondary {
+          margin-top: 1rem;
+          margin-bottom: 0.5rem;
+        }
+
+        .warning-text {
+          margin: 0;
+          font-size: 0.95rem;
+          color: #78350f;
+          line-height: 1.6;
+        }
+
+        .warning-responsibility {
+          margin-top: 0.75rem;
+        }
+
         .expiration-field {
           display: flex;
           align-items: center;
