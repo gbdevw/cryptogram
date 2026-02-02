@@ -99,6 +99,36 @@ function UpdatePage() {
             )}
           </div>
         </div>
+      ) : processError ? (
+        // Error state (when processing fails)
+        <div className="update-screen-wrapper">
+          <button className="back-button" onClick={handleBackToImport}>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            <span>Back</span>
+          </button>
+          <div className="error-screen">
+            <svg
+              className="error-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <p className="error-message">{processError}</p>
+          </div>
+        </div>
       ) : null}
 
       <style jsx>{`
@@ -187,6 +217,34 @@ function UpdatePage() {
           border-radius: 0.375rem;
           max-width: 500px;
           text-align: center;
+        }
+
+        .error-screen {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 1.5rem;
+          padding: 2rem;
+          max-width: 900px;
+          margin: 0 auto;
+          width: 100%;
+        }
+
+        .error-icon {
+          width: 3.5rem;
+          height: 3.5rem;
+          color: var(--warning-color, #d97706);
+          flex-shrink: 0;
+        }
+
+        .error-message {
+          margin: 0;
+          font-size: 1rem;
+          color: var(--text-primary, #1f2937);
+          line-height: 1.6;
+          text-align: left;
         }
 
         @keyframes spin {

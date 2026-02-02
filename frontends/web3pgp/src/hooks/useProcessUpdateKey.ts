@@ -133,13 +133,13 @@ export function useProcessUpdateKey(): UseProcessUpdateKeyReturn {
           downloadedKey = await service.getPublicKey(fingerprint)
         } catch (err) {
           throw new Error(
-            `Key with fingerprint ${fingerprint} not found on blockchain. Please register the key first.`
+            `The key with fingerprint ${fingerprint} was not found in the Web3PGP registry. Please register the public key first.`
           )
         }
 
         if (!downloadedKey) {
           throw new Error(
-            `Key with fingerprint ${fingerprint} not found on blockchain. Please register the key first.`
+            `The key with fingerprint ${fingerprint} was not found in the Web3PGP registry. Please register the public key first.`
           )
         }
 
