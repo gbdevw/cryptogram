@@ -1,7 +1,7 @@
 import { ReactNode } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { SearchIcon, RegisterIcon, RevokeIcon } from './Icons'
+import { SearchIcon, RegisterIcon, RevokeIcon, UpdateIcon } from './Icons'
 import styles from '../styles/layout.module.css'
 
 interface LayoutProps {
@@ -15,6 +15,7 @@ export function Layout({ children }: LayoutProps) {
   const navItems = [
     { label: 'Find', path: '/find', Icon: SearchIcon },
     { label: 'Register', path: '/register', Icon: RegisterIcon },
+    { label: 'Update', path: '/update', Icon: UpdateIcon },
     { label: 'Revoke', path: '/revoke', Icon: RevokeIcon },
   ]
 

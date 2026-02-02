@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { PublicKey } from 'openpgp'
+import { RevocationState } from '../types/revocation'
 
 interface KeyFingerprintProps {
   publicKey: PublicKey
   isRegistered?: boolean
+  primaryKeyRevocationState?: RevocationState
 }
 
-type KeyStatus = 'valid' | 'revoked' | 'expired'
+type KeyStatus = 'valid' | 'revoked' | 'to-revoke' | 'expired'
 
 /**
  * Displays the primary key fingerprint in a formatted, readable way
@@ -14,7 +16,7 @@ type KeyStatus = 'valid' | 'revoked' | 'expired'
  * Also displays the key status (valid, revoked, or expired)
  * Optionally displays REGISTERED badge if the key is registered on blockchain
  */
-export function KeyFingerprint({ publicKey, isRegistered }: KeyFingerprintProps) {
+export function KeyFingerprint({ publicKey, isRegistered, primaryKeyRevocationState }: KeyFingerprintProps) {
   // Get the fingerprint from the key
   const fingerprint = publicKey.getFingerprint().toUpperCase()
 
@@ -43,6 +45,20 @@ export function KeyFingerprint({ publicKey, isRegistered }: KeyFingerprintProps)
   useEffect(() => {
     const checkKeyStatus = async () => {
       try {
+        // If primaryKeyRevocationState is provided, use it instead of checking the key
+        if (primaryKeyRevocationState) {
+          if (primaryKeyRevocationState === 'to-revoke') {
+            setStatus('to-revoke')
+          } else if (primaryKeyRevocationState === 'already-revoked') {
+            setStatus('revoked')
+          } else {
+            setStatus('valid')
+          }
+          setIsLoadingStatus(false)
+          return
+        }
+
+        // Otherwise, check the key's revocation status
         const isRevoked = await publicKey.isRevoked()
         if (isRevoked) {
           setStatus('revoked')
@@ -57,7 +73,7 @@ export function KeyFingerprint({ publicKey, isRegistered }: KeyFingerprintProps)
     }
 
     checkKeyStatus()
-  }, [publicKey])
+  }, [publicKey, primaryKeyRevocationState])
 
   return (
     <div className="key-fingerprint">
@@ -212,6 +228,11 @@ export function KeyFingerprint({ publicKey, isRegistered }: KeyFingerprintProps)
         .status-value.status-expired {
           background-color: var(--warning-bg, #fef3c7);
           color: var(--warning-text, #92400e);
+        }
+
+        .status-value.status-to-revoke {
+          background-color: #fef3c7;
+          color: #92400e;
         }
 
         .status-value.loading {

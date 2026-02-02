@@ -13,6 +13,7 @@ import { Web3PGPProvider } from '../contexts/Web3PGPContext';
 import { Layout } from '../components/Layout';
 import FindPage from './find';
 import RegisterPage from './register';
+import UpdatePage from './update';
 import RevokePage from './revoke';
 
 const client = new QueryClient();
@@ -23,6 +24,7 @@ function AppContent() {
       <Routes>
         <Route path="/find" element={<FindPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/update" element={<UpdatePage />} />
         <Route path="/revoke" element={<RevokePage />} />
         <Route path="/" element={<Navigate to="/find" replace />} />
       </Routes>

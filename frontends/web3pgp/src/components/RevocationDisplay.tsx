@@ -152,6 +152,7 @@ export function RevocationDisplay({
           <KeyFingerprint
             publicKey={metadata?.mergedKey ?? publicKey}
             isRegistered={metadata?.primaryKeyRegistered}
+            primaryKeyRevocationState={metadata?.primaryKeyRevocationState}
           />
 
           {/* User IDs */}
