@@ -67,6 +67,10 @@ export function Layout({ children }: LayoutProps) {
         <div className={styles.footerContent}>
           <p>&copy; 2026 Web3PGP. All rights reserved.</p>
           <nav className={styles.footerLinks}>
+            <a href="#/about" className={styles.link}>About</a>
+            <span className={styles.separator}>•</span>
+            <a href="#/network" className={styles.link}>Network</a>
+            <span className={styles.separator}>•</span>
             <a href="#/terms" className={styles.link}>Terms of Service</a>
             <span className={styles.separator}>•</span>
             <a href="#/privacy" className={styles.link}>Privacy Policy</a>

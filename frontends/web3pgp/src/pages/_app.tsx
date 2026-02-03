@@ -15,6 +15,10 @@ import FindPage from './find';
 import RegisterPage from './register';
 import UpdatePage from './update';
 import RevokePage from './revoke';
+import TermsPage from './terms';
+import NetworkInfoPage from './network-info';
+import PrivacyPage from './privacy';
+import AboutPage from './about';
 
 const client = new QueryClient();
 
@@ -26,6 +30,11 @@ function AppContent() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/update" element={<UpdatePage />} />
         <Route path="/revoke" element={<RevokePage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/network-info" element={<NetworkInfoPage />} />
+        <Route path="/network" element={<NetworkInfoPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/" element={<Navigate to="/find" replace />} />
       </Routes>
     </Layout>
