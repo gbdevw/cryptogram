@@ -22,8 +22,11 @@ library RoleManagementHelper {
     /// @notice Role ID for UPGRADE_MANAGER_ROLE
     uint64 public constant UPGRADE_MANAGER_ROLE = 1;
 
-    /// @notice Role ID for TREASURER_ROLE
-    uint64 public constant TREASURER_ROLE = 2;
+    /// @notice Role ID for FEE_MANAGER_ROLE
+    uint64 public constant FEE_MANAGER_ROLE = 2;
+
+    /// @notice Role ID for FUNDS_MANAGER_ROLE
+    uint64 public constant FUNDS_MANAGER_ROLE = 3;
 
     /*****************************************************************************************************************/
     /* ERRORS                                                                                                        */
@@ -83,17 +86,31 @@ library RoleManagementHelper {
     }
 
     /**
-     * @notice Grant TREASURER_ROLE to a target address
+     * @notice Grant FEE_MANAGER_ROLE to a target address
      * @param accessManager The address of the AccessManager contract
      * @param targetAddress The address to grant the role to
      * @param executionDelay The delay before the role can be used (in seconds)
      */
-    function grantTreasurerRole(
+    function grantFeeManagerRole(
         address accessManager,
         address targetAddress,
         uint32 executionDelay
     ) internal {
-        grantRole(accessManager, TREASURER_ROLE, targetAddress, executionDelay);
+        grantRole(accessManager, FEE_MANAGER_ROLE, targetAddress, executionDelay);
+    }
+
+    /**
+     * @notice Grant FUNDS_MANAGER_ROLE to a target address
+     * @param accessManager The address of the AccessManager contract
+     * @param targetAddress The address to grant the role to
+     * @param executionDelay The delay before the role can be used (in seconds)
+     */
+    function grantFundsManagerRole(
+        address accessManager,
+        address targetAddress,
+        uint32 executionDelay
+    ) internal {
+        grantRole(accessManager, FUNDS_MANAGER_ROLE, targetAddress, executionDelay);
     }
 
     /*****************************************************************************************************************/
@@ -140,12 +157,21 @@ library RoleManagementHelper {
     }
 
     /**
-     * @notice Revoke TREASURER_ROLE from a target address
+     * @notice Revoke FEE_MANAGER_ROLE from a target address
      * @param accessManager The address of the AccessManager contract
      * @param targetAddress The address to revoke the role from
      */
-    function revokeTreasurerRole(address accessManager, address targetAddress) internal {
-        revokeRole(accessManager, TREASURER_ROLE, targetAddress);
+    function revokeFeeManagerRole(address accessManager, address targetAddress) internal {
+        revokeRole(accessManager, FEE_MANAGER_ROLE, targetAddress);
+    }
+
+    /**
+     * @notice Revoke FUNDS_MANAGER_ROLE from a target address
+     * @param accessManager The address of the AccessManager contract
+     * @param targetAddress The address to revoke the role from
+     */
+    function revokeFundsManagerRole(address accessManager, address targetAddress) internal {
+        revokeRole(accessManager, FUNDS_MANAGER_ROLE, targetAddress);
     }
 
     /*****************************************************************************************************************/
@@ -201,24 +227,44 @@ library RoleManagementHelper {
     }
 
     /**
-     * @notice Configure TREASURER_ROLE for a contract
+     * @notice Configure FEE_MANAGER_ROLE for a contract
      * @param accessManager The address of the AccessManager contract
      * @param contractAddress The address of the contract with fee management functions
      */
-    function configureTreasurerRole(
+    function configureFeeManagerRole(
         address accessManager,
         address contractAddress
     ) internal {
-        bytes4[] memory treasurerSelectors = new bytes4[](2);
-        treasurerSelectors[0] = FlatFee.updateRequestedFee.selector;
-        treasurerSelectors[1] = FlatFee.withdrawFees.selector;
+        bytes4[] memory feeManagerSelectors = new bytes4[](1);
+        feeManagerSelectors[0] = FlatFee.updateRequestedFee.selector;
 
         configureRole(
             accessManager,
-            TREASURER_ROLE,
-            "TREASURER",
+            FEE_MANAGER_ROLE,
+            "FEE_MANAGER",
             contractAddress,
-            treasurerSelectors
+            feeManagerSelectors
+        );
+    }
+
+    /**
+     * @notice Configure FUNDS_MANAGER_ROLE for a contract
+     * @param accessManager The address of the AccessManager contract
+     * @param contractAddress The address of the contract with fee management functions
+     */
+    function configureFundsManagerRole(
+        address accessManager,
+        address contractAddress
+    ) internal {
+        bytes4[] memory fundsManagerSelectors = new bytes4[](1);
+        fundsManagerSelectors[0] = FlatFee.withdrawFees.selector;
+
+        configureRole(
+            accessManager,
+            FUNDS_MANAGER_ROLE,
+            "FUNDS_MANAGER",
+            contractAddress,
+            fundsManagerSelectors
         );
     }
 
@@ -278,25 +324,38 @@ library RoleManagementHelper {
     }
 
     /**
-     * @notice Verify that TREASURER_ROLE is properly configured
+     * @notice Verify that FEE_MANAGER_ROLE is properly configured
      * @param accessManager The address of the AccessManager contract
      * @param contractAddress The address of the contract to check
      * @return True if the role is configured correctly
      */
-    function isTreasurerRoleConfigured(
+    function isFeeManagerRoleConfigured(
         address accessManager,
         address contractAddress
     ) internal view returns (bool) {
-        uint64 updateFeeRole = getFunctionRole(
+        uint64 assignedRole = getFunctionRole(
             accessManager,
             contractAddress,
             FlatFee.updateRequestedFee.selector
         );
-        uint64 withdrawFeesRole = getFunctionRole(
+        return assignedRole == FEE_MANAGER_ROLE;
+    }
+
+    /**
+     * @notice Verify that FUNDS_MANAGER_ROLE is properly configured
+     * @param accessManager The address of the AccessManager contract
+     * @param contractAddress The address of the contract to check
+     * @return True if the role is configured correctly
+     */
+    function isFundsManagerRoleConfigured(
+        address accessManager,
+        address contractAddress
+    ) internal view returns (bool) {
+        uint64 assignedRole = getFunctionRole(
             accessManager,
             contractAddress,
             FlatFee.withdrawFees.selector
         );
-        return updateFeeRole == TREASURER_ROLE && withdrawFeesRole == TREASURER_ROLE;
+        return assignedRole == FUNDS_MANAGER_ROLE;
     }
 }
