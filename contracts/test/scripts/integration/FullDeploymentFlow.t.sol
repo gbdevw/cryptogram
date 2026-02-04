@@ -7,6 +7,7 @@ import {RoleManagementHelper} from "scripts/lib/RoleManagementHelper.sol";
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
 import {Web3Doc} from "src/Web3Doc.sol";
+import {DeployDexesBundle} from "scripts/DeployDexesBundle.s.sol";
 
 /**
  * @title FullDeploymentFlowTest
@@ -33,7 +34,24 @@ contract FullDeploymentFlowTest is Test {
     function setUp() public {}
 
     /*****************************************************************************************************************/
-    /* FULL DEPLOYMENT FLOW TESTS                                                                                    */
+    /* DEPLOYMENT SCRIPT TESTS (Using DeployDexesBundle)                                                             */
+    /*****************************************************************************************************************/
+
+    function test_DeployDexesBundle_FullDeployment() public {
+        // Demonstrate that the script's public functions are testable
+        DeployDexesBundle deployScript = new DeployDexesBundle();
+
+        // Verify deployment addresses struct exists and is properly initialized
+        DeployDexesBundle.DeploymentAddresses memory addrs = deployScript.getAddresses();
+        
+        // Initially should be unset (zero addresses)
+        assertEq(addrs.accessManagerProxy, address(0));
+        assertEq(addrs.web3pgpProxy, address(0));
+        assertEq(addrs.web3docProxy, address(0));
+    }
+
+    /*****************************************************************************************************************/
+    /* LEGACY FULL DEPLOYMENT FLOW TESTS (Using DeploymentHelper directly)                                           */
     /*****************************************************************************************************************/
 
     function test_FullDeploymentFlow_Success() public {

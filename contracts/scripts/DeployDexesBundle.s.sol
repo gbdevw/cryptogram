@@ -37,18 +37,12 @@ contract DeployDexesBundle is Script {
      *      Environment variables:
      *      - FEE_IN_WEIS: Initial fee (optional, default 0)
      *      - INITIAL_ADMIN: Initial admin address for AccessManager (optional, default deployer)
-     * @return accessManagerProxy The AccessManager proxy address to use
+     * @return The deployment addresses struct
      */
     function run() external returns (DeploymentAddresses memory) {
-
         address deployer = msg.sender;
-        
-        // OPTIONAL: initial protocol fee requested by Web3PGP and Web3Doc contracts
         uint256 feeInWeis = vm.envOr("FEE_IN_WEIS", uint256(0));
-
-        // OPTIONAL: initial admin address for AccessManager (will be granted all admin roles)
-        // If not set, deployer will be the initial admin
-        address initialAdmin = vm.envOr("INITIAL_ADMIN", deployer);    
+        address initialAdmin = vm.envOr("INITIAL_ADMIN", deployer);
 
         vm.startBroadcast();
 
@@ -60,60 +54,7 @@ contract DeployDexesBundle is Script {
         console2.log("Initial Admin:", initialAdmin);
         console2.log("");
 
-        // ===== 1. Deploy AccessManager =====
-        console2.log("1. Deploying AccessManager...");
-        
-        addresses.accessManagerProxy = deployAccessManager(deployer);
-
-        console2.log("   Proxy:", addresses.accessManagerProxy);
-
-        // ===== 2. Deploy Web3PGP =====
-        console2.log("");
-        console2.log("2. Deploying Web3PGP...");
-        
-        addresses.web3pgpProxy = deployWeb3PGP(feeInWeis, addresses.accessManagerProxy);
-
-        console2.log("   Proxy:", addresses.web3pgpProxy);
-
-        // ===== 3. Deploy Web3Doc =====
-        console2.log("");
-        console2.log("3. Deploying Web3Doc...");
-        
-        addresses.web3docProxy = deployWeb3Doc(
-            feeInWeis,
-            addresses.accessManagerProxy,
-            addresses.web3pgpProxy
-        );
-
-        console2.log("   Proxy:", addresses.web3docProxy);
-
-        // ===== 4. Configure Roles in AccessManager =====
-        console2.log("");
-        console2.log("4. Configuring Roles in AccessManager...");
-
-        // Grant UPGRADE_MANAGER_ROLE to Initial Admin
-        grantUpgradeManagerRole(addresses.accessManagerProxy, initialAdmin, 0);
-        console2.log("   Granted UPGRADE_MANAGER_ROLE to Initial Admin:", initialAdmin);
-
-        // Grant FEE_MANAGER_ROLE to Initial Admin
-        grantFeeManagerRole(addresses.accessManagerProxy, initialAdmin, 0);
-        console2.log("   Granted FEE_MANAGER_ROLE to Initial Admin:", initialAdmin);
-
-        // Grant FUNDS_MANAGER_ROLE to Initial Admin
-        grantFundsManagerRole(addresses.accessManagerProxy, initialAdmin, 0);
-        console2.log("   Granted FUNDS_MANAGER_ROLE to Initial Admin:", initialAdmin);
-
-        // Grant ADMIN_ROLE to Initial Admin if different from Deployer and revoke from Deployer
-        if (initialAdmin != deployer) {
-            // Grant admin role to initialAdmin if different from deployer
-            grantAdminRole(addresses.accessManagerProxy, initialAdmin);
-            console2.log("   Granted admin role to Initial Admin:", initialAdmin);
-            // Revoke admin role from deployer
-            revokeAdminRole(addresses.accessManagerProxy, deployer);
-            console2.log("   Revoked admin role from Deployer:", deployer);
-        } else {
-            console2.log("   Initial Admin is Deployer");
-        }
+        deployDexesBundle(deployer, feeInWeis, initialAdmin);
 
         vm.stopBroadcast();
 
@@ -132,10 +73,181 @@ contract DeployDexesBundle is Script {
     }
 
     /**
+     * @notice Testable function that handles the entire DEXES bundle deployment
+     * @param deployer The deployer address
+     * @param feeInWeis The protocol fee in wei
+     * @param initialAdmin The initial admin address
+     */
+    function deployDexesBundle(
+        address deployer,
+        uint256 feeInWeis,
+        address initialAdmin
+    ) public {
+        // ===== 1. Deploy AccessManager =====
+        console2.log("1. Deploying AccessManager...");
+        addresses.accessManagerProxy = deployAccessManager(deployer);
+        console2.log("   Proxy:", addresses.accessManagerProxy);
+
+        // ===== 2. Deploy Web3PGP =====
+        console2.log("");
+        console2.log("2. Deploying Web3PGP...");
+        addresses.web3pgpProxy = deployWeb3PGP(feeInWeis, addresses.accessManagerProxy);
+        console2.log("   Proxy:", addresses.web3pgpProxy);
+
+        // ===== 3. Deploy Web3Doc =====
+        console2.log("");
+        console2.log("3. Deploying Web3Doc...");
+        addresses.web3docProxy = deployWeb3Doc(
+            feeInWeis,
+            addresses.accessManagerProxy,
+            addresses.web3pgpProxy
+        );
+        console2.log("   Proxy:", addresses.web3docProxy);
+
+        // ===== 4. Configure Roles in AccessManager =====
+        console2.log("");
+        console2.log("4. Configuring Roles in AccessManager...");
+        configureRoles(deployer, initialAdmin);
+    }
+
+    /**
+     * @notice Configure roles in AccessManager
+     * @param deployer The deployer address
+     * @param initialAdmin The initial admin address
+     */
+    function configureRoles(address deployer, address initialAdmin) public {
+        // Grant UPGRADE_MANAGER_ROLE to Initial Admin
+        grantUpgradeManagerRole(addresses.accessManagerProxy, initialAdmin, 0);
+        console2.log("   Granted UPGRADE_MANAGER_ROLE to Initial Admin:", initialAdmin);
+
+        // Grant FEE_MANAGER_ROLE to Initial Admin
+        grantFeeManagerRole(addresses.accessManagerProxy, initialAdmin, 0);
+        console2.log("   Granted FEE_MANAGER_ROLE to Initial Admin:", initialAdmin);
+
+        // Grant FUNDS_MANAGER_ROLE to Initial Admin
+        grantFundsManagerRole(addresses.accessManagerProxy, initialAdmin, 0);
+        console2.log("   Granted FUNDS_MANAGER_ROLE to Initial Admin:", initialAdmin);
+
+        // Grant ADMIN_ROLE to Initial Admin if different from Deployer and revoke from Deployer
+        if (initialAdmin != deployer) {
+            grantAdminRole(addresses.accessManagerProxy, initialAdmin);
+            console2.log("   Granted admin role to Initial Admin:", initialAdmin);
+            revokeAdminRole(addresses.accessManagerProxy, deployer);
+            console2.log("   Revoked admin role from Deployer:", deployer);
+        } else {
+            console2.log("   Initial Admin is Deployer");
+        }
+    }
+
+    /**
      * @notice Get all deployment addresses
      * @return The deployment addresses struct
      */
     function getAddresses() external view returns (DeploymentAddresses memory) {
         return addresses;
+    }
+
+    /*****************************************************************************************************************/
+    /* INTERNAL HELPER FUNCTIONS                                                                                     */
+    /*****************************************************************************************************************/
+
+    /**
+     * @notice Internal wrapper to deploy AccessManager
+     * @param initialAdmin The initial admin address
+     * @return The proxy address of the deployed AccessManager
+     */
+    function deployAccessManager(address initialAdmin) internal returns (address) {
+        DeploymentHelper.DeploymentResult memory result = 
+            DeploymentHelper.deployAccessManager(initialAdmin);
+        return result.proxy;
+    }
+
+    /**
+     * @notice Internal wrapper to deploy Web3PGP
+     * @param fee The service fee in weis
+     * @param accessManager The AccessManager proxy address
+     * @return The proxy address of the deployed Web3PGP
+     */
+    function deployWeb3PGP(uint256 fee, address accessManager) internal returns (address) {
+        DeploymentHelper.DeploymentResult memory result = 
+            DeploymentHelper.deployWeb3PGP(fee, accessManager);
+        return result.proxy;
+    }
+
+    /**
+     * @notice Internal wrapper to deploy Web3Doc
+     * @param fee The service fee in weis
+     * @param accessManager The AccessManager proxy address
+     * @param web3pgp The Web3PGP proxy address
+     * @return The proxy address of the deployed Web3Doc
+     */
+    function deployWeb3Doc(
+        uint256 fee,
+        address accessManager,
+        address web3pgp
+    ) internal returns (address) {
+        DeploymentHelper.DeploymentResult memory result = 
+            DeploymentHelper.deployWeb3Doc(fee, accessManager, web3pgp);
+        return result.proxy;
+    }
+
+    /**
+     * @notice Internal wrapper to grant UPGRADE_MANAGER_ROLE
+     * @param accessManager The AccessManager proxy address
+     * @param targetAddress The address to grant the role to
+     * @param executionDelay The execution delay in seconds
+     */
+    function grantUpgradeManagerRole(
+        address accessManager,
+        address targetAddress,
+        uint32 executionDelay
+    ) internal {
+        RoleManagementHelper.grantUpgradeManagerRole(accessManager, targetAddress, executionDelay);
+    }
+
+    /**
+     * @notice Internal wrapper to grant FEE_MANAGER_ROLE
+     * @param accessManager The AccessManager proxy address
+     * @param targetAddress The address to grant the role to
+     * @param executionDelay The execution delay in seconds
+     */
+    function grantFeeManagerRole(
+        address accessManager,
+        address targetAddress,
+        uint32 executionDelay
+    ) internal {
+        RoleManagementHelper.grantFeeManagerRole(accessManager, targetAddress, executionDelay);
+    }
+
+    /**
+     * @notice Internal wrapper to grant FUNDS_MANAGER_ROLE
+     * @param accessManager The AccessManager proxy address
+     * @param targetAddress The address to grant the role to
+     * @param executionDelay The execution delay in seconds
+     */
+    function grantFundsManagerRole(
+        address accessManager,
+        address targetAddress,
+        uint32 executionDelay
+    ) internal {
+        RoleManagementHelper.grantFundsManagerRole(accessManager, targetAddress, executionDelay);
+    }
+
+    /**
+     * @notice Internal wrapper to grant ADMIN_ROLE
+     * @param accessManager The AccessManager proxy address
+     * @param targetAddress The address to grant the role to
+     */
+    function grantAdminRole(address accessManager, address targetAddress) internal {
+        RoleManagementHelper.grantAdminRole(accessManager, targetAddress);
+    }
+
+    /**
+     * @notice Internal wrapper to revoke ADMIN_ROLE
+     * @param accessManager The AccessManager proxy address
+     * @param targetAddress The address to revoke the role from
+     */
+    function revokeAdminRole(address accessManager, address targetAddress) internal {
+        RoleManagementHelper.revokeAdminRole(accessManager, targetAddress);
     }
 }
