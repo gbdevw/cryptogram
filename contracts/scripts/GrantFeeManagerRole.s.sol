@@ -7,44 +7,51 @@ import {RoleManagementHelper} from "scripts/lib/RoleManagementHelper.sol";
 import {ScriptHelpers} from "scripts/lib/ScriptHelpers.sol";
 
 /**
- * @title RevokeTreasurerRole
- * @notice Foundry script to revoke TREASURER_ROLE from an address
+ * @title GrantFeeManagerRole
+ * @notice Foundry script to grant FEE_MANAGER_ROLE to an address
  * @dev Requires the caller to have admin rights in AccessManager
  */
-contract RevokeTreasurerRole is Script {
+contract GrantFeeManagerRole is Script {
     using RoleManagementHelper for *;
     using ScriptHelpers for *;
 
     /**
-     * @notice Revoke TREASURER_ROLE from a target address
+     * @notice Grant FEE_MANAGER_ROLE to a target address
      * @dev Uses environment variables:
      *      - PRIVATE_KEY: Private key of an admin
      *      - ACCESS_MANAGER: Address of the AccessManager contract
-     *      - TARGET_ADDRESS: Address to revoke the role from
+     *      - TARGET_ADDRESS: Address to grant the role to
+     *      - EXECUTION_DELAY: Delay in seconds before the role can be used (optional, default 0)
      */
     function run() external {
         uint256 adminPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(adminPrivateKey);
 
-        revokeTreasurerRole();
+        grantFeeManagerRole();
 
         vm.stopBroadcast();
     }
 
     /**
-     * @notice Revoke TREASURER_ROLE from target address
+     * @notice Grant FEE_MANAGER_ROLE to target address
      * @dev This function contains the testable business logic
      */
-    function revokeTreasurerRole() public {
+    function grantFeeManagerRole() public {
         address accessManager = vm.envAddress("ACCESS_MANAGER");
         address targetAddress = vm.envAddress("TARGET_ADDRESS");
+        uint32 executionDelay = uint32(vm.envOr("EXECUTION_DELAY", uint256(0)));
 
         ScriptHelpers.requireNonZero(accessManager, "ACCESS_MANAGER");
         ScriptHelpers.requireNonZero(targetAddress, "TARGET_ADDRESS");
 
-        RoleManagementHelper.revokeTreasurerRole(accessManager, targetAddress);
+        RoleManagementHelper.grantFeeManagerRole(
+            accessManager,
+            targetAddress,
+            executionDelay
+        );
 
-        console2.log("TREASURER_ROLE revoked from:", targetAddress);
+        console2.log("FEE_MANAGER_ROLE granted to:", targetAddress);
+        console2.log("Execution delay:", executionDelay, "seconds");
     }
-}}
+}
