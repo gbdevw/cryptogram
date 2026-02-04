@@ -83,10 +83,10 @@ contract RoleManagementHelperTest is Test {
         assertTrue(hasRole, "Target user should have UPGRADE_MANAGER_ROLE");
     }
 
-    function test_grantTreasurerRole_Success() public {
+    function test_grantFeeManagerRole_Success() public {
         uint32 delay = 0;
         vm.startPrank(admin);
-        RoleManagementHelper.grantTreasurerRole(
+        RoleManagementHelper.grantFeeManagerRole(
             address(accessManager),
             targetUser,
             delay
@@ -94,10 +94,27 @@ contract RoleManagementHelperTest is Test {
         vm.stopPrank();
 
         (bool hasRole,) = accessManager.hasRole(
-            RoleManagementHelper.TREASURER_ROLE,
+            RoleManagementHelper.FEE_MANAGER_ROLE,
             targetUser
         );
-        assertTrue(hasRole, "Target user should have TREASURER_ROLE");
+        assertTrue(hasRole, "Target user should have FEE_MANAGER_ROLE");
+    }
+
+    function test_grantFundsManagerRole_Success() public {
+        uint32 delay = 0;
+        vm.startPrank(admin);
+        RoleManagementHelper.grantFundsManagerRole(
+            address(accessManager),
+            targetUser,
+            delay
+        );
+        vm.stopPrank();
+
+        (bool hasRole,) = accessManager.hasRole(
+            RoleManagementHelper.FUNDS_MANAGER_ROLE,
+            targetUser
+        );
+        assertTrue(hasRole, "Target user should have FUNDS_MANAGER_ROLE");
     }
 
     /*****************************************************************************************************************/
@@ -139,16 +156,31 @@ contract RoleManagementHelperTest is Test {
         assertFalse(hasRole, "User should not have role after revoke");
     }
 
-    function test_revokeTreasurerRole_Success() public {
+    function test_revokeFeeManagerRole_Success() public {
         // Grant role
         vm.startPrank(admin);
-        RoleManagementHelper.grantTreasurerRole(address(accessManager), targetUser, 0);
+        RoleManagementHelper.grantFeeManagerRole(address(accessManager), targetUser, 0);
 
         // Revoke role
-        RoleManagementHelper.revokeTreasurerRole(address(accessManager), targetUser);
+        RoleManagementHelper.revokeFeeManagerRole(address(accessManager), targetUser);
         vm.stopPrank();
         (bool hasRole,) = accessManager.hasRole(
-            RoleManagementHelper.TREASURER_ROLE,
+            RoleManagementHelper.FEE_MANAGER_ROLE,
+            targetUser
+        );
+        assertFalse(hasRole, "User should not have role after revoke");
+    }
+
+    function test_revokeFundsManagerRole_Success() public {
+        // Grant role
+        vm.startPrank(admin);
+        RoleManagementHelper.grantFundsManagerRole(address(accessManager), targetUser, 0);
+
+        // Revoke role
+        RoleManagementHelper.revokeFundsManagerRole(address(accessManager), targetUser);
+        vm.stopPrank();
+        (bool hasRole,) = accessManager.hasRole(
+            RoleManagementHelper.FUNDS_MANAGER_ROLE,
             targetUser
         );
         assertFalse(hasRole, "User should not have role after revoke");
@@ -180,33 +212,50 @@ contract RoleManagementHelperTest is Test {
         assertEq(assignedRole, RoleManagementHelper.UPGRADE_MANAGER_ROLE);
     }
 
-    function test_configureTreasurerRole_Success() public {
+    function test_configureFeeManagerRole_Success() public {
         // Deploy a Web3PGP proxy for testing
         DeploymentHelper.DeploymentResult memory pgpResult = 
             DeploymentHelper.deployWeb3PGP(1 ether, address(accessManager));
 
         // Configure the role
         vm.startPrank(admin);
-        RoleManagementHelper.configureTreasurerRole(
+        RoleManagementHelper.configureFeeManagerRole(
             address(accessManager),
             pgpResult.proxy
         );
         vm.stopPrank();
 
-        // Verify both selectors are assigned
+        // Verify selector is assigned
         uint64 updateFeeRole = RoleManagementHelper.getFunctionRole(
             address(accessManager),
             pgpResult.proxy,
             FlatFee.updateRequestedFee.selector
         );
+
+        assertEq(updateFeeRole, RoleManagementHelper.FEE_MANAGER_ROLE);
+    }
+
+    function test_configureFundsManagerRole_Success() public {
+        // Deploy a Web3PGP proxy for testing
+        DeploymentHelper.DeploymentResult memory pgpResult = 
+            DeploymentHelper.deployWeb3PGP(1 ether, address(accessManager));
+
+        // Configure the role
+        vm.startPrank(admin);
+        RoleManagementHelper.configureFundsManagerRole(
+            address(accessManager),
+            pgpResult.proxy
+        );
+        vm.stopPrank();
+
+        // Verify selector is assigned
         uint64 withdrawFeesRole = RoleManagementHelper.getFunctionRole(
             address(accessManager),
             pgpResult.proxy,
             FlatFee.withdrawFees.selector
         );
 
-        assertEq(updateFeeRole, RoleManagementHelper.TREASURER_ROLE);
-        assertEq(withdrawFeesRole, RoleManagementHelper.TREASURER_ROLE);
+        assertEq(withdrawFeesRole, RoleManagementHelper.FUNDS_MANAGER_ROLE);
     }
 
     /*****************************************************************************************************************/
@@ -284,29 +333,58 @@ contract RoleManagementHelperTest is Test {
         assertFalse(isConfigured, "Role should not be configured");
     }
 
-    function test_isTreasurerRoleConfigured_True() public {
+    function test_isFeeManagerRoleConfigured_True() public {
         DeploymentHelper.DeploymentResult memory pgpResult = 
             DeploymentHelper.deployWeb3PGP(1 ether, address(accessManager));
 
         vm.startPrank(admin);
-        RoleManagementHelper.configureTreasurerRole(
+        RoleManagementHelper.configureFeeManagerRole(
             address(accessManager),
             pgpResult.proxy
         );
         vm.stopPrank();
 
-        bool isConfigured = RoleManagementHelper.isTreasurerRoleConfigured(
+        bool isConfigured = RoleManagementHelper.isFeeManagerRoleConfigured(
             address(accessManager),
             pgpResult.proxy
         );
         assertTrue(isConfigured, "Role should be configured");
     }
 
-    function test_isTreasurerRoleConfigured_False() public {
+    function test_isFeeManagerRoleConfigured_False() public {
         DeploymentHelper.DeploymentResult memory pgpResult = 
             DeploymentHelper.deployWeb3PGP(1 ether, address(accessManager));
 
-        bool isConfigured = RoleManagementHelper.isTreasurerRoleConfigured(
+        bool isConfigured = RoleManagementHelper.isFeeManagerRoleConfigured(
+            address(accessManager),
+            pgpResult.proxy
+        );
+        assertFalse(isConfigured, "Role should not be configured");
+    }
+
+    function test_isFundsManagerRoleConfigured_True() public {
+        DeploymentHelper.DeploymentResult memory pgpResult = 
+            DeploymentHelper.deployWeb3PGP(1 ether, address(accessManager));
+
+        vm.startPrank(admin);
+        RoleManagementHelper.configureFundsManagerRole(
+            address(accessManager),
+            pgpResult.proxy
+        );
+        vm.stopPrank();
+
+        bool isConfigured = RoleManagementHelper.isFundsManagerRoleConfigured(
+            address(accessManager),
+            pgpResult.proxy
+        );
+        assertTrue(isConfigured, "Role should be configured");
+    }
+
+    function test_isFundsManagerRoleConfigured_False() public {
+        DeploymentHelper.DeploymentResult memory pgpResult = 
+            DeploymentHelper.deployWeb3PGP(1 ether, address(accessManager));
+
+        bool isConfigured = RoleManagementHelper.isFundsManagerRoleConfigured(
             address(accessManager),
             pgpResult.proxy
         );
@@ -320,6 +398,7 @@ contract RoleManagementHelperTest is Test {
     function test_RoleConstants() public pure {
         assertEq(RoleManagementHelper.ADMIN_ROLE, 0);
         assertEq(RoleManagementHelper.UPGRADE_MANAGER_ROLE, 1);
-        assertEq(RoleManagementHelper.TREASURER_ROLE, 2);
+        assertEq(RoleManagementHelper.FEE_MANAGER_ROLE, 2);
+        assertEq(RoleManagementHelper.FUNDS_MANAGER_ROLE, 3);
     }
 }

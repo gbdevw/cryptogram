@@ -75,13 +75,15 @@ contract FlatFeeTest is Test {
     FlatFeeImpl impl;
     
     address admin = vm.addr(1);
-    address treasurer = vm.addr(2);
+    address feeManager = vm.addr(2);
+    address fundsManager = vm.addr(2); // Can be same address for testing
     address alice = vm.addr(3);
     address upgrader = vm.addr(4);
     
     // Role identifiers
-    uint64 public constant TREASURER_ROLE = 1;
-    uint64 public constant UPGRADER_ROLE = 2;
+    uint64 public constant FEE_MANAGER_ROLE = 1;
+    uint64 public constant FUNDS_MANAGER_ROLE = 2;
+    uint64 public constant UPGRADER_ROLE = 3;
 
     // Mirror event signature from IFlatFee to use in vm.expectEmit
     event FeesWithdrawn(address indexed to, uint256 amount);
@@ -103,25 +105,33 @@ contract FlatFeeTest is Test {
         // Setup roles as admin
         vm.startPrank(admin);
         
-        // Grant TREASURER_ROLE to treasurer
-        accessManager.grantRole(TREASURER_ROLE, treasurer, 0); // 0 = no expiration
+        // Grant FEE_MANAGER_ROLE to feeManager
+        accessManager.grantRole(FEE_MANAGER_ROLE, feeManager, 0);
+        
+        // Grant FUNDS_MANAGER_ROLE to fundsManager
+        accessManager.grantRole(FUNDS_MANAGER_ROLE, fundsManager, 0);
         
         // Grant UPGRADER_ROLE to upgrader
         accessManager.grantRole(UPGRADER_ROLE, upgrader, 0);
         
         // Configure function permissions
-        // TREASURER can call updateRequestedFee and withdrawFees
-        bytes4[] memory treasurerSelectors = new bytes4[](2);
-        treasurerSelectors[0] = IFlatFee.updateRequestedFee.selector;
-        treasurerSelectors[1] = IFlatFee.withdrawFees.selector;
+        // FEE_MANAGER can call updateRequestedFee
+        bytes4[] memory feeManagerSelectors = new bytes4[](1);
+        feeManagerSelectors[0] = IFlatFee.updateRequestedFee.selector;
+        accessManager.setTargetFunctionRole(
+            address(impl),
+            feeManagerSelectors,
+            FEE_MANAGER_ROLE
+        );
         
-        for (uint256 i = 0; i < treasurerSelectors.length; ++i) {
-            accessManager.setTargetFunctionRole(
-                address(impl),
-                treasurerSelectors,
-                TREASURER_ROLE
-            );
-        }
+        // FUNDS_MANAGER can call withdrawFees
+        bytes4[] memory fundsManagerSelectors = new bytes4[](1);
+        fundsManagerSelectors[0] = IFlatFee.withdrawFees.selector;
+        accessManager.setTargetFunctionRole(
+            address(impl),
+            fundsManagerSelectors,
+            FUNDS_MANAGER_ROLE
+        );
         
         // UPGRADER can call upgradeToAndCall
         bytes4[] memory upgraderSelectors = new bytes4[](1);
@@ -136,7 +146,8 @@ contract FlatFeeTest is Test {
         
         // Fund test accounts
         vm.deal(alice, 10 ether);
-        vm.deal(treasurer, 10 ether);
+        vm.deal(feeManager, 10 ether);
+        vm.deal(fundsManager, 10 ether);
     }
 
     // Allow the test contract to receive ETH when impl.withdrawFees() sends funds
@@ -190,34 +201,34 @@ contract FlatFeeTest is Test {
     }
 
     /*****************************************************************************************************************/
-    /* RBAC - TREASURER ROLE TESTS                                                                                   */
+    /* RBAC - FUNDS_MANAGER_ROLE AND FEE_MANAGER_ROLE TESTS                                                          */
     /*****************************************************************************************************************/
 
-    function testTreasurerCanWithdrawFees() public {
+    function testFundsManagerCanWithdrawFees() public {
         // alice pays fee
         vm.prank(alice);
         impl.pay{value: 1 ether}();
 
         // expect FeesWithdrawn event
         vm.expectEmit(true, false, false, true, address(impl));
-        emit FeesWithdrawn(treasurer, 1 ether);
+        emit FeesWithdrawn(fundsManager, 1 ether);
 
-        uint256 treasurerBalanceBefore = treasurer.balance;
+        uint256 fundsManagerBalanceBefore = fundsManager.balance;
         
-        // treasurer withdraws fees
-        vm.prank(treasurer);
-        impl.withdrawFees(treasurer);
+        // fundsManager withdraws fees
+        vm.prank(fundsManager);
+        impl.withdrawFees(fundsManager);
         
         assertEq(address(impl).balance, 0);
-        assertEq(treasurer.balance, treasurerBalanceBefore + 1 ether);
+        assertEq(fundsManager.balance, fundsManagerBalanceBefore + 1 ether);
     }
 
-    function testNonTreasurerCannotWithdrawFees() public {
+    function testNonFundsManagerCannotWithdrawFees() public {
         // alice pays fee
         vm.prank(alice);
         impl.pay{value: 1 ether}();
         
-        // alice (non-treasurer) cannot withdraw
+        // alice (non-funds-manager) cannot withdraw
         vm.prank(alice);
         vm.expectRevert();
         impl.withdrawFees(alice);
@@ -228,9 +239,9 @@ contract FlatFeeTest is Test {
 
     function testWithdrawWhenNoFeesReverts() public {
         // contract has zero balance
-        vm.prank(treasurer);
+        vm.prank(fundsManager);
         vm.expectRevert();
-        impl.withdrawFees(treasurer);
+        impl.withdrawFees(fundsManager);
     }
 
     function testWithdrawFailsWhenRecipientCannotReceive() public {
@@ -241,13 +252,13 @@ contract FlatFeeTest is Test {
         // deploy FailReceiver
         FailReceiver r = new FailReceiver();
 
-        // treasurer tries to withdraw to FailReceiver, should revert
-        vm.prank(treasurer);
+        // fundsManager tries to withdraw to FailReceiver, should revert
+        vm.prank(fundsManager);
         vm.expectRevert();
         impl.withdrawFees(address(r));
     }
 
-    function testTreasurerCanUpdateFee() public {
+    function testFeeManagerCanUpdateFee() public {
         // Check initial fee
         assertEq(impl.requestedFee(), 1 ether);
         
@@ -255,14 +266,14 @@ contract FlatFeeTest is Test {
         vm.expectEmit(true, true, false, true, address(impl));
         emit RequestedFeeUpdated(1 ether, 2 ether);
         
-        // Treasurer updates fee
-        vm.prank(treasurer);
+        // FeeManager updates fee
+        vm.prank(feeManager);
         impl.updateRequestedFee(2 ether);
         
         assertEq(impl.requestedFee(), 2 ether);
     }
 
-    function testNonTreasurerCannotUpdateFee() public {
+    function testNonFeeManagerCannotUpdateFee() public {
         vm.prank(alice);
         vm.expectRevert();
         impl.updateRequestedFee(2 ether);
@@ -318,8 +329,8 @@ contract FlatFeeTest is Test {
         vm.prank(alice);
         impl.pay{value: 1 ether}();
         
-        // Treasurer updates fee
-        vm.prank(treasurer);
+        // FeeManager updates fee
+        vm.prank(feeManager);
         impl.updateRequestedFee(2 ether);
         
         assertEq(impl.counter(), 1);
@@ -351,36 +362,36 @@ contract FlatFeeTest is Test {
     /*****************************************************************************************************************/
 
     function testAdminCanGrantRoles() public {
-        address newTreasurer = vm.addr(5);
+        address newFundsManager = vm.addr(5);
         
         vm.prank(admin);
-        accessManager.grantRole(TREASURER_ROLE, newTreasurer, 0);
+        accessManager.grantRole(FUNDS_MANAGER_ROLE, newFundsManager, 0);
         
-        // New treasurer should be able to withdraw fees
+        // New funds manager should be able to withdraw fees
         vm.prank(alice);
         impl.pay{value: 1 ether}();
         
-        vm.prank(newTreasurer);
-        impl.withdrawFees(newTreasurer);
+        vm.prank(newFundsManager);
+        impl.withdrawFees(newFundsManager);
         
         assertEq(address(impl).balance, 0);
     }
 
     function testAdminCanRevokeRoles() public {
         vm.prank(admin);
-        accessManager.revokeRole(TREASURER_ROLE, treasurer);
+        accessManager.revokeRole(FEE_MANAGER_ROLE, feeManager);
         
-        // Treasurer should no longer be able to update fee
-        vm.prank(treasurer);
+        // Fee manager should no longer be able to update fee
+        vm.prank(feeManager);
         vm.expectRevert();
         impl.updateRequestedFee(2 ether);
     }
 
     function testNonAdminCannotGrantRoles() public {
-        address newTreasurer = vm.addr(5);
+        address newFeeManager = vm.addr(5);
         
         vm.prank(alice);
         vm.expectRevert();
-        accessManager.grantRole(TREASURER_ROLE, newTreasurer, 0);
+        accessManager.grantRole(FEE_MANAGER_ROLE, newFeeManager, 0);
     }
 }

@@ -46,13 +46,15 @@ contract Web3PGPTest is Test {
     Web3PGP pgp;
     
     address admin = vm.addr(1);
-    address treasurer = vm.addr(2);
+    address feeManager = vm.addr(2);
+    address fundsManager = vm.addr(2); // Can be same address for testing
     address alice = vm.addr(3);
     address upgrader = vm.addr(4);
     
     // Role identifiers
-    uint64 public constant TREASURER_ROLE = 1;
-    uint64 public constant UPGRADER_ROLE = 2;
+    uint64 public constant FEE_MANAGER_ROLE = 1;
+    uint64 public constant FUNDS_MANAGER_ROLE = 2;
+    uint64 public constant UPGRADER_ROLE = 3;
 
     event KeyRegistered(bytes32 indexed primaryKeyFingerprint, bytes32[] subkeyFingerprints, bytes openPGPMsg);
     event SubkeyAdded(bytes32 indexed parentKeyFingerprint, bytes32 indexed subkeyFingerprint, bytes openPGPMsg);
@@ -79,21 +81,31 @@ contract Web3PGPTest is Test {
         // Setup roles as admin
         vm.startPrank(admin);
         
-        // Grant TREASURER_ROLE to treasurer
-        accessManager.grantRole(TREASURER_ROLE, treasurer, 0);
+        // Grant FEE_MANAGER_ROLE to feeManager
+        accessManager.grantRole(FEE_MANAGER_ROLE, feeManager, 0);
+        
+        // Grant FUNDS_MANAGER_ROLE to fundsManager
+        accessManager.grantRole(FUNDS_MANAGER_ROLE, fundsManager, 0);
         
         // Grant UPGRADER_ROLE to upgrader
         accessManager.grantRole(UPGRADER_ROLE, upgrader, 0);
         
-        // Configure function permissions for TREASURER
-        bytes4[] memory treasurerSelectors = new bytes4[](2);
-        treasurerSelectors[0] = IFlatFee.updateRequestedFee.selector;
-        treasurerSelectors[1] = IFlatFee.withdrawFees.selector;
-        
+        // Configure function permissions for FEE_MANAGER
+        bytes4[] memory feeManagerSelectors = new bytes4[](1);
+        feeManagerSelectors[0] = IFlatFee.updateRequestedFee.selector;
         accessManager.setTargetFunctionRole(
             address(pgp),
-            treasurerSelectors,
-            TREASURER_ROLE
+            feeManagerSelectors,
+            FEE_MANAGER_ROLE
+        );
+        
+        // Configure function permissions for FUNDS_MANAGER
+        bytes4[] memory fundsManagerSelectors = new bytes4[](1);
+        fundsManagerSelectors[0] = IFlatFee.withdrawFees.selector;
+        accessManager.setTargetFunctionRole(
+            address(pgp),
+            fundsManagerSelectors,
+            FUNDS_MANAGER_ROLE
         );
         
         // Configure function permissions for UPGRADER
@@ -110,7 +122,8 @@ contract Web3PGPTest is Test {
         
         // Fund test accounts
         vm.deal(alice, 10 ether);
-        vm.deal(treasurer, 10 ether);
+        vm.deal(feeManager, 10 ether);
+        vm.deal(fundsManager, 10 ether);
     }
 
     function testRegisterAndEmitEventsAndExistence() public {
@@ -411,16 +424,16 @@ contract Web3PGPTest is Test {
     /* FLATFEE RBAC TESTS                                                                                            */
     /*****************************************************************************************************************/
 
-    function testTreasurerCanUpdateFee() public {
+    function testFeeManagerCanUpdateFee() public {
         assertEq(pgp.requestedFee(), 0);
         
-        vm.prank(treasurer);
+        vm.prank(feeManager);
         pgp.updateRequestedFee(1 ether);
         
         assertEq(pgp.requestedFee(), 1 ether);
     }
 
-    function testNonTreasurerCannotUpdateFee() public {
+    function testNonFeeManagerCannotUpdateFee() public {
         vm.prank(alice);
         vm.expectRevert();
         pgp.updateRequestedFee(1 ether);
@@ -428,9 +441,9 @@ contract Web3PGPTest is Test {
         assertEq(pgp.requestedFee(), 0);
     }
 
-    function testTreasurerCanWithdrawFees() public {
+    function testFundsManagerCanWithdrawFees() public {
         // Set a fee and have alice pay it
-        vm.prank(treasurer);
+        vm.prank(feeManager);
         pgp.updateRequestedFee(1 ether);
         
         bytes32 fp = keccak256("fee-test");
@@ -439,18 +452,18 @@ contract Web3PGPTest is Test {
         
         assertEq(address(pgp).balance, 1 ether);
         
-        uint256 treasurerBalanceBefore = treasurer.balance;
+        uint256 fundsManagerBalanceBefore = fundsManager.balance;
         
-        vm.prank(treasurer);
-        pgp.withdrawFees(treasurer);
+        vm.prank(fundsManager);
+        pgp.withdrawFees(fundsManager);
         
         assertEq(address(pgp).balance, 0);
-        assertEq(treasurer.balance, treasurerBalanceBefore + 1 ether);
+        assertEq(fundsManager.balance, fundsManagerBalanceBefore + 1 ether);
     }
 
-    function testNonTreasurerCannotWithdrawFees() public {
+    function testNonFundsManagerCannotWithdrawFees() public {
         // Set a fee and have alice pay it
-        vm.prank(treasurer);
+        vm.prank(feeManager);
         pgp.updateRequestedFee(1 ether);
         
         bytes32 fp = keccak256("fee-test2");

@@ -22,7 +22,8 @@ contract FullDeploymentFlowTest is Test {
 
     address internal deployer = address(0x1111);
     address internal upgradeManager = address(0x2222);
-    address internal treasurer = address(0x3333);
+    address internal feeManager = address(0x3333);
+    address internal fundsManager = address(0x4444);
     uint256 internal fee = 1 ether;
 
     /*****************************************************************************************************************/
@@ -54,21 +55,25 @@ contract FullDeploymentFlowTest is Test {
         
         // Configure roles for Web3PGP
         RoleManagementHelper.configureUpgradeManagerRole(amResult.proxy, pgpResult.proxy);
-        RoleManagementHelper.configureTreasurerRole(amResult.proxy, pgpResult.proxy);
+        RoleManagementHelper.configureFeeManagerRole(amResult.proxy, pgpResult.proxy);
+        RoleManagementHelper.configureFundsManagerRole(amResult.proxy, pgpResult.proxy);
 
         // Configure roles for Web3Doc
         RoleManagementHelper.configureUpgradeManagerRole(amResult.proxy, docResult.proxy);
-        RoleManagementHelper.configureTreasurerRole(amResult.proxy, docResult.proxy);
+        RoleManagementHelper.configureFeeManagerRole(amResult.proxy, docResult.proxy);
+        RoleManagementHelper.configureFundsManagerRole(amResult.proxy, docResult.proxy);
 
         // Grant roles to users
         RoleManagementHelper.grantUpgradeManagerRole(amResult.proxy, upgradeManager, 0);
-        RoleManagementHelper.grantTreasurerRole(amResult.proxy, treasurer, 0);
+        RoleManagementHelper.grantFeeManagerRole(amResult.proxy, feeManager, 0);
+        RoleManagementHelper.grantFundsManagerRole(amResult.proxy, fundsManager, 0);
         
         vm.stopPrank();
 
         // Verify all is configured
         assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.UPGRADE_MANAGER_ROLE, upgradeManager));
-        assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.TREASURER_ROLE, treasurer));
+        assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.FEE_MANAGER_ROLE, feeManager));
+        assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.FUNDS_MANAGER_ROLE, fundsManager));
     }
 
     function test_FullDeploymentFlow_VerifyAccessManager() public {
@@ -140,7 +145,8 @@ contract FullDeploymentFlowTest is Test {
         // Configure roles (as deployer/admin)
         vm.startPrank(deployer);
         RoleManagementHelper.configureUpgradeManagerRole(amResult.proxy, pgpResult.proxy);
-        RoleManagementHelper.configureTreasurerRole(amResult.proxy, pgpResult.proxy);
+        RoleManagementHelper.configureFeeManagerRole(amResult.proxy, pgpResult.proxy);
+        RoleManagementHelper.configureFundsManagerRole(amResult.proxy, pgpResult.proxy);
         vm.stopPrank();
 
         // Verify configuration
@@ -148,7 +154,10 @@ contract FullDeploymentFlowTest is Test {
             RoleManagementHelper.isUpgradeManagerRoleConfigured(amResult.proxy, pgpResult.proxy)
         );
         assertTrue(
-            RoleManagementHelper.isTreasurerRoleConfigured(amResult.proxy, pgpResult.proxy)
+            RoleManagementHelper.isFeeManagerRoleConfigured(amResult.proxy, pgpResult.proxy)
+        );
+        assertTrue(
+            RoleManagementHelper.isFundsManagerRoleConfigured(amResult.proxy, pgpResult.proxy)
         );
     }
 
@@ -157,11 +166,12 @@ contract FullDeploymentFlowTest is Test {
             DeploymentHelper.deployAccessManager(deployer);
 
         // Create multiple users with different roles
-        address admin1 = address(0x4444);
-        address admin2 = address(0x5555);
-        address upgrader1 = address(0x6666);
-        address upgrader2 = address(0x7777);
-        address treasurer1 = address(0x8888);
+        address admin1 = address(0x5555);
+        address admin2 = address(0x6666);
+        address upgrader1 = address(0x7777);
+        address upgrader2 = address(0x8888);
+        address feeManager1 = address(0x9999);
+        address fundsManager1 = address(0xAAAA);
 
         // Grant roles (as deployer/admin)
         vm.startPrank(deployer);
@@ -169,14 +179,16 @@ contract FullDeploymentFlowTest is Test {
         RoleManagementHelper.grantAdminRole(amResult.proxy, admin2);
         RoleManagementHelper.grantUpgradeManagerRole(amResult.proxy, upgrader1, 0);
         RoleManagementHelper.grantUpgradeManagerRole(amResult.proxy, upgrader2, 0);
-        RoleManagementHelper.grantTreasurerRole(amResult.proxy, treasurer1, 0);
+        RoleManagementHelper.grantFeeManagerRole(amResult.proxy, feeManager1, 0);
+        RoleManagementHelper.grantFundsManagerRole(amResult.proxy, fundsManager1, 0);
 
         // Verify all roles are assigned
         assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.ADMIN_ROLE, admin1));
         assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.ADMIN_ROLE, admin2));
         assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.UPGRADE_MANAGER_ROLE, upgrader1));
         assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.UPGRADE_MANAGER_ROLE, upgrader2));
-        assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.TREASURER_ROLE, treasurer1));
+        assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.FEE_MANAGER_ROLE, feeManager1));
+        assertTrue(RoleManagementHelper.hasRole(amResult.proxy, RoleManagementHelper.FUNDS_MANAGER_ROLE, fundsManager1));
 
         // Revoke one admin role
         RoleManagementHelper.revokeAdminRole(amResult.proxy, admin2);
