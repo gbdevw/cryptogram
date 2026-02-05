@@ -32,8 +32,8 @@ export FEE_IN_WEIS=1000000000000000
 forge script scripts/DeployWeb3PGP.s.sol --rpc-url $RPC_URL --broadcast
 ```
 
-### DeployWeb3Doc.s.sol
-Deploys Web3Doc contract and assigns existing roles to its functions.
+### DeployWeb3Sign.s.sol
+Deploys Web3Sign contract and assigns existing roles to its functions.
 
 **Environment Variables:**
 - `PRIVATE_KEY`: Deployer's private key
@@ -47,7 +47,7 @@ Deploys Web3Doc contract and assigns existing roles to its functions.
 export ACCESS_MANAGER=0x...
 export WEB3PGP=0x...
 export FEE_IN_WEIS=1000000000000000
-forge script scripts/DeployWeb3Doc.s.sol --rpc-url $RPC_URL --broadcast
+forge script scripts/DeployWeb3Sign.s.sol --rpc-url $RPC_URL --broadcast
 ```
 
 ## Role Management Scripts
@@ -126,7 +126,7 @@ Set to 0 for immediate activation (development/testing) or use values like 86400
 ### Role Hierarchy
 - ADMIN_ROLE can grant/revoke all roles including itself
 - Other roles can only execute their assigned functions
-- Role assignments are per-contract (Web3PGP and Web3Doc have separate function assignments)
+- Role assignments are per-contract (Web3PGP and Web3Sign have separate function assignments)
 
 ## Deployment Workflow Example
 
@@ -140,8 +140,8 @@ export FEE_IN_WEIS=1000000000000000
 forge script scripts/DeployWeb3PGP.s.sol --rpc-url $RPC_URL --broadcast
 export WEB3PGP=<deployed_proxy_address>
 
-# 3. Deploy Web3Doc
-forge script scripts/DeployWeb3Doc.s.sol --rpc-url $RPC_URL --broadcast
+# 3. Deploy Web3Sign
+forge script scripts/DeployWeb3Sign.s.sol --rpc-url $RPC_URL --broadcast
 
 # 4. Grant roles to additional addresses
 export TARGET_ADDRESS=0x...

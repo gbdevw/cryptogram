@@ -1,14 +1,14 @@
 export const CHAIN_CONFIG = {
   inkSepolia: {
     id: 'inkSepolia',
-    // We only need Web3Doc contract address for timestamp verification
-    // Web3Doc contract has a "getWeb3PGPAddress" method to get the address of the Web3PGP contract the Web3Doc contract interacts with
+    // We only need Web3Sign contract address for timestamp verification
+    // Web3Sign contract has a "getWeb3PGPAddress" method to get the address of the Web3PGP contract the Web3Sign contract interacts with
     // to verify key existence.
-    web3docContractAddress: import.meta.env.REACT_APP_CONTRACT_ADDRESS_INK_SEPOLIA || '0x5C09E831276ADCec4D5C94645F34500D3deA8E8A',
+    web3signContractAddress: import.meta.env.REACT_APP_CONTRACT_ADDRESS_INK_SEPOLIA || '0x5C09E831276ADCec4D5C94645F34500D3deA8E8A',
   },
   ink: {
     id: 'ink',
-    web3docContractAddress: import.meta.env.REACT_APP_CONTRACT_ADDRESS_INK || '',
+    web3signContractAddress: import.meta.env.REACT_APP_CONTRACT_ADDRESS_INK || '',
   },
 } as const
 

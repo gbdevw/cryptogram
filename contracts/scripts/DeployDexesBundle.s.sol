@@ -6,14 +6,14 @@ import {console2} from "lib/forge-std/src/console2.sol";
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
 import {ERC1967Proxy} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
-import {Web3Doc} from "src/Web3Doc.sol";
+import {Web3Sign} from "src/Web3Sign.sol";
 import {DeploymentHelper} from "scripts/lib/DeploymentHelper.sol";
 import {RoleManagementHelper} from "scripts/lib/RoleManagementHelper.sol";
 import {ScriptHelpers} from "scripts/lib/ScriptHelpers.sol";
 
 /**
  * @title DeployDexesBundle
- * @notice Deploy and configure all contracts that are part of DEXES: AccessManager + Web3PGP + Web3Doc
+ * @notice Deploy and configure all contracts that are part of DEXES: AccessManager + Web3PGP + Web3Sign
  * @dev This script deploys and configure all contracts that are part of DEXES in one go
  */
 contract DeployDexesBundle is Script {
@@ -25,7 +25,7 @@ contract DeployDexesBundle is Script {
     struct DeploymentAddresses {
         address accessManagerProxy;
         address web3pgpProxy;
-        address web3docProxy;
+        address web3signProxy;
     }
 
     /// @notice Deployment results
@@ -65,7 +65,7 @@ contract DeployDexesBundle is Script {
         console2.log("========================================");
         console2.log("AccessManager:", addresses.accessManagerProxy);
         console2.log("Web3PGP:", addresses.web3pgpProxy);
-        console2.log("Web3Doc:", addresses.web3docProxy);
+        console2.log("Web3Sign:", addresses.web3signProxy);
         console2.log("All contracts initialized and ready for use");
         console2.log("========================================");
 
@@ -94,15 +94,15 @@ contract DeployDexesBundle is Script {
         addresses.web3pgpProxy = deployWeb3PGP(feeInWeis, addresses.accessManagerProxy);
         console2.log("   Proxy:", addresses.web3pgpProxy);
 
-        // ===== 3. Deploy Web3Doc =====
+        // ===== 3. Deploy Web3Sign =====
         console2.log("");
-        console2.log("3. Deploying Web3Doc...");
-        addresses.web3docProxy = deployWeb3Doc(
+        console2.log("3. Deploying Web3Sign...");
+        addresses.web3signProxy = deployWeb3Sign(
             feeInWeis,
             addresses.accessManagerProxy,
             addresses.web3pgpProxy
         );
-        console2.log("   Proxy:", addresses.web3docProxy);
+        console2.log("   Proxy:", addresses.web3signProxy);
 
         // ===== 4. Configure Roles in AccessManager =====
         console2.log("");
@@ -175,19 +175,19 @@ contract DeployDexesBundle is Script {
     }
 
     /**
-     * @notice Internal wrapper to deploy Web3Doc
+     * @notice Internal wrapper to deploy Web3Sign
      * @param fee The service fee in weis
      * @param accessManager The AccessManager proxy address
      * @param web3pgp The Web3PGP proxy address
-     * @return The proxy address of the deployed Web3Doc
+     * @return The proxy address of the deployed Web3Sign
      */
-    function deployWeb3Doc(
+    function deployWeb3Sign(
         uint256 fee,
         address accessManager,
         address web3pgp
     ) internal returns (address) {
         DeploymentHelper.DeploymentResult memory result = 
-            DeploymentHelper.deployWeb3Doc(fee, accessManager, web3pgp);
+            DeploymentHelper.deployWeb3Sign(fee, accessManager, web3pgp);
         return result.proxy;
     }
 

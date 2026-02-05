@@ -1,15 +1,15 @@
 import { PublicClient } from 'viem'
-import { Web3Doc, Web3PGP, Web3PGPService, Web3DocService } from '@cryptogram/dexes'
+import { Web3Sign, Web3PGP, Web3PGPService, Web3SignService } from '@cryptogram/dexes'
 import { getCurrentChainConfig } from '../config/chains'
 
 /**
  * Manages the initialization of blockchain clients and services
  */
 class BlockchainServiceManager {
-  private web3Doc: Web3Doc | null = null
+  private web3Sign: Web3Sign | null = null
   private web3PGP: Web3PGP | null = null
   private web3PGPService: Web3PGPService | null = null
-  private web3DocService: Web3DocService | null = null
+  private web3SignService: Web3SignService | null = null
 
   /**
    * Initialize all services based on publicClient
@@ -18,16 +18,16 @@ class BlockchainServiceManager {
     try {
       // Step 1: Get contract addresses
       const chainConfig = getCurrentChainConfig()
-      const web3DocAddress = chainConfig.web3docContractAddress as `0x${string}`
+      const web3SignAddress = chainConfig.web3signContractAddress as `0x${string}`
 
-      // Step 2: Create Web3PGP client first (low level, needed by Web3Doc)
-      // Get the Web3PGP address from Web3Doc
-      const tempWeb3Doc = new Web3Doc(
-        web3DocAddress,
+      // Step 2: Create Web3PGP client first (low level, needed by Web3Sign)
+      // Get the Web3PGP address from Web3Sign
+      const tempWeb3Sign = new Web3Sign(
+        web3SignAddress,
         undefined as any,
         publicClient as any
       )
-      const web3PGPAddress = await tempWeb3Doc.getWeb3PGPAddress()
+      const web3PGPAddress = await tempWeb3Sign.getWeb3PGPAddress()
 
       // Step 3: Create Web3PGP client with correct address
       this.web3PGP = new Web3PGP(
@@ -35,9 +35,9 @@ class BlockchainServiceManager {
         publicClient as any
       )
 
-      // Step 4: Create Web3Doc client with both address and Web3PGP
-      this.web3Doc = new Web3Doc(
-        web3DocAddress,
+      // Step 4: Create Web3Sign client with both address and Web3PGP
+      this.web3Sign = new Web3Sign(
+        web3SignAddress,
         this.web3PGP as any,
         publicClient as any
       )
@@ -45,9 +45,9 @@ class BlockchainServiceManager {
       // Step 5: Create Web3PGP service (high level)
       this.web3PGPService = new Web3PGPService(this.web3PGP as any)
 
-      // Step 6: Create Web3Doc service (high level)
-      this.web3DocService = new Web3DocService(
-        this.web3Doc as any,
+      // Step 6: Create Web3Sign service (high level)
+      this.web3SignService = new Web3SignService(
+        this.web3Sign as any,
         this.web3PGPService as any
       )
 
@@ -59,13 +59,13 @@ class BlockchainServiceManager {
   }
 
   /**
-   * Get Web3DocService (high level)
+   * Get Web3SignService (high level)
    */
-  getWeb3DocService(): Web3DocService {
-    if (!this.web3DocService) {
-      throw new Error('Web3DocService not initialized')
+  getWeb3SignService(): Web3SignService {
+    if (!this.web3SignService) {
+      throw new Error('Web3SignService not initialized')
     }
-    return this.web3DocService
+    return this.web3SignService
   }
 
   /**
@@ -83,7 +83,7 @@ class BlockchainServiceManager {
    */
   isInitialized(): boolean {
     return (
-      this.web3DocService !== null &&
+      this.web3SignService !== null &&
       this.web3PGPService !== null
     )
   }
@@ -92,10 +92,10 @@ class BlockchainServiceManager {
    * Reset all services (useful for testing)
    */
   reset(): void {
-    this.web3Doc = null
+    this.web3Sign = null
     this.web3PGP = null
     this.web3PGPService = null
-    this.web3DocService = null
+    this.web3SignService = null
   }
 }
 

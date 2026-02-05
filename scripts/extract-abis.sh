@@ -37,9 +37,11 @@ EOF
 # Generate ABIs for all contracts
 generate_ts_abi "Web3PGP" "Web3PGP.sol"
 generate_ts_abi "Web3Doc" "Web3Doc.sol"
+generate_ts_abi "Web3Sign" "Web3Sign.sol"
 generate_ts_abi "FlatFee" "FlatFee.sol"
 generate_ts_abi "IWeb3PGP" "IWeb3PGP.sol"
 generate_ts_abi "IWeb3Doc" "IWeb3Doc.sol"
+generate_ts_abi "IWeb3Sign" "IWeb3Sign.sol"
 generate_ts_abi "IFlatFee" "IFlatFee.sol"
 
 echo ""

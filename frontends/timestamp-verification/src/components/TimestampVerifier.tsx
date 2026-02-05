@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import pLimit from 'p-limit'
-import { useWeb3DocService } from '../hooks/useWeb3DocService'
+import { useWeb3SignService } from '../hooks/useWeb3SignService'
 import { useWeb3PGPService } from '../hooks/useWeb3PGPService'
 import { useWellKnownKeys } from '../hooks/useWellKnownKeys'
 import { FileUpload } from './FileUpload'
@@ -13,7 +13,7 @@ interface TimestampVerifierProps {
 }
 
 export const TimestampVerifier = ({ idFromUrl }: TimestampVerifierProps) => {
-    const web3DocService = useWeb3DocService()
+    const web3SignService = useWeb3SignService()
     const web3PGPService = useWeb3PGPService()
     const { keys: wellKnownKeys } = useWellKnownKeys()
     const [loading, setLoading] = useState(false)
@@ -22,7 +22,7 @@ export const TimestampVerifier = ({ idFromUrl }: TimestampVerifierProps) => {
     const [hasError, setHasError] = useState(false)
 
     const verifyTimestamp = async (hash: `0x${string}`, fileName: string) => {
-        if (!web3DocService || !web3PGPService) {
+        if (!web3SignService || !web3PGPService) {
             return
         }
 
@@ -42,7 +42,7 @@ export const TimestampVerifier = ({ idFromUrl }: TimestampVerifierProps) => {
                 timestampIds = [BigInt(idFromUrl)]
             } else {
                 // Otherwise, find timestamps by hash
-                timestampIds = await web3DocService.findTimestampsByHash(toBytes(hash))
+                timestampIds = await web3SignService.findTimestampsByHash(toBytes(hash))
             }
 
             // Load well-known keys used to verify the identity of timestamp signers
@@ -78,7 +78,7 @@ export const TimestampVerifier = ({ idFromUrl }: TimestampVerifierProps) => {
                 limit(async () => {
                     try {
                         console.log(`Verifying timestamp with ID ${id.toString()}`)
-                        const timestamp = await web3DocService.verifyTimestamp(id)
+                        const timestamp = await web3SignService.verifyTimestamp(id)
                         console.log(`Valid timestamp retrieved: ID = ${id.toString()}, Date = ${timestamp.date}, TX = ${timestamp.tx}, Hash = ${toHex(timestamp.documentHash)}, Emitter = ${timestamp.publicKey.getFingerprint()}`)
                         console.log('Verifying the timestamp matches the provided hash:', hash)
                         if (toHex(timestamp.documentHash) !== hash) {

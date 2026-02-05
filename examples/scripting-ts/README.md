@@ -9,7 +9,7 @@ This example demonstrates the complete PKI and document timestamping workflow us
 3. **Registers the customer key** - Publishes the key on-chain via Web3PGP contract
 4. **Certifies the key** - Signs the customer key with the certification key
 5. **Creates and signs a document** - Creates a sample document, hashes it, and signs with the customer key
-6. **Timestamps the document** - Stores the document hash and signature on-chain via Web3Doc contract
+6. **Timestamps the document** - Stores the document hash and signature on-chain via Web3Sign contract
 7. **Verifies the timestamp** - Retrieves and validates the stored document from the blockchain
 
 ## Quick Start
@@ -34,7 +34,7 @@ The script will output a document ID and verification details. Generated documen
 ## Outputs
 
 - **Local file**: Sample document created in the working directory
-- **On-chain**: Document hash and signature stored in Web3Doc contract
+- **On-chain**: Document hash and signature stored in Web3Sign contract
 - **Verification**: Proof available at [Cryptogram Verifier](https://dexes-verify.vercel.app/#/timestamp)
 
 ## Test Credentials

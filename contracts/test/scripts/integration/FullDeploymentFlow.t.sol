@@ -47,7 +47,7 @@ contract FullDeploymentFlowTest is Test {
         // Initially should be unset (zero addresses)
         assertEq(addrs.accessManagerProxy, address(0));
         assertEq(addrs.web3pgpProxy, address(0));
-        assertEq(addrs.web3docProxy, address(0));
+        assertEq(addrs.web3signProxy, address(0));
     }
 
     /*****************************************************************************************************************/

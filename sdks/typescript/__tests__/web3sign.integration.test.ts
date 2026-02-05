@@ -1,20 +1,26 @@
-import { Address } from 'viem';
-import { AnvilHelper } from './helpers/anvil.helper';
+import { Address, createPublicClient, createWalletClient, http } from 'viem';
+import { foundry } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
 import { Web3PGPService } from '../src/web3pgp/web3pgp.service';
-import { Web3DocService } from '../src/web3doc/web3doc.service';
+import { Web3SignService } from '../src/web3sign/web3sign.service';
 import { Web3PGP } from '../src/web3pgp/web3pgp';
-import { Web3Doc } from '../src/web3doc/web3doc';
+import { Web3Sign } from '../src/web3sign/web3sign';
+import { getTestWalletClient, getPublicClient, getContractAddress } from '../src/utils/test-wallet';
 
 /**
- * Web3Doc Integration Tests
+ * Web3Sign Integration Tests
  *
- * These tests verify that Web3DocService correctly interacts with:
- * - Web3Doc smart contract for document timestamping
+ * These tests verify that Web3SignService correctly interacts with:
+ * - Web3Sign smart contract for document timestamping
  * - Web3PGPService for key management
  * - The blockchain through Viem clients
  *
  * Note: These tests use dummy OpenPGP data (fingerprints, signatures, keys)
  * because the focus is on verifying blockchain interactions, not cryptography.
+ *
+ * Prerequisites:
+ * - Run "npm test" to start anvil and deploy contracts
+ * - Test environment is configured via .env.test (auto-generated)
  */
 
 // ============================================================================
@@ -63,60 +69,55 @@ const DUMMY_DOCUMENT_HASH = Buffer.from('a'.repeat(64), 'hex');
 // ============================================================================
 
 interface TestEnvironment {
-  anvil: AnvilHelper;
   web3pgpAddress: Address;
-  web3docAddress: Address;
+  web3signAddress: Address;
   web3pgp: Web3PGP;
   web3pgpService: Web3PGPService;
-  web3doc: Web3Doc;
+  web3sign: Web3Sign;
 }
 
 let testEnv: TestEnvironment;
 
 /**
- * Deploy test environment using Anvil helper
+ * Initialize test environment from .env.test (created by test orchestrator)
  */
-async function deployTestEnvironment(): Promise<TestEnvironment> {
+function initializeTestEnvironment(): TestEnvironment {
   console.log('========================================');
-  console.log('Setting up Web3Doc Integration Tests');
+  console.log('Initializing Web3Sign Integration Tests');
   console.log('========================================');
-  
-  console.log('Starting Anvil blockchain...');
-  // Use dynamic port based on Jest worker ID for parallel test execution
-  const workerId = process.env.JEST_WORKER_ID ? parseInt(process.env.JEST_WORKER_ID) : 1;
-  const port = 8545 + (workerId - 1) * 100; // Worker 1: 8545, Worker 2: 8645, Worker 3: 8745, Worker 4: 8845
-  const anvil = new AnvilHelper({ port, blockTime: 0.01 });
-  await anvil.start();
-  console.log('✓ Anvil started at', anvil.getRpcUrl());
 
-  console.log('Deploying contracts via Foundry scripts...');
-  const deployed = await anvil.deployWeb3Doc(0n); // Initialize with 0 fee
-  const web3pgpAddress = deployed.web3pgp;
-  const web3docAddress = deployed.web3doc;
-  
-  console.log('✓ Deployment summary:');
-  console.log('  - AccessManager:', deployed.accessManager);
+  // Verify required environment variables
+  if (!process.env.DEXES_WEB3SIGN || !process.env.DEXES_WEB3PGP) {
+    throw new Error(
+      'Contract addresses not found in environment.\n' +
+      'Please run "npm test" to start anvil and deploy contracts.'
+    );
+  }
+
+  const web3pgpAddress = getContractAddress('DEXES_WEB3PGP');
+  const web3signAddress = getContractAddress('DEXES_WEB3SIGN');
+
+  console.log('✓ Contract addresses loaded from environment:');
   console.log('  - Web3PGP:', web3pgpAddress);
-  console.log('  - Web3Doc:', web3docAddress);
+  console.log('  - Web3Sign:', web3signAddress);
 
-  // Create SDK instances with real clients
-  const publicClient = anvil.getPublicClient();
-  const walletClient = anvil.getWalletClient();
+  // Create SDK instances with test clients
+  const publicClient = getPublicClient();
+  const walletClient = getTestWalletClient();
 
   const web3pgp = new Web3PGP(web3pgpAddress, publicClient, walletClient);
   const web3pgpService = new Web3PGPService(web3pgp);
-  const web3doc = new Web3Doc(web3docAddress, web3pgp, publicClient, walletClient);
-  
-  console.log('✓ Web3PGP and Web3Doc SDKs initialized');
+  const web3sign = new Web3Sign(web3signAddress, web3pgp, publicClient, walletClient);
+
+  console.log('✓ SDK clients and services initialized');
   console.log('========================================\n');
 
   return {
-    anvil,
     web3pgpAddress,
-    web3docAddress,
+    web3signAddress,
     web3pgp,
     web3pgpService,
-    web3doc,
+    web3sign,
   };
 }
 
@@ -124,25 +125,18 @@ async function deployTestEnvironment(): Promise<TestEnvironment> {
 // Test Suites
 // ============================================================================
 
-describe('Web3Doc Integration Tests', () => {
-  beforeAll(async () => {
-    testEnv = await deployTestEnvironment();
-  }, 120000); // Increased timeout for Foundry script execution
-
-  afterAll(async () => {
-    if (testEnv?.anvil) {
-      console.log('Stopping Anvil...');
-      testEnv.anvil.stop();
-    }
+describe('Web3Sign Integration Tests', () => {
+  beforeAll(() => {
+    testEnv = initializeTestEnvironment();
   });
 
   // ========== Contract Initialization ==========
 
   describe('Contract Initialization', () => {
-    test('should verify Web3Doc contract is deployed', async () => {
-      const publicClient = testEnv.anvil.getPublicClient();
+    test('should verify Web3Sign contract is deployed', async () => {
+      const publicClient = getPublicClient();
       const code = await publicClient.getCode({
-        address: testEnv.web3docAddress,
+        address: testEnv.web3signAddress,
       });
 
       expect(code).toBeDefined();
@@ -150,7 +144,7 @@ describe('Web3Doc Integration Tests', () => {
     });
 
     test('should verify Web3PGP contract is deployed', async () => {
-      const publicClient = testEnv.anvil.getPublicClient();
+      const publicClient = getPublicClient();
       const code = await publicClient.getCode({
         address: testEnv.web3pgpAddress,
       });
@@ -159,8 +153,8 @@ describe('Web3Doc Integration Tests', () => {
       expect(code).not.toBe('0x');
     });
 
-    test('should read requested fee from Web3Doc', async () => {
-      const fee = await testEnv.web3doc.requestedFee();
+    test('should read requested fee from Web3Sign', async () => {
+      const fee = await testEnv.web3sign.requestedFee();
 
       expect(fee).toBeDefined();
       expect(typeof fee).toBe('bigint');
@@ -181,10 +175,7 @@ describe('Web3Doc Integration Tests', () => {
     });
 
     test('should use Web3PGPService to retrieve registered keys', async () => {
-      const publicClient = testEnv.anvil.getPublicClient();
-      const web3pgpService = new Web3PGPService(
-        testEnv.web3pgp,
-      );
+      const web3pgpService = new Web3PGPService(testEnv.web3pgp);
 
       // The service should be able to query the contract
       expect(web3pgpService).toBeDefined();
@@ -195,21 +186,21 @@ describe('Web3Doc Integration Tests', () => {
   // ========== Document Timestamping ==========
 
   describe('Document Timestamping', () => {
-    test('should create a Web3DocService instance', async () => {
+    test('should create a Web3SignService instance', async () => {
       const web3pgpService = new Web3PGPService(testEnv.web3pgp);
-      const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService);
+      const web3signService = new Web3SignService(testEnv.web3sign, web3pgpService);
 
-      expect(web3docService).toBeDefined();
+      expect(web3signService).toBeDefined();
     });
 
-    test('should interact with Web3Doc contract', async () => {
+    test('should interact with Web3Sign contract', async () => {
       // Verify contract is accessible
-      const fee = await testEnv.web3doc.requestedFee();
+      const fee = await testEnv.web3sign.requestedFee();
       expect(typeof fee).toBe('bigint');
     });
 
     test('should track document timestamps on blockchain', async () => {
-      const publicClient = testEnv.anvil.getPublicClient();
+      const publicClient = getPublicClient();
 
       // Get initial block number
       const initialBlockNumber = await publicClient.getBlockNumber();
@@ -221,8 +212,8 @@ describe('Web3Doc Integration Tests', () => {
   // ========== Fee Management ==========
 
   describe('Fee Management', () => {
-    test('should read fee from Web3Doc', async () => {
-      const fee = await testEnv.web3doc.requestedFee();
+    test('should read fee from Web3Sign', async () => {
+      const fee = await testEnv.web3sign.requestedFee();
 
       expect(fee).toBeDefined();
       expect(typeof fee).toBe('bigint');
@@ -236,7 +227,7 @@ describe('Web3Doc Integration Tests', () => {
     });
 
     test('should verify fees are consistent', async () => {
-      const docFee = await testEnv.web3doc.requestedFee();
+      const docFee = await testEnv.web3sign.requestedFee();
       const pgpFee = await testEnv.web3pgp.requestedFee();
 
       // Both should be valid fees
@@ -247,23 +238,23 @@ describe('Web3Doc Integration Tests', () => {
 
   // ========== Service Interactions ==========
 
-  describe('Web3DocService Interactions', () => {
-    test('should instantiate Web3DocService with proper dependencies', async () => {
+  describe('Web3SignService Interactions', () => {
+    test('should instantiate Web3SignService with proper dependencies', async () => {
       const web3pgpService = new Web3PGPService(testEnv.web3pgp);
-      const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService);
+      const web3signService = new Web3SignService(testEnv.web3sign, web3pgpService);
 
-      expect(web3docService).toBeDefined();
-      expect(web3docService.web3pgpService).toBe(web3pgpService);
+      expect(web3signService).toBeDefined();
+      expect(web3signService.web3pgpService).toBe(web3pgpService);
     });
 
     test('should handle Web3PGP as a dependency', async () => {
-      // Web3Doc should be able to use Web3PGP
+      // Web3Sign should be able to use Web3PGP
       expect(testEnv.web3pgp.address).toBe(testEnv.web3pgpAddress);
-      expect(testEnv.web3doc.address).toBe(testEnv.web3docAddress);
+      expect(testEnv.web3sign.address).toBe(testEnv.web3signAddress);
     });
 
     test('should access both contracts through service', async () => {
-      const docFee = await testEnv.web3doc.requestedFee();
+      const docFee = await testEnv.web3sign.requestedFee();
       const pgpFee = await testEnv.web3pgp.requestedFee();
 
       expect(docFee).toBeDefined();
@@ -275,7 +266,7 @@ describe('Web3Doc Integration Tests', () => {
 
   describe('Blockchain State Management', () => {
     test('should track block numbers correctly', async () => {
-      const publicClient = testEnv.anvil.getPublicClient();
+      const publicClient = getPublicClient();
       const blockNumber = await publicClient.getBlockNumber();
 
       expect(typeof blockNumber).toBe('bigint');
@@ -283,16 +274,16 @@ describe('Web3Doc Integration Tests', () => {
     });
 
     test('should verify contract state persists across calls', async () => {
-      const fee1 = await testEnv.web3doc.requestedFee();
-      const fee2 = await testEnv.web3doc.requestedFee();
+      const fee1 = await testEnv.web3sign.requestedFee();
+      const fee2 = await testEnv.web3sign.requestedFee();
 
       expect(fee1).toBe(fee2);
     });
 
     test('should handle multiple contract queries in sequence', async () => {
-      const docFee = await testEnv.web3doc.requestedFee();
+      const docFee = await testEnv.web3sign.requestedFee();
       const pgpFee = await testEnv.web3pgp.requestedFee();
-      const docFee2 = await testEnv.web3doc.requestedFee();
+      const docFee2 = await testEnv.web3sign.requestedFee();
 
       expect(docFee).toBe(docFee2);
       expect(docFee).toBeDefined();
@@ -307,13 +298,14 @@ describe('Web3Doc Integration Tests', () => {
       const invalidAddress = '0x0000000000000000000000000000000000000000';
 
       expect(() => {
-        new Web3Doc(invalidAddress as Address, testEnv.web3pgp, testEnv.anvil.getPublicClient());
+        const publicClient = getPublicClient();
+        new Web3Sign(invalidAddress as Address, testEnv.web3pgp, publicClient);
       }).not.toThrow();
     });
 
     test('should verify contract availability', async () => {
       // Should be able to call contract methods
-      const fee = await testEnv.web3doc.requestedFee();
+      const fee = await testEnv.web3sign.requestedFee();
       expect(fee).toBeDefined();
     });
   });
@@ -353,47 +345,47 @@ describe('Web3Doc Integration Tests', () => {
   // ========== Service Configuration ==========
 
   describe('Service Configuration', () => {
-    test('should accept Web3DocServiceOptions', async () => {
+    test('should accept Web3SignServiceOptions', async () => {
       const web3pgpService = new Web3PGPService(testEnv.web3pgp);
-      const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService, {
+      const web3signService = new Web3SignService(testEnv.web3sign, web3pgpService, {
         concurrencyLimit: 10,
       });
 
-      expect(web3docService).toBeDefined();
+      expect(web3signService).toBeDefined();
     });
 
     test('should apply default concurrency limit', async () => {
       const web3pgpService = new Web3PGPService(testEnv.web3pgp);
-      const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService);
+      const web3signService = new Web3SignService(testEnv.web3sign, web3pgpService);
 
-      expect(web3docService).toBeDefined();
+      expect(web3signService).toBeDefined();
     });
   });
 
   // ========== Contract Dependencies ==========
 
   describe('Contract Dependencies', () => {
-    test('should verify Web3Doc depends on Web3PGP', async () => {
+    test('should verify Web3Sign depends on Web3PGP', async () => {
       // Both should be accessible and initialized
-      expect(testEnv.web3doc.address).toBe(testEnv.web3docAddress);
+      expect(testEnv.web3sign.address).toBe(testEnv.web3signAddress);
       expect(testEnv.web3pgp.address).toBe(testEnv.web3pgpAddress);
     });
 
     test('should handle service with proper dependencies', async () => {
       const web3pgpService = new Web3PGPService(testEnv.web3pgp);
-      const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService);
+      const web3signService = new Web3SignService(testEnv.web3sign, web3pgpService);
 
       // Service should have access to both contracts
-      expect(web3docService).toBeDefined();
-      expect(web3docService.web3pgpService).toBe(web3pgpService);
+      expect(web3signService).toBeDefined();
+      expect(web3signService.web3pgpService).toBe(web3pgpService);
     });
 
     test('should allow querying both contracts through service', async () => {
       const web3pgpService = new Web3PGPService(testEnv.web3pgp);
-      const web3docService = new Web3DocService(testEnv.web3doc, web3pgpService);
+      const web3signService = new Web3SignService(testEnv.web3sign, web3pgpService);
 
       // Should be able to access both contract fees
-      const docFee = await testEnv.web3doc.requestedFee();
+      const docFee = await testEnv.web3sign.requestedFee();
       const pgpFee = await testEnv.web3pgp.requestedFee();
 
       expect(docFee).toBeDefined();

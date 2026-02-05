@@ -5,6 +5,7 @@ import {ERC1967Proxy} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppe
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
 import {Web3Doc} from "src/Web3Doc.sol";
+import {Web3Sign} from "src/Web3Sign.sol";
 import {ScriptHelpers} from "scripts/lib/ScriptHelpers.sol";
 
 /**
@@ -134,6 +135,38 @@ library DeploymentHelper {
         // Prepare initialization data
         bytes memory initData = abi.encodeWithSelector(
             Web3Doc.initialize.selector,
+            fee,
+            accessManager,
+            web3pgp
+        );
+
+        // Deploy proxy
+        result = deployProxy(address(implementation), initData);
+        
+        return result;
+    }
+
+    /**
+     * @notice Deploy Web3Sign contract with initialization
+     * @param fee The service fee in weis
+     * @param accessManager The address of the AccessManager contract
+     * @param web3pgp The address of the Web3PGP contract
+     * @return result The deployment result
+     */
+    function deployWeb3Sign(
+        uint256 fee,
+        address accessManager,
+        address web3pgp
+    ) internal returns (DeploymentResult memory result) {
+        ScriptHelpers.requireNonZero(accessManager, "accessManager");
+        ScriptHelpers.requireNonZero(web3pgp, "web3pgp");
+
+        // Deploy implementation
+        Web3Sign implementation = new Web3Sign();
+
+        // Prepare initialization data
+        bytes memory initData = abi.encodeWithSelector(
+            Web3Sign.initialize.selector,
             fee,
             accessManager,
             web3pgp

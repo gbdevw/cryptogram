@@ -28,4 +28,4 @@ For a no-registration method, we recommand using the POW faucet with a wallet li
 | Explorer | https://sepolia.scrollscan.com/ |
 | Access Manager | 0xEE9C6cBB829A65185cD9756A83fD576B4985d8a3 |
 | Web3PGP | 0xDa63568866C8eB53627a5CCF27DaB76061538dB1 |
-| Web3Doc | 0x8ceb8c20c367C32a459575f165566978c54da2c4 |
+| Web3Sign | 0x8ceb8c20c367C32a459575f165566978c54da2c4 |

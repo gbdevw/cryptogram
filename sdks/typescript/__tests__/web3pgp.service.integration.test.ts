@@ -1,6 +1,6 @@
 import { Web3PGP } from '../src/web3pgp/web3pgp';
 import { Web3PGPService, Web3PGPServiceError, Web3PGPServiceValidationError } from '../src/web3pgp/web3pgp.service';
-import { AnvilHelper } from './helpers/anvil.helper';
+import { getPublicClient, getTestWalletClient, getContractAddress } from '../src/utils/test-wallet';
 import { Address, ContractFunctionExecutionError, toHex } from 'viem';
 import * as openpgp from 'openpgp';
 import { OpenPGPUtils } from '../src/utils/openpgp';
@@ -21,7 +21,6 @@ import { forma } from 'viem/chains';
  * Unlike unit tests, these DO NOT use mocks and test the full stack with real cryptographic operations.
  */
 describe('Web3PGPService Integration Tests', () => {
-    let anvil: AnvilHelper;
     let web3pgp: Web3PGP;
     let service: Web3PGPService;
     let contractAddress: Address;
@@ -32,36 +31,30 @@ describe('Web3PGPService Integration Tests', () => {
 
     beforeAll(async () => {
         console.log('========================================');
-        console.log('Setting up Web3PGPService Integration Tests');
+        console.log('Initializing Web3PGPService Integration Tests');
         console.log('========================================');
-        
-        console.log('Starting Anvil blockchain...');
-        anvil = new AnvilHelper({ port: 8546, blockTime: 1 }); // Different port to avoid conflict with web3pgp.integration.test.ts
-        await anvil.start();
-        console.log('✓ Anvil started');
 
-        console.log('Deploying Web3PGP via Foundry scripts...');
-        let deployment = await anvil.deployWeb3PGP();
-        contractAddress = deployment.web3pgp;
-        console.log('✓ Web3PGP deployed at:', contractAddress);
+        // Verify required environment variables
+        if (!process.env.DEXES_WEB3PGP) {
+            throw new Error(
+                'Contract addresses not found in environment.\n' +
+                'Please run "npm test" to start anvil and deploy contracts.'
+            );
+        }
+
+        contractAddress = getContractAddress('DEXES_WEB3PGP');
+        console.log('✓ Web3PGP address loaded:', contractAddress);
 
         console.log('Creating Web3PGP and Web3PGPService instances...');
         web3pgp = new Web3PGP(
             contractAddress,
-            anvil.getPublicClient(),
-            anvil.getWalletClient()
+            getPublicClient(),
+            getTestWalletClient()
         );
         service = new Web3PGPService(web3pgp);
         console.log('✓ SDK instances initialized');
-
-        console.log('✓ Setup complete!');
         console.log('========================================\n');
-    }, 120000); // 2 minute timeout for Foundry script execution
-
-    afterAll(async () => {
-        console.log('Stopping Anvil...');
-        await anvil.stop();
-    });
+    }, 120000); // 2 minute timeout
 
     describe('Key Registration', () => {
         test('should register a primary key without subkeys', async () => {
