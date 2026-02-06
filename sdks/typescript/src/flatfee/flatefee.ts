@@ -1,4 +1,4 @@
-import { Address, TransactionReceipt, PublicClient, WalletClient, parseEventLogs } from 'viem';
+import { Address, TransactionReceipt, PublicClient, WalletClient, parseEventLogs, Transport, Chain } from 'viem';
 import { IFlatFee } from './flatefee.interface';
 import { RequestedFeeUpdatedLog, FeesWithdrawnLog } from './types/types';
 import { FlatFee as FlatFeeABI } from '../abis/FlatFee';
@@ -14,7 +14,7 @@ export class FlatFee implements IFlatFee {
     // Address of the FlatFee contract
     private _address: Address;
     // Viem public client instance used to read from the blockchain
-    private _client: PublicClient;
+    private _client: PublicClient<Transport, Chain | undefined>;
     // Viem wallet client instance used to sign transactions
     private _walletClient: WalletClient | undefined;
 
@@ -25,7 +25,7 @@ export class FlatFee implements IFlatFee {
      * @param client A Viem public client for interacting with the blockchain.
      * @param walletClient Optional Viem wallet client for signing transactions.
      */
-    constructor(address: Address, client: PublicClient, walletClient?: WalletClient) {
+    constructor(address: Address, client: PublicClient<Transport, Chain | undefined>, walletClient?: WalletClient) {
         this._address = address;
         this._client = client;
         this._walletClient = walletClient;
@@ -59,7 +59,7 @@ export class FlatFee implements IFlatFee {
     /**
      * Sets the Viem public client.
      */
-    set client(client: PublicClient) {
+    set client(client: PublicClient<Transport, Chain | undefined>) {
         this._client = client;
     }
 

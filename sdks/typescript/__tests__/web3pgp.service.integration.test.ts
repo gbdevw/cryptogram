@@ -1,6 +1,6 @@
 import { Web3PGP } from '../src/web3pgp/web3pgp';
 import { Web3PGPService, Web3PGPServiceError, Web3PGPServiceValidationError } from '../src/web3pgp/web3pgp.service';
-import { getPublicClient, getTestWalletClient, getContractAddress } from '../src/utils/test-wallet';
+import { getPublicClient, getTestWalletClient, getContractAddress } from './test-utilities';
 import { Address, ContractFunctionExecutionError, toHex } from 'viem';
 import * as openpgp from 'openpgp';
 import { OpenPGPUtils } from '../src/utils/openpgp';

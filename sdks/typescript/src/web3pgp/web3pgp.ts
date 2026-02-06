@@ -1,6 +1,6 @@
 import { Web3PGP as Web3PGPABI }  from '../abis/Web3PGP';
 import { toBytes32 } from '../utils/0xstr';
-import { BlockTag, PublicClient, TransactionReceipt, WalletClient, parseEventLogs, toEventSelector } from 'viem';
+import { BlockTag, PublicClient, TransactionReceipt, WalletClient, parseEventLogs, toEventSelector, Transport, Chain } from 'viem';
 import { IWeb3PGP } from './web3pgp.interface';
 import { KeyRegisteredLog, SubkeyAddedLog, KeyRevokedLog, KeyCertificationRevokedLog, KeyCertifiedLog, KeyUpdatedLog, OwnershipChallengedLog, OwnershipProvedLog, Web3PGPEvents, Web3PGPEventLog } from './types/types';
 import { FlatFee } from '../flatfee/flatefee';
@@ -20,7 +20,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
     private static readonly KEY_CERTIFIED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyCertified')!;
     private static readonly KEY_CERTIFICATION_REVOKED_EVENT = Web3PGPABI.find(item => item.type === 'event' && item.name === 'KeyCertificationRevoked')!;
 
-    constructor(address: `0x${string}`, client: PublicClient, walletClient?: WalletClient) {
+    constructor(address: `0x${string}`, client: PublicClient<Transport, Chain | undefined>, walletClient?: WalletClient) {
         super(address, client, walletClient);
     }
 
