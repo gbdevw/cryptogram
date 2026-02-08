@@ -39,6 +39,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             abi: Web3PGPABI,
             functionName: 'exists',
             args: [toBytes32(fingerprint)],
+            authorizationList: [],
         });
     }
 
@@ -53,6 +54,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             abi: Web3PGPABI,
             functionName: 'isSubKey',
             args: [toBytes32(fingerprint)],
+            authorizationList: [],
         });
     }
 
@@ -67,6 +69,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             abi: Web3PGPABI,
             functionName: 'parentOf',
             args: [toBytes32(subkeyFingerprint)],
+            authorizationList: [],
         });
     }
 
@@ -81,6 +84,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             abi: Web3PGPABI,
             functionName: 'getKeyPublicationBlock',
             args: [toBytes32(fingerprint)],
+            authorizationList: [],
         });
     }
 
@@ -95,6 +99,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             abi: Web3PGPABI,
             functionName: 'getKeyPublicationBlock',
             args: [fingerprints.map(fp => toBytes32(fp))],
+            authorizationList: [],
         }) as Promise<bigint[]>;
     }
 
@@ -111,6 +116,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             abi: Web3PGPABI,
             functionName: 'listKeyUpdates',
             args: [toBytes32(fingerprint), start, limit],
+            authorizationList: [],
         }) as Promise<bigint[]>;
     }
 
@@ -127,6 +133,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             abi: Web3PGPABI,
             functionName: 'listRevocations',
             args: [toBytes32(fingerprint), start, limit],
+            authorizationList: [],
         }) as Promise<bigint[]>;
     }
 
@@ -143,6 +150,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             abi: Web3PGPABI,
             functionName: 'listSubkeys',
             args: [toBytes32(parentKeyFingerprint), start, limit],
+            authorizationList: [],
         }) as Promise<`0x${string}`[]>;
     }
 
@@ -159,6 +167,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             abi: Web3PGPABI,
             functionName: 'listCertifications',
             args: [toBytes32(fingerprint), start, limit],
+            authorizationList: [],
         }) as Promise<bigint[]>;
     }
 
@@ -175,6 +184,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
             abi: Web3PGPABI,
             functionName: 'listCertificationRevocations',
             args: [toBytes32(fingerprint), start, limit],
+            authorizationList: [],
         }) as Promise<bigint[]>;
     }
 
@@ -918,7 +928,7 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
                 toBlock: typeof to === 'bigint' ? `0x${to.toString(16)}` : to,
                 topics: fingerprintsArray !== undefined ? [eventSelectors, fingerprintsArray] : [eventSelectors]
             }]
-        });
+        }) as any;
 
         // Parse the raw logs using the ABI
         const parsedLogs = parseEventLogs({

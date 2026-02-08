@@ -35,8 +35,8 @@ export function getPublicClient(): PublicClient<Transport, Chain | undefined> {
   const transports = rpcUrls.map((url) =>
     http(url, {
       batch: {
-        size: 1024 * 100, // 100kb
-        wait: 16,
+        batchSize: 20,
+        wait: 150,
       },
     })
   );
@@ -82,8 +82,8 @@ export function getTestWalletClient(): WalletClient {
   const transports = rpcUrls.map((endpoint) =>
     http(endpoint, {
       batch: {
-        size: 1024 * 100,
-        wait: 16,
+        batchSize: 20,
+        wait: 150,
       },
     })
   );

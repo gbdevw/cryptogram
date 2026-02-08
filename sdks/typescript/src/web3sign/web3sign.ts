@@ -325,6 +325,7 @@ export class Web3Sign extends FlatFee implements IWeb3Sign {
             address: this.address,
             abi: Web3SignABI,
             functionName: 'getWeb3PGPAddress',
+            authorizationList: [],
         });
     }
 
@@ -340,6 +341,7 @@ export class Web3Sign extends FlatFee implements IWeb3Sign {
             abi: Web3SignABI,
             functionName: 'isCopyOf',
             args: [id],
+            authorizationList: [],
         });
     }
 
@@ -355,6 +357,7 @@ export class Web3Sign extends FlatFee implements IWeb3Sign {
             abi: Web3SignABI,
             functionName: 'getDocumentBlockNumberByID',
             args: [id],
+            authorizationList: [],
         });
     }
 
@@ -370,6 +373,7 @@ export class Web3Sign extends FlatFee implements IWeb3Sign {
             abi: Web3SignABI,
             functionName: 'getDocumentBlockNumberByIDBatch',
             args: [ids],
+            authorizationList: [],
         }) as Promise<bigint[]>;
     }
 
@@ -387,6 +391,7 @@ export class Web3Sign extends FlatFee implements IWeb3Sign {
             abi: Web3SignABI,
             functionName: 'listSignatures',
             args: [id, start, limit],
+            authorizationList: [],
         }) as Promise<bigint[]>;
     }
 
@@ -402,6 +407,7 @@ export class Web3Sign extends FlatFee implements IWeb3Sign {
             abi: Web3SignABI,
             functionName: 'getSignatureBlockNumberByHash',
             args: [signatureHash],
+            authorizationList: [],
         });
     }
 
@@ -417,6 +423,7 @@ export class Web3Sign extends FlatFee implements IWeb3Sign {
             abi: Web3SignABI,
             functionName: 'getSignatureBlockNumberByHashBatch',
             args: [signatureHashes],
+            authorizationList: [],
         }) as Promise<bigint[]>;
     }
 
@@ -434,6 +441,7 @@ export class Web3Sign extends FlatFee implements IWeb3Sign {
             abi: Web3SignABI,
             functionName: 'listDocumentIdsByHash',
             args: [dochash, start, limit],
+            authorizationList: [],
         }) as Promise<bigint[]>;
     }
 
@@ -451,6 +459,7 @@ export class Web3Sign extends FlatFee implements IWeb3Sign {
             abi: Web3SignABI,
             functionName: 'listSignatureRevocationsBlockNumbers',
             args: [signatureHash, start, limit],
+            authorizationList: [],
         }) as Promise<bigint[]>;
     }
 
