@@ -2,6 +2,7 @@ import { ReactNode } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { SearchIcon, RegisterIcon, RevokeIcon, UpdateIcon } from './Icons'
+import { TestnetFaucetButton } from './TestnetFaucetButton'
 import styles from '../styles/layout.module.css'
 
 interface LayoutProps {
@@ -29,8 +30,11 @@ export function Layout({ children }: LayoutProps) {
           <h1 className={styles.title}>
             Web3PGP: A global public key infrastructure for OpenPGP powered by Ethereum
           </h1>
-          <div className={styles.connectButton}>
-            <ConnectButton />
+          <div className={styles.headerActions}>
+            <TestnetFaucetButton />
+            <div className={styles.connectButton}>
+              <ConnectButton />
+            </div>
           </div>
         </div>
       </header>

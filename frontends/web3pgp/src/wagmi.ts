@@ -1,49 +1,67 @@
 import { createConfig, http } from 'wagmi'
-import { ink, inkSepolia } from 'wagmi/chains'
+import { sepolia as sepoliaChain } from 'wagmi/chains'
+import { defineChain } from 'viem'
 import { fallback } from 'viem'
-import { getConfiguredChain } from './config/chains'
 
-const configuredChain = getConfiguredChain()
-const chains = configuredChain === 'ink' ? [ink] as const : [inkSepolia] as const
+// Customize Sepolia with [DEMO] prefix
+const sepolia = {
+  ...sepoliaChain,
+  name: '[DEMO] Sepolia',
+}
 
-const batchConfig = { batchSize: 100, wait: 50 }
+// Define Scroll Sepolia chain with [DEMO] prefix
+const scrollSepolia = defineChain({
+  id: 534351,
+  name: '[DEMO] Scroll Sepolia',
+  network: 'scroll-sepolia',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'ETH',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://sepolia-rpc.scroll.io'],
+    },
+    public: {
+      http: ['https://sepolia-rpc.scroll.io'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Scroll Sepolia Blockscout',
+      url: 'https://sepolia-blockscout.scroll.io',
+    },
+  },
+  testnet: true,
+})
 
-const createFallbackTransport = (isMainnet: boolean) =>
+// Support both chains so wallet can switch between them
+const chains = [sepolia, scrollSepolia] as const
+
+const batchConfig = { batchSize: 20, wait: 150 }
+
+const createSepoliaTransport = () =>
   fallback(
     [
-      // 1. Gelato (Primary)
-      http(
-        isMainnet
-          ? 'https://rpc-gel.inkonchain.com'
-          : 'https://rpc-gel-sepolia.inkonchain.com',
-        { batch: batchConfig }
-      ),
-
-      // 2. Tenderly (Backup 1)
-      http(
-        isMainnet
-          ? 'https://rpc-ten.inkonchain.com'
-          : 'https://rpc-ten-sepolia.inkonchain.com',
-        { batch: batchConfig }
-      ),
-
-      // 3. QuickNode (Backup 2)
-      http(
-        isMainnet
-          ? 'https://rpc-qnd.inkonchain.com'
-          : 'https://rpc-qnd-sepolia.inkonchain.com',
-        { batch: batchConfig }
-      ),
-
-      // 4. dRPC (Backup 3 - with stricter batch settings for safety)
-      http(
-        isMainnet ? 'https://ink.drpc.org' : 'https://ink-sepolia.drpc.org',
-        { batch: { batchSize: 50, wait: 50 } }
-      ),
+      http('https://ethereum-sepolia-rpc.publicnode.com', { batch: batchConfig }),
+      http('https://rpc2.sepolia.org', { batch: batchConfig }),
+      http('https://gateway.tenderly.co/public/sepolia', { batch: batchConfig }),
     ],
     {
-      // rank: false (default) - Use simple round-robin without continuous health checks
-      // This prevents unnecessary net_listening calls
+      retryCount: 3,
+      retryDelay: 500,
+    }
+  )
+
+const createScrollSepoliaTransport = () =>
+  fallback(
+    [
+      http('https://scroll-sepolia-rpc.publicnode.com', { batch: batchConfig }),
+      http('https://sepolia-rpc.scroll.io/', { batch: batchConfig }),
+      http('https://scroll-sepolia.drpc.org', { batch: batchConfig }),
+    ],
+    {
       retryCount: 3,
       retryDelay: 500,
     }
@@ -52,8 +70,8 @@ const createFallbackTransport = (isMainnet: boolean) =>
 export const config = createConfig({
   chains,
   transports: {
-    [ink.id]: createFallbackTransport(true),
-    [inkSepolia.id]: createFallbackTransport(false),
+    [sepolia.id]: createSepoliaTransport(),
+    [scrollSepolia.id]: createScrollSepoliaTransport(),
   },
 })
 

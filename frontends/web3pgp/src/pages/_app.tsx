@@ -10,6 +10,7 @@ import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 
 import { config } from '../wagmi';
 import { Web3PGPProvider } from '../contexts/Web3PGPContext';
+
 import { Layout } from '../components/Layout';
 import FindPage from './find';
 import RegisterPage from './register';
@@ -63,7 +64,7 @@ function MyApp({ Component, pageProps }: AppProps) {
           </Web3PGPProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
-    </WagmiProvider>                            
+    </WagmiProvider>
   );
 }
 
