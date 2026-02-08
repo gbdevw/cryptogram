@@ -151,8 +151,7 @@ export class FlatFee implements IFlatFee {
             address: this.address,
             abi: FlatFeeABI,
             functionName: 'requestedFee',
-            authorizationList: [],
-        });
+        } as any) as unknown as Promise<bigint>;
     }
 
     /*****************************************************************************************************************/

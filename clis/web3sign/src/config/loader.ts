@@ -134,11 +134,11 @@ function loadEnvVarsConfig(env: Record<string, string | undefined>): Partial<Mer
       env.DEXES_WEB3PGP_CONTRACT;
   }
 
-  // DEXES_WEB3DOC_CONTRACT
-  if (env.DEXES_WEB3DOC_CONTRACT) {
+  // DEXES_WEB3SIGN_CONTRACT
+  if (env.DEXES_WEB3SIGN_CONTRACT) {
     if (!config.web3sign) config.web3sign = {};
     (config.web3sign as Record<string, unknown>).contract =
-      env.DEXES_WEB3DOC_CONTRACT;
+      env.DEXES_WEB3SIGN_CONTRACT;
   }
 
   // DEXES_LOG_LEVEL

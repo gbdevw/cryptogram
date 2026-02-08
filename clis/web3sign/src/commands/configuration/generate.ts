@@ -53,7 +53,7 @@ monitoring:
 # DEXES_CHAIN_ID=763373
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
 # DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
-# DEXES_WEB3DOC_CONTRACT=<CONTRACT_ADDRESS>
+# DEXES_WEB3SIGN_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_LOG_LEVEL=debug
 `;
   } else {
@@ -79,7 +79,7 @@ ethereum:
   #   
   #   # Private key for signing transactions
   #   # WARNING: Store this securely! Better to use the DEXES_WALLET_PRIVATE_KEY env var.
-  #   # Support for \${VAR_NAME} syntax: privateKey: "\${DEXES_WALLET_PRIVATE_KEY}"
+  #   # Support for ${VAR_NAME} syntax: privateKey: "${DEXES_WALLET_PRIVATE_KEY}"
   #   # privateKey: "<YOUR_PRIVATE_KEY>"
 
 web3pgp:
@@ -105,7 +105,7 @@ monitoring:
 # DEXES_CHAIN_ID=<CHAIN_ID>
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
 # DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
-# DEXES_WEB3DOC_CONTRACT=<CONTRACT_ADDRESS>
+# DEXES_WEB3SIGN_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_LOG_LEVEL=info
 `;
   }
