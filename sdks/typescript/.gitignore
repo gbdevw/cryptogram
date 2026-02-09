@@ -1,3 +1,5 @@
 *.js
 *.d.ts
 *.map
+.env.*
+!.env.integration.example
