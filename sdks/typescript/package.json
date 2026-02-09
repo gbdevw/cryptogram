@@ -1,6 +1,6 @@
 {
   "name": "@jibidieuw/dexes",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "SDK for interacting with DEXES protocols (Web3PGP & Web3Sign) based on Ethereum and using Viem and OpenPGP",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -71,6 +71,6 @@
   "dependencies": {
     "openpgp": "^6.1.0",
     "p-limit": "^2.3.0",
-    "viem": "^2.21.0"
+    "viem": "*"
   }
 }
