@@ -79,7 +79,7 @@ ethereum:
   #   
   #   # Private key for signing transactions
   #   # WARNING: Store this securely! Better to use the DEXES_WALLET_PRIVATE_KEY env var.
-  #   # Support for ${VAR_NAME} syntax: privateKey: "${DEXES_WALLET_PRIVATE_KEY}"
+  #   # Support for \${VAR_NAME} syntax: privateKey: "\${DEXES_WALLET_PRIVATE_KEY}"
   #   # privateKey: "<YOUR_PRIVATE_KEY>"
 
 web3pgp:
