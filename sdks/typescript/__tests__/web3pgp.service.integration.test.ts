@@ -542,7 +542,6 @@ describe('Web3PGPService Integration Tests', () => {
             await service.revoke(bobRevocationCert, to0x(bobPublicKey.getFingerprint()));
             // 5. Retrieve and verify Alice's key
             // Sleep for a while to ensure all transactions are indexed
-            await new Promise(resolve => setTimeout(resolve, 3000));
             let retrievedAlice = await service.getPublicKey(to0x(alicePublicKey.getFingerprint()));
             expect(retrievedAlice.getFingerprint()).toBe(alicePublicKey.getFingerprint());
             expect(retrievedAlice.subkeys.length).toBe(3);
