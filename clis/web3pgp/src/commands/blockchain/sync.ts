@@ -106,6 +106,13 @@ export function createSyncCommand(deps: SyncDeps): Command {
           }
           target = fromBlock + maxRange - 1n < target ? fromBlock + maxRange - 1n : target;
 
+          if (target < fromBlock) {
+            // No new blocks to process - wait before next check
+            cmdLogger.info('No new blocks to process - waiting before next check');
+            await sleep(intervalSeconds * 1000);
+            continue;
+          }
+
           // Fetch the events
           cmdLogger.info({ fromBlock, toBlock: target }, `Fetching events from blockchain from block ${fromBlock} to ${target}`);
           const logs = await service.searchKeyEvents(undefined, fromBlock, target);
@@ -120,10 +127,6 @@ export function createSyncCommand(deps: SyncDeps): Command {
           if (shouldExit || (toBlock !== undefined && fromBlock > toBlock)) {
             break;
           }
-
-          // Wait for the specified interval before next iteration
-          cmdLogger.debug({ waitSeconds: intervalSeconds }, 'Waiting before next polling iteration');
-          await sleep(intervalSeconds * 1000);
         }
 
         // Exit gracefully

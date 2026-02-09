@@ -33,7 +33,7 @@ async function main(): Promise<void> {
 
     const program = new Command()
       .name('web3pgp')
-      .version('0.0.1', '-v, --version')
+      .version('0.1.0', '-v, --version')
       .description('Web3PGP CLI - Decentralized OpenPGP key infrastructure on Ethereum')
       .helpOption('-h, --help', 'Show help');
 
