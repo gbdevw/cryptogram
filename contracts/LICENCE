@@ -1,0 +1,32 @@
+Business Source License 1.1
+
+Parameters:
+
+Licensor:           Lake42 (BE0786445217)
+Licensed Work:      The DEXES Smart Contracts (all .sol files in the /contracts directory)
+Additional Use Grant: None. Deployment to public mainnets or production environments 
+                      is strictly prohibited without prior written authorization 
+                      from the Licensor. Use in local development and public 
+                      testnets (e.g., Sepolia, Scroll Testnet) is permitted.
+Change Date:        January 1, 2031
+Change License:     Apache License 2.0
+
+---------------------------------------------------------------------------------------
+
+License Text:
+
+The Licensor hereby grants you the right to copy, modify, create derivative works, 
+redistribute, and make non-production use of the Licensed Work. 
+
+The Licensor may also grant you the right to make production use of the Licensed Work 
+under the Additional Use Grant, subject to the terms of this License.
+
+The right to make production use of the Licensed Work is subject to a 
+"Change Date" of January 1, 2031. On the Change Date, this License shall 
+expire and be replaced by the Change License (Apache 2.0).
+
+Any use of the Licensed Work in a production environment or deployment to 
+a blockchain before the Change Date requires a separate commercial license or written 
+permission from the Licensor.
+
+THE LICENSED WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
