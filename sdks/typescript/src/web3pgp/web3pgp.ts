@@ -35,11 +35,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      */
     public exists(fingerprint: `0x${string}`): Promise<boolean> {
         return this.client.readContract({
+            authorizationList: undefined,
             address: this.address,
             abi: Web3PGPABI,
             functionName: 'exists',
             args: [toBytes32(fingerprint)],
-        } as any) as unknown as Promise<boolean>;
+        });
     }
 
     /**
@@ -49,11 +50,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      */
     public isSubKey(fingerprint: `0x${string}`): Promise<boolean> {
         return this.client.readContract({
+            authorizationList: undefined,
             address: this.address,
             abi: Web3PGPABI,
             functionName: 'isSubKey',
             args: [toBytes32(fingerprint)],
-        } as any) as unknown as Promise<boolean>;
+        });
     }
 
     /**
@@ -63,11 +65,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      */
     public parentOf(subkeyFingerprint: `0x${string}`): Promise<`0x${string}`> {
         return this.client.readContract({
+            authorizationList: undefined,
             address: this.address,
             abi: Web3PGPABI,
             functionName: 'parentOf',
             args: [toBytes32(subkeyFingerprint)],
-        } as any) as unknown as Promise<`0x${string}`>;
+        });
     }
 
     /**
@@ -77,11 +80,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      */
     public getKeyPublicationBlock(fingerprint: `0x${string}`): Promise<bigint> {
         return this.client.readContract({
+            authorizationList: undefined,
             address: this.address,
             abi: Web3PGPABI,
             functionName: 'getKeyPublicationBlock',
             args: [toBytes32(fingerprint)],
-        } as any) as unknown as Promise<bigint>;
+        });
     }
 
     /**
@@ -91,11 +95,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      */
     public getKeyPublicationBlockBatch(fingerprints: `0x${string}`[]): Promise<bigint[]> {
         return this.client.readContract({
+            authorizationList: undefined,
             address: this.address,
             abi: Web3PGPABI,
             functionName: 'getKeyPublicationBlock',
             args: [fingerprints.map(fp => toBytes32(fp))],
-        } as any) as Promise<bigint[]>;
+        }) as Promise<bigint[]>;
     }
 
     /**
@@ -107,11 +112,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      */
     listKeyUpdates(fingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]>{
         return this.client.readContract({
+            authorizationList: undefined,
             address: this.address,
             abi: Web3PGPABI,
             functionName: 'listKeyUpdates',
             args: [toBytes32(fingerprint), start, limit],
-        } as any) as Promise<bigint[]>;
+        }) as Promise<bigint[]>;
     }
 
     /**
@@ -123,11 +129,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      */
     public listRevocations(fingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
         return this.client.readContract({
+            authorizationList: undefined,
             address: this.address,
             abi: Web3PGPABI,
             functionName: 'listRevocations',
             args: [toBytes32(fingerprint), start, limit],
-        } as any) as Promise<bigint[]>;
+        }) as Promise<bigint[]>;
     }
 
     /**
@@ -139,11 +146,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      */
     public listSubkeys(parentKeyFingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<`0x${string}`[]> {
         return this.client.readContract({
+            authorizationList: undefined,
             address: this.address,
             abi: Web3PGPABI,
             functionName: 'listSubkeys',
             args: [toBytes32(parentKeyFingerprint), start, limit],
-        } as any) as Promise<`0x${string}`[]>;
+        }) as Promise<`0x${string}`[]>;
     }
 
     /**
@@ -155,11 +163,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      */
     public listCertifications(fingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
         return this.client.readContract({
+            authorizationList: undefined,
             address: this.address,
             abi: Web3PGPABI,
             functionName: 'listCertifications',
             args: [toBytes32(fingerprint), start, limit],
-        } as any) as Promise<bigint[]>;
+        }) as Promise<bigint[]>;
     }
 
     /**
@@ -171,11 +180,12 @@ export class Web3PGP extends FlatFee implements IWeb3PGP {
      */
     public listCertificationRevocations(fingerprint: `0x${string}`, start: bigint, limit: bigint): Promise<bigint[]> {
         return this.client.readContract({
+            authorizationList: undefined,
             address: this.address,
             abi: Web3PGPABI,
             functionName: 'listCertificationRevocations',
             args: [toBytes32(fingerprint), start, limit],
-        } as any) as Promise<bigint[]>;
+        }) as Promise<bigint[]>;
     }
 
     /*****************************************************************************************************************/

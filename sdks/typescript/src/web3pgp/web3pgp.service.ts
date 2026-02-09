@@ -257,7 +257,7 @@ export class Web3PGPService implements IWeb3PGPService {
             const sk = pk.getSubkeys()[0];
             const now = new Date();
             // Verify the sanitized key
-            await OpenPGPUtils.verifyKey(pk, now);
+            await OpenPGPUtils.verifyKey(pk,      );
             // Publish the sanitized key
             return this.web3pgp.addSubkey(
                 toBytes32(to0x(pk.getFingerprint())),
@@ -710,7 +710,10 @@ export class Web3PGPService implements IWeb3PGPService {
             const primaryKey = await openpgp.readKey({ binaryKey: toBytes(log.openPGPMsg) });
             // Verify the primary key has a valid signature and was not expired/revoked at the time of the block in which it was registered
             if (skipCryptographicVerifications !== true) {
-                await primaryKey.verifyPrimaryKey(log.blockTimestamp);
+                // Clock Skew Fix: Pick the max between the creation time of the key and the block timestamp as reference for verification to avoid failure
+                // (Signature is in the future) in case the user device is ahead of the RPC node time when creating and registering the key.
+                const referenceTime = new Date(Math.max(primaryKey.getCreationTime().getTime(), log.blockTimestamp.getTime()));
+                await primaryKey.verifyPrimaryKey(referenceTime);
             }
             // Validate the key fingerprint matches the declared one
             if (toBytes32(to0x(primaryKey.getFingerprint())) !== toBytes32(to0x(log.primaryKeyFingerprint))) {
@@ -725,7 +728,10 @@ export class Web3PGPService implements IWeb3PGPService {
                 if (subkey) {
                     // Verify the subkey has a valid signature and was not expired/revoked at the time of the block in which it was registered
                     if (skipCryptographicVerifications !== true) {
-                        await subkey.verify(log.blockTimestamp);
+                        // Clock Skew Fix: Pick the max between the creation time of the key and the block timestamp as reference for verification to avoid failure
+                        // (Signature is in the future) in case the user device is ahead of the RPC node time when creating and registering the key.
+                        const referenceTime = new Date(Math.max(subkey.getCreationTime().getTime(), log.blockTimestamp.getTime()));
+                        await subkey.verify(referenceTime);
                     }
                     subkeys.push(subkey);
                 } else {
@@ -796,7 +802,10 @@ export class Web3PGPService implements IWeb3PGPService {
                 pk = await OpenPGPUtils.sanitizeSubkey(pk, log.subkeyFingerprint);
                 // Verify the sanitized key
                 if (skipCryptographicVerifications !== true) {
-                    await OpenPGPUtils.verifyKey(pk, log.blockTimestamp);
+                    // Clock Skew Fix: Pick the max between the creation time of the key and the block timestamp as reference for verification to avoid failure
+                    // (Signature is in the future) in case the user device is ahead of the RPC node time when creating and registering the key.
+                    const referenceTime = new Date(Math.max(pk.getCreationTime().getTime(), log.blockTimestamp.getTime()));
+                    await OpenPGPUtils.verifyKey(pk, referenceTime);
                 }
             } catch (err) {
                 throw new Web3PGPServiceValidationError(`Failed to read and sanitize the OpenPGP message for subkey with fingerprint ${log.subkeyFingerprint} from SubkeyAddedLog event: ${err}`);
@@ -893,8 +902,15 @@ export class Web3PGPService implements IWeb3PGPService {
             if (toBytes32(to0x(revokedKey.getFingerprint())) === toBytes32(to0x(log.fingerprint))) {
                 // Sanitize primary key
                 const pk = await OpenPGPUtils.sanitizePrimaryKey(revokedKey);
+                // Compute the reference time for verification to avoid failure in case of clock skew between user device and RPC node
+                let referenceTime: Date = log.blockTimestamp;
+                pk.revocationSignatures.forEach(sig => {
+                    if (sig.created && sig.created > referenceTime) {
+                        referenceTime = sig.created;
+                    }
+                });
                 // Check the primary key is revoked
-                if (skipCryptographicVerifications !== true && !await pk.isRevoked(undefined, undefined, log.blockTimestamp)) {
+                if (skipCryptographicVerifications !== true && !await pk.isRevoked(undefined, undefined, new Date(referenceTime))) {
                     throw new Web3PGPServiceValidationError(`The primary key with fingerprint ${pk.getFingerprint()} is not revoked as expected in the KeyRevokedLog event.`);
                 }
                 // Return the revoked key and no standalone revocation certificate
@@ -903,8 +919,15 @@ export class Web3PGPService implements IWeb3PGPService {
             } else {
                 // Sanitize to keep only the target subkey - Will throw an error if not found
                 const pk = await OpenPGPUtils.sanitizeSubkey(revokedKey, log.fingerprint);
+                // Compute the reference time for verification to avoid failure in case of clock skew between user device and RPC node
+                let referenceTime: Date = log.blockTimestamp;
+                pk.subkeys[0]?.revocationSignatures.forEach(sig => {
+                    if (sig.created && sig.created > referenceTime) {
+                        referenceTime = sig.created;
+                    }
+                });
                 // Check subkey is revoked
-                if (skipCryptographicVerifications !== true && !await OpenPGPUtils.isSubkeyRevoked(pk.subkeys[0]!, pk, log.blockTimestamp)) {
+                if (skipCryptographicVerifications !== true && !await OpenPGPUtils.isSubkeyRevoked(pk.subkeys[0]!, pk, new Date(referenceTime))) {
                     throw new Web3PGPServiceValidationError(`The subkey with fingerprint ${log.fingerprint} is not revoked as expected in the KeyRevokedLog event.`);
                 }
                 // Return the revoked key and no standalone revocation certificate
@@ -921,7 +944,7 @@ export class Web3PGPService implements IWeb3PGPService {
         }
     }
 
-        /**
+    /**
      * Validate and extract the updated public key from a KeyUpdatedLog event.
      * 
      * @description
@@ -970,8 +993,11 @@ export class Web3PGPService implements IWeb3PGPService {
             // Remove extra subkeys
             pk = await OpenPGPUtils.sanitizePrimaryKey(pk);
             // Verify the key if needed
+            // Clock Skew Fix: Pick the max between the creation time of the key and the block timestamp as reference for verification to avoid failure
+            // (Signature is in the future) in case the user device is ahead of the RPC node time when creating and registering the key.
+            const referenceTime = new Date(Math.max(pk.getCreationTime().getTime(), log.blockTimestamp.getTime()));
             if (skipCryptographicVerifications !== true) {
-                await OpenPGPUtils.verifyKey(pk, log.blockTimestamp);
+                await OpenPGPUtils.verifyKey(pk, referenceTime);
             }
             console.debug(`[Web3PGP - Service] Successfully extracted updated key ${pk.getFingerprint()} from KeyUpdatedLog event`);
             return pk.toPublic();
@@ -1044,8 +1070,9 @@ export class Web3PGPService implements IWeb3PGPService {
             //
             // Note: Certifications are not verified here as they will be verified by the caller when needed.
             // This avoids fetching the public key of the issuer multiple times if there are multiple certifications to verify.
+            const referenceTime = new Date(Math.max(pk.getCreationTime().getTime(), log.blockTimestamp.getTime()));
             if (skipCryptographicVerifications !== true) {
-                await OpenPGPUtils.verifyKey(pk, log.blockTimestamp);
+                await OpenPGPUtils.verifyKey(pk, referenceTime);
             }
             console.debug(`[Web3PGP - Service] Successfully extracted key certification for ${pk.getFingerprint()} from KeyCertifiedLog event`);
             return pk.toPublic();
@@ -1115,8 +1142,9 @@ export class Web3PGPService implements IWeb3PGPService {
             //
             // Note: Certifications and their revocations are not verified here as they will be verified by the caller when needed.
             // This avoids fetching the public key of the issuer multiple times if there are multiple certifications to verify.
+            const referenceTime = new Date(Math.max(pk.getCreationTime().getTime(), log.blockTimestamp.getTime()));
             if (skipCryptographicVerifications !== true) {
-                await OpenPGPUtils.verifyKey(pk, log.blockTimestamp);
+                await OpenPGPUtils.verifyKey(pk, referenceTime);
             }
             console.debug(`[Web3PGP - Service] Successfully extracted the key certification revocation for ${pk.getFingerprint()} from KeyCertificationRevokedLog event`);
             return pk.toPublic();

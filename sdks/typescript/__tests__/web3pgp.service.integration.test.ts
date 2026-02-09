@@ -114,7 +114,7 @@ describe('Web3PGPService Integration Tests', () => {
             publicKey.subkeys[0] = await publicKey.subkeys[0]!.revoke(privateKey.keyPacket as openpgp.SecretKeyPacket);
             expect(await OpenPGPUtils.isSubkeyRevoked(publicKey.subkeys[0]!, publicKey)).toBe(true);
             // 3. Attempt to register the key - EXPECT ERROR
-            await expect(service.register(publicKey)).rejects.toThrow(Web3PGPServiceError);   
+            await expect(service.register(publicKey)).rejects.toThrow(Web3PGPServiceError);
         });
 
         test('should fail to register a malformed key', async () => {
@@ -122,7 +122,7 @@ describe('Web3PGPService Integration Tests', () => {
             let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
             publicKey.subkeys[0]!.bindingSignatures = [];
             // 2. Attempt to register the malformed key - EXPECT ERROR
-            await expect(service.register(publicKey)).rejects.toThrow(Web3PGPServiceError);   
+            await expect(service.register(publicKey)).rejects.toThrow(Web3PGPServiceError);
         });
     });
 
@@ -190,8 +190,8 @@ describe('Web3PGPService Integration Tests', () => {
             let receipt = await service.addSubkey(primaryPublicKey, to0x(primaryPublicKey.subkeys[0]!.getFingerprint()));
             // 5. Use the low level bindings and information fom the receipt to extract the SubkeyAddedLog from the blockchain
             let log = await service.contract.getSubkeyAddedLog(
-                to0x(primaryPublicKey.getFingerprint()), 
-                to0x(primaryPublicKey.subkeys[0]!.getFingerprint()), 
+                to0x(primaryPublicKey.getFingerprint()),
+                to0x(primaryPublicKey.subkeys[0]!.getFingerprint()),
                 receipt.blockNumber
             );
             // 6. Extract the key from the log and verify it matches the original subkey
@@ -302,7 +302,7 @@ describe('Web3PGPService Integration Tests', () => {
             // NOTE: revoke, when used with a standalone subkey revocation, publishes the full primary key with the revoked subkey
             expect(logs.length).toBe(1);
             let [revokedKey, cert] = await service.extractFromKeyRevokedLog(logs[0]);
-            expect(cert).toBeUndefined(); 
+            expect(cert).toBeUndefined();
             expect(revokedKey).toBeDefined();
             expect(await revokedKey!.isRevoked()).toBe(true);
         });
@@ -520,7 +520,7 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('register multiple keys, subkeys and revocation certificates and reconstruct them', async () => {
             // 1. Generate Alice's and Bob's OpenPGP key pairs
-            let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();    
+            let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();
             let [bobPrivateKey, bobPublicKey, bobRevocationCert] = await createBobOpenPGPKeys();
             // 2. Register both keys on-chain
             await service.register(alicePublicKey);
@@ -541,6 +541,8 @@ describe('Web3PGPService Integration Tests', () => {
             // 4. Revoke Bob's primary key by publishing the standalone revocation certificate
             await service.revoke(bobRevocationCert, to0x(bobPublicKey.getFingerprint()));
             // 5. Retrieve and verify Alice's key
+            // Sleep for a while to ensure all transactions are indexed
+            await new Promise(resolve => setTimeout(resolve, 3000));
             let retrievedAlice = await service.getPublicKey(to0x(alicePublicKey.getFingerprint()));
             expect(retrievedAlice.getFingerprint()).toBe(alicePublicKey.getFingerprint());
             expect(retrievedAlice.subkeys.length).toBe(3);
@@ -562,7 +564,7 @@ describe('Web3PGPService Integration Tests', () => {
 
         test('should prevent malicious subkey injection by pruning subkeys that do not belong to the primary key', async () => {
             // 1. Create Alice's and Bob's OpenPGP key pairs
-            let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();    
+            let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();
             let [bobPrivateKey, bobPublicKey, bobRevocationCert] = await createBobOpenPGPKeys();
             // 2. Register Alice's primary key on-chain
             await service.register(alicePublicKey);
@@ -635,7 +637,7 @@ describe('Web3PGPService Integration Tests', () => {
     });
 
     describe('Key certification and certification revocation', () => {
-        
+
         test('should publish a key certification signature', async () => {
             // 1. Generate OpenPGP key pairs for Alice (certifier), Bob (target) and Cecil (2nd certifier)
             let [alicePrivateKey, alicePublicKey, aliceRevocationCert] = await createAliceOpenPGPKeys();
@@ -793,7 +795,7 @@ describe('Web3PGPService Integration Tests', () => {
                 let extractedKey = await service.extractFromKeyRegisteredLog(log);
                 // 4. Verify extracted key matches original and has the extra subkeey pruned
                 expect(extractedKey.getFingerprint()).toBe(publicKey.getFingerprint());
-                expect(extractedKey.subkeys.length).toBe(publicKey.subkeys.length-1);
+                expect(extractedKey.subkeys.length).toBe(publicKey.subkeys.length - 1);
                 expect(extractedKey.subkeys[0]!.getFingerprint()).toBe(publicKey.subkeys[0]!.getFingerprint());
             });
 
@@ -1037,7 +1039,7 @@ describe('Web3PGPService Integration Tests', () => {
             });
 
             test('should throw an error if the subkey does not have a valid binding signature', async () => {
-                
+
                 // 1. Generate OpenPGP key pair
                 let [privateKey, publicKey, revocationCert] = await createAliceOpenPGPKeys();
                 // 2. Remove binding signatures from the published subkey
@@ -1272,15 +1274,15 @@ async function createAliceOpenPGPKeys(): Promise<[openpgp.PrivateKey, openpgp.Pu
         },
         userIDs: [{ name: 'Alice', email: 'alice@example.com' }],
         subkeys: [
-            { 
-                type: 'rsa', 
-                rsaBits: 4096, 
+            {
+                type: 'rsa',
+                rsaBits: 4096,
                 sign: true,
                 keyExpirationTime: 365 * 24 * 60 * 60 // 1 year
             },
-            { 
-                type: 'rsa', 
-                rsaBits: 4096, 
+            {
+                type: 'rsa',
+                rsaBits: 4096,
                 keyExpirationTime: 365 * 24 * 60 * 60 // 1 year
             }
         ],
@@ -1303,15 +1305,15 @@ async function createBobOpenPGPKeys(): Promise<[openpgp.PrivateKey, openpgp.Publ
         curve: 'nistP256',
         userIDs: [{ name: 'Bob', email: 'bob@example.com' }],
         subkeys: [
-            { 
-                type: 'ecc', 
-                curve: 'nistP256', 
+            {
+                type: 'ecc',
+                curve: 'nistP256',
                 sign: true,
                 keyExpirationTime: 180 * 24 * 60 * 60 // 6 months
             },
-            { 
-                type: 'ecc', 
-                curve: 'nistP256', 
+            {
+                type: 'ecc',
+                curve: 'nistP256',
                 keyExpirationTime: 180 * 24 * 60 * 60 // 6 months
             }
         ],
@@ -1337,15 +1339,15 @@ async function createCecilOpenPGPKeys(): Promise<[openpgp.PrivateKey, openpgp.Pu
         curve: 'nistP256',
         userIDs: [{ name: 'Cecil', email: 'cecil@example.com' }],
         subkeys: [
-            { 
-                type: 'ecc', 
-                curve: 'nistP256', 
+            {
+                type: 'ecc',
+                curve: 'nistP256',
                 sign: true,
                 keyExpirationTime: 180 * 24 * 60 * 60 // 6 months
             },
-            { 
-                type: 'ecc', 
-                curve: 'nistP256', 
+            {
+                type: 'ecc',
+                curve: 'nistP256',
                 keyExpirationTime: 180 * 24 * 60 * 60 // 6 months
             }
         ],
