@@ -1,6 +1,6 @@
 {
   "name": "@jibidieuw/web3pgp-cli",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Command-line interface for managing OpenPGP keys on Ethereum through Web3PGP smart contracts",
   "type": "commonjs",
   "main": "dist/index.js",

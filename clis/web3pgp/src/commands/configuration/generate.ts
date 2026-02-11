@@ -20,8 +20,8 @@ export function generateConfigTemplate(environment: 'test' | 'prod' = 'test'): s
 
 ethereum:
   # Blockchain network configuration
-  # Using Ink Sepolia testnet
-  chain: ink-sepolia  # or use numeric ID: 763373
+  # Using Sepolia testnet
+  chain: sepolia  # or use numeric ID: 11155111
 
   # RPC endpoint configuration
   # Multiple endpoints with fallback support and per-endpoint batching configuration
@@ -29,29 +29,29 @@ ethereum:
     # Array of RPC endpoints with priority-based failover
     # Lower priority number = higher priority (1 is highest)
     endpoints:
-      # Primary RPC endpoint - Gelato
-      - url: https://rpc-gel-sepolia.inkonchain.com
+      # Primary RPC endpoint - PublicNode
+      - url: https://ethereum-sepolia-rpc.publicnode.com
         priority: 1
         batching:
           size: 20         # Maximum requests per batch
           waitMs: 100      # Maximum wait time before sending batch in milliseconds
       
       # Backup 1 - Tenderly
-      - url: https://rpc-ten-sepolia.inkonchain.com
+      - url: https://sepolia.gateway.tenderly.co
         priority: 2
         batching:
           size: 20
           waitMs: 100
       
-      # Backup 2 - QuickNode
-      - url: https://rpc-qnd-sepolia.inkonchain.com
+      # Backup 2 - dRPC
+      - url: https://sepolia.drpc.org
         priority: 3
         batching:
           size: 20
           waitMs: 100
       
-      # Backup 3 - dRPC
-      - url: https://ink-sepolia.drpc.org
+      # Backup 3 - 1RPC
+      - url: https://1rpc.io/sepolia
         priority: 4
         batching:
           size: 20
@@ -76,8 +76,8 @@ ethereum:
   #   # privateKey: "<YOUR_PRIVATE_KEY>"
 
 web3pgp:
-  # Web3PGP smart contract address (test deployment on Ink Sepolia)
-  contract: "0x72d02B94317ac899B34459a4e6685eFe12Ac17a8"
+  # Web3PGP smart contract address (test deployment on Sepolia)
+  contract: "0xce66927a2E6171056a9c2464CFe83b813215A905"
 
 monitoring:
   logging:
@@ -89,7 +89,7 @@ monitoring:
 # ============================================================================
 # You can override any configuration value using environment variables:
 #
-# DEXES_CHAIN=ink-sepolia
+# DEXES_CHAIN=sepolia
 # DEXES_RPC_ENDPOINTS='[{"url":"...","priority":1,"batching":{"size":100,"waitMs":50}}]'
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
 # DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>

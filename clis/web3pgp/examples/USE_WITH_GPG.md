@@ -4,6 +4,8 @@ This guide will show you how to use web3pgp in combination with gpg to create ke
 
 In the context of this guide, we will use the convenience commands of gpg to create keys, add subkeys, etc. Feel free to use other gpg commands which provide more options.
 
+Please note the default cofniguration will use Sepolia testnet as target. No real money will be involved. Keep in mind it takes 12 seconds to Sepolia to produce a block so be patient when using the testing environment. Production environment aims to produce a block every 2 seconds.
+
 ## Prerequisites
 
 - Install gpg
@@ -28,29 +30,38 @@ You should see something similar. You can copy this configuration in ~/.web3pgp/
 
 ```yaml
 ethereum:
-  chain: 534351
+  chain: sepolia
   rpc:
     endpoints:
-      - url: https://sepolia-rpc.scroll.io/
+      - url: https://ethereum-sepolia-rpc.publicnode.com
         priority: 1
         batching:
           size: 20
           waitMs: 100
-      - url: https://scroll-sepolia-rpc.publicnode.com
+      - url: https://sepolia.gateway.tenderly.co
         priority: 2
         batching:
           size: 20
           waitMs: 100
-      - url: https://scroll-sepolia.drpc.org
+      - url: https://sepolia.drpc.org
         priority: 3
         batching:
           size: 20
           waitMs: 100
+      - url: https://1rpc.io/sepolia
+        priority: 4
+        batching:
+          size: 20
+          waitMs: 100
+    maxBlockRange: 10000
+    retry:
+      count: 3
+      delayMs: 200
   wallet:
     type: private-key
     privateKey: 0xb1...39fd
 web3pgp:
-  contract: "0xDa63568866C8eB53627a5CCF27DaB76061538dB1"
+  contract: "0xce66927a2E6171056a9c2464CFe83b813215A905"
 monitoring:
   logging:
     level: info
@@ -104,12 +115,12 @@ Here is the result on stdout
 And the structured logs on stderr
 
 ```json
-{"level":"info","time":1769001374400,"pid":13076,"hostname":"gbdevw-Inspiron-16-5635","command":"register","msg":"Reading PGP key from stdin"}
-{"level":"info","time":1769001374405,"pid":13076,"hostname":"gbdevw-Inspiron-16-5635","command":"register","msg":"Parsing and validating PGP key"}
-{"level":"info","time":1769001375182,"pid":13076,"hostname":"gbdevw-Inspiron-16-5635","command":"register","fingerprint":"568d4df6b36fa952004c4228bc5864ef00eb2ab9","transactionHash":"0x8cf6d9fff6bb10f1beabe2cbc856aeb54d0c230cedf639d175012ebd786e2bed","blockNumber":16246348,"msg":"Key registration successful"}
+{"level":"info","time":1769001374400,"pid":13076,"hostname":"XXX","command":"register","msg":"Reading PGP key from stdin"}
+{"level":"info","time":1769001374405,"pid":13076,"hostname":"XXX","command":"register","msg":"Parsing and validating PGP key"}
+{"level":"info","time":1769001375182,"pid":13076,"hostname":"XXX","command":"register","fingerprint":"568d4df6b36fa952004c4228bc5864ef00eb2ab9","transactionHash":"0x8cf6d9fff6bb10f1beabe2cbc856aeb54d0c230cedf639d175012ebd786e2bed","blockNumber":16246348,"msg":"Key registration successful"}
 ```
 
-Remember, you can then watch transaction on https://sepolia.scrollscan.com/. For example, [you can see the transaction here](https://sepolia.scrollscan.com/tx/0x8cf6d9fff6bb10f1beabe2cbc856aeb54d0c230cedf639d175012ebd786e2bed)
+Remember, you can then watch transaction on https://sepolia.etherscan.io/. For example, [you can see the transaction here](https://sepolia.etherscan.io/tx/0xed6acaca05eb172f011b3bbbf145c71e933596e9f82806ebf89a5b2846ea8bed)
 
 ### Add a subkey
 
@@ -164,8 +175,8 @@ Here is an example of the output on stdout
 And the logs on stderr
 
 ```json
-{"level":"info","time":1769002722331,"pid":16332,"hostname":"gbdevw-Inspiron-16-5635","command":"add-subkey","msg":"Reading key from stdin"}
-{"level":"info","time":1769002722340,"pid":16332,"hostname":"gbdevw-Inspiron-16-5635","command":"add-subkey","subkeyFingerprint":"9E04A69D51219CE62164B9A57F37B138C4B84132","msg":"Adding subkey to blockchain"}
+{"level":"info","time":1769002722331,"pid":16332,"hostname":"XXX","command":"add-subkey","msg":"Reading key from stdin"}
+{"level":"info","time":1769002722340,"pid":16332,"hostname":"XXX","command":"add-subkey","subkeyFingerprint":"9E04A69D51219CE62164B9A57F37B138C4B84132","msg":"Adding subkey to blockchain"}
 ```
 
 ### Revoke a key or subkey
@@ -268,8 +279,8 @@ Here is the output on stdout
 And the logs on stderr
 
 ```json
-{"level":"info","time":1769014493592,"pid":35880,"hostname":"gbdevw-Inspiron-16-5635","command":"revoke","msg":"Reading armored revocation certificate from stdin"}
-{"level":"info","time":1769014494341,"pid":35880,"hostname":"gbdevw-Inspiron-16-5635","command":"revoke","fingerprint":"5BC19840CF8EBAD3AFF3006AE24F55B67E6E8E20","transactionHash":"0xae00381df11086ce70332ef2155034fbe9301cfeb72efd550fd23ea583053b72","blockNumber":16249692,"msg":"Key revocation successful"}
+{"level":"info","time":1769014493592,"pid":35880,"hostname":"XXX","command":"revoke","msg":"Reading armored revocation certificate from stdin"}
+{"level":"info","time":1769014494341,"pid":35880,"hostname":"XXX","command":"revoke","fingerprint":"5BC19840CF8EBAD3AFF3006AE24F55B67E6E8E20","transactionHash":"0xae00381df11086ce70332ef2155034fbe9301cfeb72efd550fd23ea583053b72","blockNumber":16249692,"msg":"Key revocation successful"}
 ```
 
 ### Certify a key (Web of Trust)
@@ -335,10 +346,10 @@ The output will look like this
 The logs
 
 ```json
-{"level":"info","time":1769015187456,"pid":37514,"hostname":"gbdevw-Inspiron-16-5635","command":"certify","issuerFp":"0x000000000000000000000000339292aad15b1ec848da1ed147bb3d6b65672a25","msg":"Fetching issuer public key"}
-{"level":"info","time":1769015187457,"pid":37514,"hostname":"gbdevw-Inspiron-16-5635","command":"certify","msg":"Reading PGP key to certify from stdin"}
-{"level":"info","time":1769015187460,"pid":37514,"hostname":"gbdevw-Inspiron-16-5635","command":"certify","msg":"Parsing and validating PGP key to certify"}
-{"level":"info","time":1769015188375,"pid":37514,"hostname":"gbdevw-Inspiron-16-5635","command":"certify","issuerFingerprint":"339292aad15b1ec848da1ed147bb3d6b65672a25","certifiedFingerprint":"568d4df6b36fa952004c4228bc5864ef00eb2ab9","transactionHash":"0x4bcc29e47501ff63bbe58bb63b301ec62010ffc378d31d9a7f3ef627b7c588ea","blockNumber":16250082,"msg":"Key certification successful"}
+{"level":"info","time":1769015187456,"pid":37514,"hostname":"XXX","command":"certify","issuerFp":"0x000000000000000000000000339292aad15b1ec848da1ed147bb3d6b65672a25","msg":"Fetching issuer public key"}
+{"level":"info","time":1769015187457,"pid":37514,"hostname":"XXX","command":"certify","msg":"Reading PGP key to certify from stdin"}
+{"level":"info","time":1769015187460,"pid":37514,"hostname":"XXX","command":"certify","msg":"Parsing and validating PGP key to certify"}
+{"level":"info","time":1769015188375,"pid":37514,"hostname":"XXX","command":"certify","issuerFingerprint":"339292aad15b1ec848da1ed147bb3d6b65672a25","certifiedFingerprint":"568d4df6b36fa952004c4228bc5864ef00eb2ab9","transactionHash":"0x4bcc29e47501ff63bbe58bb63b301ec62010ffc378d31d9a7f3ef627b7c588ea","blockNumber":16250082,"msg":"Key certification successful"}
 ```
 
 ### Revoke a key certification
@@ -381,10 +392,10 @@ Here is the output
 The logs
 
 ```json
-{"level":"info","time":1769015762883,"pid":39833,"hostname":"gbdevw-Inspiron-16-5635","command":"revoke-certification","issuerFp":"0x000000000000000000000000339292aad15b1ec848da1ed147bb3d6b65672a25","msg":"Fetching issuer public key"}
-{"level":"info","time":1769015762883,"pid":39833,"hostname":"gbdevw-Inspiron-16-5635","command":"revoke-certification","msg":"Reading PGP key to revoke certification from stdin"}
-{"level":"info","time":1769015762887,"pid":39833,"hostname":"gbdevw-Inspiron-16-5635","command":"revoke-certification","msg":"Parsing and validating PGP key"}
-{"level":"info","time":1769015763782,"pid":39833,"hostname":"gbdevw-Inspiron-16-5635","command":"revoke-certification","issuerFingerprint":"339292aad15b1ec848da1ed147bb3d6b65672a25","certifiedFingerprint":"568d4df6b36fa952004c4228bc5864ef00eb2ab9","transactionHash":"0x9eadec1a5539285c9392c7e703f03d8ee0ec72ffbfc69fba21ac55ec627adb63","blockNumber":16250239,"msg":"Certification revocation successful"}
+{"level":"info","time":1769015762883,"pid":39833,"hostname":"XXX","command":"revoke-certification","issuerFp":"0x000000000000000000000000339292aad15b1ec848da1ed147bb3d6b65672a25","msg":"Fetching issuer public key"}
+{"level":"info","time":1769015762883,"pid":39833,"hostname":"XXX","command":"revoke-certification","msg":"Reading PGP key to revoke certification from stdin"}
+{"level":"info","time":1769015762887,"pid":39833,"hostname":"XXX","command":"revoke-certification","msg":"Parsing and validating PGP key"}
+{"level":"info","time":1769015763782,"pid":39833,"hostname":"XXX","command":"revoke-certification","issuerFingerprint":"339292aad15b1ec848da1ed147bb3d6b65672a25","certifiedFingerprint":"568d4df6b36fa952004c4228bc5864ef00eb2ab9","transactionHash":"0x9eadec1a5539285c9392c7e703f03d8ee0ec72ffbfc69fba21ac55ec627adb63","blockNumber":16250239,"msg":"Certification revocation successful"}
 ```
 
 ### Fetch a public key by fingerprint
@@ -429,8 +440,8 @@ DA==
 The logs on stderr
 
 ```json
-{"level":"info","time":1769016149456,"pid":40236,"hostname":"gbdevw-Inspiron-16-5635","command":"get","fingerprint":"9E04A69D51219CE62164B9A57F37B138C4B84132","msg":"Retrieving public key"}
-{"level":"info","time":1769016149918,"pid":40236,"hostname":"gbdevw-Inspiron-16-5635","command":"get","fingerprint":"9E04A69D51219CE62164B9A57F37B138C4B84132","msg":"Key retrieved"}
+{"level":"info","time":1769016149456,"pid":40236,"hostname":"XXX","command":"get","fingerprint":"9E04A69D51219CE62164B9A57F37B138C4B84132","msg":"Retrieving public key"}
+{"level":"info","time":1769016149918,"pid":40236,"hostname":"XXX","command":"get","fingerprint":"9E04A69D51219CE62164B9A57F37B138C4B84132","msg":"Key retrieved"}
 ```
 
 You can import or inspect the public key like this:
