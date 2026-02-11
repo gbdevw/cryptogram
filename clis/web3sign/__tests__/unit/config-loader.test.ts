@@ -41,6 +41,8 @@ ethereum:
     type: private-key
 web3pgp:
   contract: "0xABCDEF1234567890ABCDEF1234567890ABCDEF12"
+web3sign:
+  contract: "0x5C09E831276ADCec4D5C94645F34500D3deA8E8A"
 monitoring:
   logging:
     level: debug
@@ -66,6 +68,8 @@ ethereum:
     type: private-key
 web3pgp:
   contract: "0x1111111111111111111111111111111111111111"
+web3sign:
+  contract: "0x5C09E831276ADCec4D5C94645F34500D3deA8E8A"
 monitoring:
   logging:
     level: debug
@@ -155,6 +159,8 @@ ethereum:
     privateKey: "\${DEXES_WALLET_PRIVATE_KEY}"
 web3pgp:
   contract: "0x1234567890123456789012345678901234567890"
+web3sign:
+  contract: "0x5C09E831276ADCec4D5C94645F34500D3deA8E8A"
 monitoring:
   logging:
     level: info
@@ -186,6 +192,8 @@ ethereum:
     type: private-key
 web3pgp:
   contract: "0x1111111111111111111111111111111111111111"
+web3sign:
+  contract: "0x5C09E831276ADCec4D5C94645F34500D3deA8E8A"
 monitoring:
   logging:
     level: warn

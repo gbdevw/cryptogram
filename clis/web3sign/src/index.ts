@@ -37,7 +37,7 @@ async function main(): Promise<void> {
 
     const program = new Command()
       .name('web3sign')
-      .version('0.1.0', '-v, --version')
+      .version('1.0.0', '-v, --version')
       .description('Web3Sign CLI - Decentralized document management on Ethereum')
       .helpOption('-h, --help', 'Show help');
 

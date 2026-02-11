@@ -48,6 +48,9 @@ ethereum:
         web3pgp: {
           contract: '0x1234567890123456789012345678901234567890',
         },
+        web3sign: {
+          contract: '0x1234567890123456789012345678901234567890',
+        },
         monitoring: {
           logging: {
             level: 'info',
@@ -89,6 +92,7 @@ ethereum:
           wallet: { type: 'private-key' },
         },
         web3pgp: { contract: '0x...' },
+        web3sign: { contract: '0x...' },
       };
       expect(() => validateYamlStructure(data)).toThrow(
         new ConfigError('Missing required field: monitoring')
@@ -126,6 +130,7 @@ ethereum:
           wallet: { type: 'private-key' },
         },
         web3pgp: { contract: '0x...' },
+        web3sign: { contract: '0x...' },
         monitoring: { logging: { level: 'info' } },
       };
       expect(() => validateYamlStructure(data)).toThrow(
@@ -141,6 +146,7 @@ ethereum:
           wallet: { type: 'private-key' },
         },
         web3pgp: { contract: '0x...' },
+        web3sign: { contract: '0x...' },
         monitoring: { logging: { level: 'info' } },
       };
       expect(() => validateYamlStructure(data)).toThrow(
@@ -162,6 +168,8 @@ ethereum:
     type: private-key
 web3pgp:
   contract: "0x1234567890123456789012345678901234567890"
+web3sign:
+  contract: "0x5C09E831276ADCec4D5C94645F34500D3deA8E8A"
 monitoring:
   logging:
     level: info

@@ -23,6 +23,38 @@ ethereum:
   # Using Ink Sepolia testnet
   chain: ink-sepolia  # or use numeric ID: 763373
 
+  # RPC endpoint configuration with batching and failover
+  rpc:
+    endpoints:
+      # Primary RPC endpoint with batching configuration
+      - url: "https://rpc-gel-sepolia.inkonchain.com"
+        priority: 1
+        batching:
+          size: 20    # Maximum requests per batch
+          waitMs: 100 # Wait time before sending batch
+      # Secondary RPC endpoints for failover
+      - url: "https://rpc-ten-sepolia.inkonchain.com"
+        priority: 2
+        batching:
+          size: 20
+          waitMs: 100
+      - url: "https://rpc-qnd-sepolia.inkonchain.com"
+        priority: 3
+        batching:
+          size: 20
+          waitMs: 100
+      - url: "https://ink-sepolia.drpc.org"
+        priority: 4
+        batching:
+          size: 20
+          waitMs: 100
+    # Maximum block range for queries
+    maxBlockRange: 10000
+    # Retry configuration for failed requests
+    retry:
+      count: 3      # Number of retry attempts
+      delayMs: 200  # Delay between retries
+
   # wallet: (OPTIONAL - required only for signing transactions)
   #   # Wallet configuration (currently only 'private-key' is supported)
   #   type: private-key
@@ -50,7 +82,9 @@ monitoring:
 # ============================================================================
 # You can override any configuration value using environment variables:
 #
-# DEXES_CHAIN_ID=763373
+# DEXES_CHAIN=ink-sepolia  # or numeric ID: DEXES_CHAIN_ID=763373
+# DEXES_RPC_URL=https://rpc-gel-sepolia.inkonchain.com  # Single RPC endpoint override
+# DEXES_RPC_ENDPOINTS='[{"url":"https://rpc.example.com","priority":1}]'  # JSON array of endpoints
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
 # DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_WEB3SIGN_CONTRACT=<CONTRACT_ADDRESS>
@@ -72,6 +106,38 @@ ethereum:
   # Blockchain network configuration
   # Using Ink mainnet
   chain: ink
+
+  # RPC endpoint configuration with batching and failover
+  rpc:
+    endpoints:
+      # Primary RPC endpoint with batching configuration
+      - url: "https://rpc-gel.inkonchain.com"
+        priority: 1
+        batching:
+          size: 20    # Maximum requests per batch
+          waitMs: 100 # Wait time before sending batch
+      # Secondary RPC endpoints for failover
+      - url: "https://rpc-ten.inkonchain.com"
+        priority: 2
+        batching:
+          size: 20
+          waitMs: 100
+      - url: "https://rpc-qnd.inkonchain.com"
+        priority: 3
+        batching:
+          size: 20
+          waitMs: 100
+      - url: "https://ink.drpc.org"
+        priority: 4
+        batching:
+          size: 20
+          waitMs: 100
+    # Maximum block range for queries
+    maxBlockRange: 10000
+    # Retry configuration for failed requests
+    retry:
+      count: 3      # Number of retry attempts
+      delayMs: 200  # Delay between retries
 
   # wallet: (OPTIONAL - required only for signing transactions)
   #   # Wallet configuration (currently only 'private-key' is supported)
@@ -102,7 +168,9 @@ monitoring:
 # ============================================================================
 # You can override any configuration value using environment variables:
 #
-# DEXES_CHAIN_ID=<CHAIN_ID>
+# DEXES_CHAIN=ink  # or numeric ID: DEXES_CHAIN_ID=<CHAIN_ID>
+# DEXES_RPC_URL=https://rpc-gel.inkonchain.com  # Single RPC endpoint override
+# DEXES_RPC_ENDPOINTS='[{"url":"https://rpc.example.com","priority":1}]'  # JSON array of endpoints
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
 # DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
 # DEXES_WEB3SIGN_CONTRACT=<CONTRACT_ADDRESS>

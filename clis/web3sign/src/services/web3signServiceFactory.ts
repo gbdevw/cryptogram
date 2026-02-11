@@ -4,17 +4,16 @@ import {
   WalletClient,
   createPublicClient,
   createWalletClient,
-  fallback,
-  http,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet, sepolia, foundry, ink, inkSepolia } from 'viem/chains';
 import { Logger } from 'pino';
 
-import { ChainConfig, MergedConfig } from '../config/types';
+import { ChainConfig, MergedConfig, RpcEndpoint } from '../config/types';
 import { ConfigError } from '../errors';
 import { IWeb3SignService, Web3Sign, Web3SignService } from '@jibidieuw/dexes';
 import { IWeb3PGPService } from '@jibidieuw/dexes';
+import { buildFallbackTransport } from '../config/transport';
 
 /**
  * Map of well-known Viem chain names to chain objects.
@@ -91,7 +90,7 @@ function getChainForConfig(chainConfig: ChainConfig): Chain {
  * 2. Predefined endpoints from the well-known chain
  * 3. Error if chain is unknown and no RPC endpoints provided
  */
-function resolveRpcEndpoints(config: MergedConfig, logger: Logger): Array<{ url: string; priority: number }> {
+function resolveRpcEndpoints(config: MergedConfig, logger: Logger): RpcEndpoint[] {
   const { chain, rpc } = config.ethereum;
 
   // Priority 1: User-provided endpoints
@@ -107,7 +106,7 @@ function resolveRpcEndpoints(config: MergedConfig, logger: Logger): Array<{ url:
   if (typeof chain === 'string') {
     const chainObj = CHAIN_MAP[chain];
     if (chainObj?.rpcUrls?.default?.http && chainObj.rpcUrls.default.http.length > 0) {
-      const predefinedEndpoints = chainObj.rpcUrls.default.http.map((url, index) => ({
+      const predefinedEndpoints: RpcEndpoint[] = chainObj.rpcUrls.default.http.map((url, index) => ({
         url,
         priority: index,
       }));
@@ -121,7 +120,7 @@ function resolveRpcEndpoints(config: MergedConfig, logger: Logger): Array<{ url:
     // For numeric chain IDs, check if we have a predefined chain
     const chainObj = CHAIN_ID_MAP[chain];
     if (chainObj?.rpcUrls?.default?.http && chainObj.rpcUrls.default.http.length > 0) {
-      const predefinedEndpoints = chainObj.rpcUrls.default.http.map((url, index) => ({
+      const predefinedEndpoints: RpcEndpoint[] = chainObj.rpcUrls.default.http.map((url, index) => ({
         url,
         priority: index,
       }));
@@ -146,24 +145,21 @@ function createPublicClientWithFallback(config: MergedConfig, logger: Logger): P
   const chain = getChainForConfig(config.ethereum.chain);
   const endpoints = resolveRpcEndpoints(config, logger);
 
-  const httpTransports = endpoints.map((ep) => http(ep.url));
-
-  if (httpTransports.length === 1) {
-    logger.debug({ endpoint: endpoints[0].url }, 'Creating PublicClient with single RPC');
-    return createPublicClient({
-      chain,
-      transport: httpTransports[0],
-    }) as any;
-  }
-
   logger.debug(
-    { count: httpTransports.length, endpoints: endpoints.map(e => e.url) },
-    'Creating PublicClient with fallback RPC'
+    { 
+      endpoints: endpoints.map(e => e.url),
+      retryConfig: config.ethereum.rpc?.retry,
+      batchingConfigs: endpoints.map(e => ({ url: e.url, batching: e.batching })),
+    },
+    'Creating PublicClient with RPC fallback chain',
   );
+
+  // Create fallback transport with batching and retry configuration
+  const fallbackTransport = buildFallbackTransport(endpoints, config.ethereum.rpc?.retry);
 
   return createPublicClient({
     chain,
-    transport: fallback(httpTransports),
+    transport: fallbackTransport,
   }) as any;
 }
 
@@ -202,16 +198,22 @@ function createWalletClientIfConfigured(
   // Resolve RPC endpoints (user config > predefined defaults > error)
   const rpcEndpoints = resolveRpcEndpoints(config, logger);
 
-  // Use the primary endpoint for the wallet client
-  const sortedEndpoints = [...rpcEndpoints].sort((a, b) => a.priority - b.priority);
-  const primaryEndpoint = sortedEndpoints[0];
-  const primaryTransport = http(primaryEndpoint.url);
+  logger.debug(
+    { 
+      endpoints: rpcEndpoints.map(e => e.url),
+      retryConfig: config.ethereum.rpc?.retry
+    },
+    'Creating WalletClient with fallback transport',
+  );
+
+  // Use fallback transport with batching and retry for wallet client too
+  const fallbackTransport = buildFallbackTransport(rpcEndpoints, config.ethereum.rpc?.retry);
 
   // Create wallet client
   const walletClient = createWalletClient({
     account,
     chain: chainObj,
-    transport: primaryTransport,
+    transport: fallbackTransport,
   }) as any;
 
   return walletClient;
