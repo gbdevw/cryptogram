@@ -1,6 +1,6 @@
 # Example: Timestamp a document
 
-This guide will show you how to use web3sign CLI to timestamp and verify a document.
+This guide will show you how to use Web3sign CLI to timestamp and verify a document.
 
 ## Prerequisites
 

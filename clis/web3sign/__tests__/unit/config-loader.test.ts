@@ -23,8 +23,9 @@ describe('Configuration Loader', () => {
     it('should load defaults when no config provided', () => {
       // Pass empty env vars to prevent DEXES_LOG_LEVEL override from process.env
       const config = loadConfig({ configPath: '/nonexistent/path', envVars: {} });
-      expect(config.ethereum.chain).toBe('ink-sepolia');
-      expect(config.web3pgp.contract).toBe('0x72d02B94317ac899B34459a4e6685eFe12Ac17a8');
+      expect(config.ethereum.chain).toBe('sepolia');
+      expect(config.web3pgp.contract).toBe('0xce66927a2E6171056a9c2464CFe83b813215A905');
+      expect(config.web3sign.contract).toBe('0x14756E2646596e184D305deC6971802b38cf0651');
       expect(config.monitoring.logging.level).toBe('info');
     });
 
@@ -149,7 +150,7 @@ monitoring:
       const configPath = path.join(tempDir, 'config.yaml');
       const configContent = `
 ethereum:
-  chain: ink-sepolia
+  chain: sepolia
   rpc:
     endpoints:
       - url: https://rpc.example.com

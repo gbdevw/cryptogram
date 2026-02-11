@@ -20,30 +20,30 @@ export function generateConfigTemplate(environment: 'test' | 'prod' = 'test'): s
 
 ethereum:
   # Blockchain network configuration
-  # Using Ink Sepolia testnet
-  chain: ink-sepolia  # or use numeric ID: 763373
+  # Using Sepolia testnet
+  chain: sepolia  # or use numeric ID: 11155111
 
   # RPC endpoint configuration with batching and failover
   rpc:
     endpoints:
       # Primary RPC endpoint with batching configuration
-      - url: "https://rpc-gel-sepolia.inkonchain.com"
+      - url: "https://ethereum-sepolia-rpc.publicnode.com"
         priority: 1
         batching:
           size: 20    # Maximum requests per batch
           waitMs: 100 # Wait time before sending batch
       # Secondary RPC endpoints for failover
-      - url: "https://rpc-ten-sepolia.inkonchain.com"
+      - url: "https://sepolia.gateway.tenderly.co"
         priority: 2
         batching:
           size: 20
           waitMs: 100
-      - url: "https://rpc-qnd-sepolia.inkonchain.com"
+      - url: "https://sepolia.drpc.org"
         priority: 3
         batching:
           size: 20
           waitMs: 100
-      - url: "https://ink-sepolia.drpc.org"
+      - url: "https://1rpc.io/sepolia"
         priority: 4
         batching:
           size: 20
@@ -66,11 +66,11 @@ ethereum:
 
 web3pgp:
   # Web3PGP smart contract address (test deployment)
-  contract: "0x72d02B94317ac899B34459a4e6685eFe12Ac17a8"
+  contract: "0xce66927a2E6171056a9c2464CFe83b813215A905"
 
 web3sign:
   # Web3Sign smart contract address (test deployment)
-  contract: "0x5C09E831276ADCec4D5C94645F34500D3deA8E8A"
+  contract: "0x14756E2646596e184D305deC6971802b38cf0651"
 
 monitoring:
   logging:
@@ -82,8 +82,8 @@ monitoring:
 # ============================================================================
 # You can override any configuration value using environment variables:
 #
-# DEXES_CHAIN=ink-sepolia  # or numeric ID: DEXES_CHAIN_ID=763373
-# DEXES_RPC_URL=https://rpc-gel-sepolia.inkonchain.com  # Single RPC endpoint override
+# DEXES_CHAIN=sepolia  # or numeric ID: DEXES_CHAIN_ID=11155111
+# DEXES_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com  # Single RPC endpoint override
 # DEXES_RPC_ENDPOINTS='[{"url":"https://rpc.example.com","priority":1}]'  # JSON array of endpoints
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
 # DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
