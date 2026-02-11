@@ -1,6 +1,6 @@
 {
   "name": "@jibidieuw/web3sign-cli",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Command-line interface for timestamping and verifying documents on Ethereum through Web3Sign and Web3PGP smart contracts",
   "type": "commonjs",
   "main": "dist/index.js",
