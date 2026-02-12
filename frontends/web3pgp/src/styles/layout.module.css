@@ -155,7 +155,7 @@
 }
 
 .link {
-  color: #aaa;
+  color: #ddd;
   text-decoration: none;
   font-size: 0.875rem;
   transition: color 0.2s ease;
@@ -166,7 +166,7 @@
 }
 
 .separator {
-  color: #666;
+  color: #999;
 }
 
 /* Responsive Design */

@@ -1,6 +1,6 @@
 import { PublicClient, WalletClient } from 'viem'
 import { Web3PGP, Web3PGPService } from '@jibidieuw/dexes'
-import { getCurrentChainConfig } from '../config/chains'
+import { CHAIN_CONFIG } from '../config/chains'
 
 /**
  * Manages the initialization of Web3PGP client and service
@@ -13,17 +13,38 @@ class Web3PGPServiceManager {
   private walletClient: WalletClient | null = null
 
   /**
+   * Get Web3PGP contract address based on chain ID from public client
+   */
+  private getContractAddressForChain(chainId: number): string {
+    // Find the chain config by chainId
+    const chainEntry = Object.entries(CHAIN_CONFIG).find(
+      ([_, config]) => config.chainId === chainId
+    )
+
+    if (!chainEntry) {
+      throw new Error(`No configuration found for chain ID: ${chainId}`)
+    }
+
+    const contractAddress = chainEntry[1].web3pgpContractAddress
+    if (!contractAddress || contractAddress.length === 0) {
+      throw new Error(`Web3PGP contract address not configured for chain ID: ${chainId}`)
+    }
+
+    return contractAddress
+  }
+
+  /**
    * Initialize Web3PGP service based on publicClient
    */
   async initialize(publicClient: PublicClient): Promise<void> {
     try {
-      // Step 1: Get contract address
-      const chainConfig = getCurrentChainConfig()
-      const web3pgpAddress = chainConfig.web3pgpContractAddress as `0x${string}`
-
-      if (!web3pgpAddress || web3pgpAddress.length === 0) {
-        throw new Error(`Web3PGP contract address not configured for this chain`)
+      // Get contract address based on the actual chain ID from public client
+      const chainId = publicClient.chain?.id
+      if (!chainId) {
+        throw new Error('Unable to determine chain ID from public client')
       }
+
+      const web3pgpAddress = this.getContractAddressForChain(chainId) as `0x${string}`
 
       // Step 2: Create Web3PGP client
       this.web3PGP = new Web3PGP(web3pgpAddress, publicClient as any)
@@ -34,9 +55,37 @@ class Web3PGPServiceManager {
       // Store public client
       this.publicClient = publicClient
 
-      console.log('Web3PGP service initialized successfully')
+      console.log(`Web3PGP service initialized for chain ${chainId} with contract ${web3pgpAddress}`)
     } catch (error) {
       console.error('Failed to initialize Web3PGP service:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Update the contract address based on the current public client's chain
+   * Call this when the network is switched
+   */
+  setContractAddress(publicClient: PublicClient): void {
+    try {
+      if (!this.web3PGP) {
+        throw new Error('Web3PGP not initialized')
+      }
+
+      const chainId = publicClient.chain?.id
+      if (!chainId) {
+        throw new Error('Unable to determine chain ID from public client')
+      }
+
+      const newContractAddress = this.getContractAddressForChain(chainId) as `0x${string}`
+
+      // Update the contract address on the Web3PGP instance
+      this.web3PGP.address = newContractAddress
+      this.publicClient = publicClient
+
+      console.log(`Web3PGP contract address updated to ${newContractAddress} for chain ${chainId}`)
+    } catch (error) {
+      console.error('Failed to update contract address:', error)
       throw error
     }
   }

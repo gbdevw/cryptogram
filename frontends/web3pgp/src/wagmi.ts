@@ -9,11 +9,11 @@ const sepolia = {
   name: '[DEMO] Sepolia',
 }
 
-// Define Scroll Sepolia chain with [DEMO] prefix
-const scrollSepolia = defineChain({
-  id: 534351,
-  name: '[DEMO] Scroll Sepolia',
-  network: 'scroll-sepolia',
+// Define Scroll Mainnet chain
+const scroll = defineChain({
+  id: 534352,
+  name: 'Scroll',
+  network: 'scroll',
   nativeCurrency: {
     decimals: 18,
     name: 'ETH',
@@ -21,32 +21,34 @@ const scrollSepolia = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://sepolia-rpc.scroll.io'],
+      http: ['https://rpc.scroll.io'],
     },
     public: {
-      http: ['https://sepolia-rpc.scroll.io'],
+      http: ['https://rpc.scroll.io'],
     },
   },
   blockExplorers: {
     default: {
-      name: 'Scroll Sepolia Blockscout',
-      url: 'https://sepolia-blockscout.scroll.io',
+      name: 'Scrollscan',
+      url: 'https://scrollscan.com',
     },
   },
-  testnet: true,
+  testnet: false,
 })
 
 // Support both chains so wallet can switch between them
-const chains = [sepolia, scrollSepolia] as const
+const chains = [sepolia, scroll] as const
 
-const batchConfig = { batchSize: 20, wait: 150 }
+const sepoliaBatchConfig = { batchSize: 20, wait: 100 }
+const scrollBatchConfig = { batchSize: 20, wait: 150 }
 
 const createSepoliaTransport = () =>
   fallback(
     [
-      http('https://ethereum-sepolia-rpc.publicnode.com', { batch: batchConfig }),
-      http('https://rpc2.sepolia.org', { batch: batchConfig }),
-      http('https://gateway.tenderly.co/public/sepolia', { batch: batchConfig }),
+      http('https://ethereum-sepolia-rpc.publicnode.com', { batch: sepoliaBatchConfig }),
+      http('https://sepolia.gateway.tenderly.co', { batch: sepoliaBatchConfig }),
+      http('https://sepolia.drpc.org', { batch: sepoliaBatchConfig }),
+      http('https://1rpc.io/sepolia', { batch: sepoliaBatchConfig }),
     ],
     {
       retryCount: 3,
@@ -54,12 +56,13 @@ const createSepoliaTransport = () =>
     }
   )
 
-const createScrollSepoliaTransport = () =>
+const createScrollTransport = () =>
   fallback(
     [
-      http('https://scroll-sepolia-rpc.publicnode.com', { batch: batchConfig }),
-      http('https://sepolia-rpc.scroll.io/', { batch: batchConfig }),
-      http('https://scroll-sepolia.drpc.org', { batch: batchConfig }),
+      http('https://rpc.scroll.io', { batch: scrollBatchConfig }),
+      http('https://1rpc.io/scroll', { batch: scrollBatchConfig }),
+      http('https://scroll-rpc.publicnode.com', { batch: scrollBatchConfig }),
+      http('https://scroll.drpc.org', { batch: scrollBatchConfig }),
     ],
     {
       retryCount: 3,
@@ -71,7 +74,7 @@ export const config = createConfig({
   chains,
   transports: {
     [sepolia.id]: createSepoliaTransport(),
-    [scrollSepolia.id]: createScrollSepoliaTransport(),
+    [scroll.id]: createScrollTransport(),
   },
 })
 

@@ -6,11 +6,11 @@ export const CHAIN_CONFIG = {
     // Web3PGP contract address for key management and verification
     web3pgpContractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_SEPOLIA || '0x82733B49e65A2FE6B611e5CE454AC21237071638',
   },
-  scrollSepolia: {
-    id: 'scrollSepolia',
-    chainId: 534351,
-    displayName: '[DEMO] Scroll Sepolia',
-    web3pgpContractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_SCROLL_SEPOLIA || '0xDa63568866C8eB53627a5CCF27DaB76061538dB1',
+  scroll: {
+    id: 'scroll',
+    chainId: 534352,
+    displayName: 'Scroll',
+    web3pgpContractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS_SCROLL || '0xDa63568866C8eB53627a5CCF27DaB76061538dB1',
   },
 } as const
 
@@ -19,10 +19,10 @@ export type SupportedChain = keyof typeof CHAIN_CONFIG
 // Use an environment variable to determine the configured chain
 export const getConfiguredChain = (): SupportedChain => {
   const chain = process.env.NEXT_PUBLIC_CHAIN || 'sepolia'
-  if (chain !== 'sepolia' && chain !== 'scrollSepolia') {
+  if (chain !== 'sepolia' && chain !== 'scroll') {
     throw new Error(`Unsupported chain: ${chain}`)
   }
-  return chain
+  return chain as SupportedChain
 }
 
 export const getCurrentChainConfig = () => {

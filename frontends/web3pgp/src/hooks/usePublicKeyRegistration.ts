@@ -94,9 +94,15 @@ export function usePublicKeyRegistration(): UsePublicKeyRegistrationReturn {
         // Step 2: Check if primary key is registered on blockchain
         const primaryFingerprint = publicKey.getFingerprint()
         const primaryFingerprintHex = to0x(primaryFingerprint.toUpperCase())
-        const primaryExists = await web3pgpService.contract.exists(
-          primaryFingerprintHex
-        )
+        let primaryExists = false
+        try {
+          primaryExists = await web3pgpService.contract.exists(
+            primaryFingerprintHex
+          )
+        } catch (error) {
+          // If error checking existence (e.g., key not found), assume not registered
+          primaryExists = false
+        }
         setPrimaryRegistered(primaryExists)
 
         // Step 3: Get subkeys
@@ -125,9 +131,15 @@ export function usePublicKeyRegistration(): UsePublicKeyRegistrationReturn {
             verificationStatusMap.set(subkeyFingerprint, status)
 
             // Check if subkey is registered
-            const isSubkey = await web3pgpService.contract.isSubKey(
-              subkeyFingerprintHex
-            )
+            let isSubkey = false
+            try {
+              isSubkey = await web3pgpService.contract.isSubKey(
+                subkeyFingerprintHex
+              )
+            } catch (error) {
+              // If error checking subkey existence (e.g., subkey not found), assume not registered
+              isSubkey = false
+            }
             registrationStatusMap.set(subkeyFingerprint, isSubkey)
 
             // A subkey is selectable if:
