@@ -1190,13 +1190,14 @@ export class Web3PGPService implements IWeb3PGPService {
      * Retrieve and reconstruct an OpenPGP public key from the blockchain by its fingerprint.
      * 
      * @param fingerprint The fingerprint of the key to retrieve (primary key or subkey)
+     * @param insecure If true, skips all validations of the retrieved key and returns it as is. Defaults to false.
      * @returns The reconstructed and validated OpenPGP public key, with revocations applied if any
      * 
      * @throws Error if the key is not registered on-chain
      * @throws Error if the key data cannot be retrieved from blockchain events
      * @throws Error if the retrieved OpenPGP message is invalid or corrupted
      */
-    public async getPublicKey(fingerprint: `0x${string}`): Promise<openpgp.PublicKey> {
+    public async getPublicKey(fingerprint: `0x${string}`, insecure?: boolean): Promise<openpgp.PublicKey> {
 
         // 1. Get the publication block number of the target key and its parent if any
         const normalizedFingerprint = toBytes32(to0x(fingerprint));
@@ -1228,7 +1229,7 @@ export class Web3PGPService implements IWeb3PGPService {
         if (parentFingerprint !== BYTES32_ZERO) {
             // This is a subkey, retrieve the parent key and return the reconstructed full key
             console.debug(`[Web3PGP - Service] Key ${normalizedFingerprint} is a subkey, retrieving parent key to reconstruct full key`);
-            return await this.getPublicKey(parentFingerprint);
+            return await this.getPublicKey(parentFingerprint, insecure);
         }
 
         // 3. List all subkeys and their revocations (certifications and revocations are not handled because subkeys cannot be certified)
@@ -1376,7 +1377,7 @@ export class Web3PGPService implements IWeb3PGPService {
             );
         }
         console.debug(`[Web3PGP - Service] Found KeyRegistered log for primary key ${normalizedFingerprint} at block ${flattenedLogs[0].blockNumber} - tx ${flattenedLogs[0].transactionHash}`);
-        let primaryKey = await this.extractFromKeyRegisteredLog(flattenedLogs[0]);
+        let primaryKey = await this.extractFromKeyRegisteredLog(flattenedLogs[0], insecure);
 
         // 10. Iterate over the logs and reconstruct the key
         console.debug(`[Web3PGP - Service] Reconstructing primary key ${normalizedFingerprint} from ${flattenedLogs.length} logs`);
@@ -1386,7 +1387,7 @@ export class Web3PGPService implements IWeb3PGPService {
                 switch (log.type) {
                     case Web3PGPEvents.SubkeyAdded:
                         console.debug(`[Web3PGP - Service] Processing SubkeyAdded log for subkey ${log.subkeyFingerprint} at block ${log.blockNumber} - tx ${log.transactionHash}`);
-                        const subkey = await this.extractFromSubkeyAddedLog(log);
+                        const subkey = await this.extractFromSubkeyAddedLog(log, insecure);
                         primaryKey = await primaryKey.update(subkey, log.blockTimestamp);
                         break;
                     case Web3PGPEvents.KeyRevoked:
@@ -1412,17 +1413,17 @@ export class Web3PGPService implements IWeb3PGPService {
                         break;
                     case Web3PGPEvents.KeyUpdated:
                         console.debug(`[Web3PGP - Service] Processing KeyUpdated log at block ${log.blockNumber} - tx ${log.transactionHash}`);
-                        const updatedKey = await this.extractFromKeyUpdatedLog(log);
+                        const updatedKey = await this.extractFromKeyUpdatedLog(log, insecure);
                         primaryKey = await primaryKey.update(updatedKey, log.blockTimestamp);
                         break;
                     case Web3PGPEvents.KeyCertified:
                         console.debug(`[Web3PGP - Service] Processing KeyCertified log at block ${log.blockNumber} - tx ${log.transactionHash}`);
-                        const certifiedKey = await this.extractFromKeyCertifiedLog(log);
+                        const certifiedKey = await this.extractFromKeyCertifiedLog(log, insecure);
                         primaryKey = await primaryKey.update(certifiedKey, log.blockTimestamp);
                         break;
                     case Web3PGPEvents.KeyCertificationRevoked:
                         console.debug(`[Web3PGP - Service] Processing KeyCertificationRevoked log at block ${log.blockNumber} - tx ${log.transactionHash}`);
-                        const certRevokedKey = await this.extractFromKeyCertificationRevokedLog(log);
+                        const certRevokedKey = await this.extractFromKeyCertificationRevokedLog(log, insecure);
                         primaryKey = await primaryKey.update(certRevokedKey, log.blockTimestamp);
                         break;
                     default:

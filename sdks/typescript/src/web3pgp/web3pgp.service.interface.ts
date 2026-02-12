@@ -264,6 +264,7 @@ export interface IWeb3PGPService {
      * 10. Returns the reconstructed public key
      * 
      * @param fingerprint The fingerprint of the key to retrieve (primary key or subkey)
+     * @param insecure If true, skips cryptographic verifications of the key and subkeys. Defaults to false.
      * @returns The reconstructed and validated OpenPGP public key, with revocations applied if any
      * 
      * @throws Error if the key is not registered on-chain
@@ -289,7 +290,7 @@ export interface IWeb3PGPService {
      * }
      * ```
      */
-    getPublicKey(fingerprint: `0x${string}`): Promise<openpgp.PublicKey>;
+    getPublicKey(fingerprint: `0x${string}`, insecure?: boolean): Promise<openpgp.PublicKey>;
 
     /*****************************************************************************************************************/
     /* LOGS OPERATIONS                                                                                               */
