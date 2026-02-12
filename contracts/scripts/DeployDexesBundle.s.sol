@@ -107,27 +107,40 @@ contract DeployDexesBundle is Script {
         // ===== 4. Configure Roles in AccessManager =====
         console2.log("");
         console2.log("4. Configuring Roles in AccessManager...");
-        configureRoles(deployer, initialAdmin);
+        configureRoles(deployer, initialAdmin, addresses.web3pgpProxy, addresses.web3signProxy);
     }
 
     /**
      * @notice Configure roles in AccessManager
      * @param deployer The deployer address
      * @param initialAdmin The initial admin address
+     * @param web3pgpProxy The Web3PGP proxy address
+     * @param web3signProxy The Web3Sign proxy address
      */
-    function configureRoles(address deployer, address initialAdmin) public {
+    function configureRoles(address deployer, address initialAdmin, address web3pgpProxy, address web3signProxy) public {
+        
+        // --- 1. CONFIGURE ROLES ---
+        // Web3Sign
+        console2.log("   Configuring roles for Web3Sign...");
+        RoleManagementHelper.configureUpgradeManagerRole(addresses.accessManagerProxy, web3signProxy);
+        RoleManagementHelper.configureFeeManagerRole(addresses.accessManagerProxy, web3signProxy);
+        RoleManagementHelper.configureFundsManagerRole(addresses.accessManagerProxy, web3signProxy);
+        // Web3PGP
+        console2.log("   Configuring roles for Web3PGP...");
+        RoleManagementHelper.configureUpgradeManagerRole(addresses.accessManagerProxy, web3pgpProxy);
+        RoleManagementHelper.configureFeeManagerRole(addresses.accessManagerProxy, web3pgpProxy);
+        RoleManagementHelper.configureFundsManagerRole(addresses.accessManagerProxy, web3pgpProxy);
+
+        // --- 2. GRANT ROLES TO INITIAL ADMIN ---
         // Grant UPGRADE_MANAGER_ROLE to Initial Admin
         grantUpgradeManagerRole(addresses.accessManagerProxy, initialAdmin, 0);
         console2.log("   Granted UPGRADE_MANAGER_ROLE to Initial Admin:", initialAdmin);
-
         // Grant FEE_MANAGER_ROLE to Initial Admin
         grantFeeManagerRole(addresses.accessManagerProxy, initialAdmin, 0);
         console2.log("   Granted FEE_MANAGER_ROLE to Initial Admin:", initialAdmin);
-
         // Grant FUNDS_MANAGER_ROLE to Initial Admin
         grantFundsManagerRole(addresses.accessManagerProxy, initialAdmin, 0);
         console2.log("   Granted FUNDS_MANAGER_ROLE to Initial Admin:", initialAdmin);
-
         // Grant ADMIN_ROLE to Initial Admin if different from Deployer and revoke from Deployer
         if (initialAdmin != deployer) {
             grantAdminRole(addresses.accessManagerProxy, initialAdmin);

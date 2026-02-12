@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {ERC1967Proxy} from "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
-import {Web3Doc} from "src/Web3Doc.sol";
 import {Web3Sign} from "src/Web3Sign.sol";
 import {ScriptHelpers} from "scripts/lib/ScriptHelpers.sol";
 
@@ -106,38 +105,6 @@ library DeploymentHelper {
             Web3PGP.initialize.selector,
             fee,
             accessManager
-        );
-
-        // Deploy proxy
-        result = deployProxy(address(implementation), initData);
-        
-        return result;
-    }
-
-    /**
-     * @notice Deploy Web3Doc contract with initialization
-     * @param fee The service fee in weis
-     * @param accessManager The address of the AccessManager contract
-     * @param web3pgp The address of the Web3PGP contract
-     * @return result The deployment result
-     */
-    function deployWeb3Doc(
-        uint256 fee,
-        address accessManager,
-        address web3pgp
-    ) internal returns (DeploymentResult memory result) {
-        ScriptHelpers.requireNonZero(accessManager, "accessManager");
-        ScriptHelpers.requireNonZero(web3pgp, "web3pgp");
-
-        // Deploy implementation
-        Web3Doc implementation = new Web3Doc();
-
-        // Prepare initialization data
-        bytes memory initData = abi.encodeWithSelector(
-            Web3Doc.initialize.selector,
-            fee,
-            accessManager,
-            web3pgp
         );
 
         // Deploy proxy

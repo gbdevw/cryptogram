@@ -87,8 +87,7 @@ contract Web3Sign is FlatFee, IWeb3Sign, UUPSUpgradeable {
     }
 
     /// @dev keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Web3Sign")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant WEB3SIGN_STORAGE_LOCATION =
-        0x126b4ad6791ca5ab4e9a2b6bda753a1b72d59cc8959232491e0a27e873933a00;
+    bytes32 private constant WEB3SIGN_STORAGE_LOCATION = 0xee8561c57681beda608743fac1d07a5402d517a6a8bfc6854d432aa1a9f30000;
 
     function _getWeb3SignStorage()
         private

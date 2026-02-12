@@ -5,7 +5,6 @@ import {Test} from "lib/forge-std/src/Test.sol";
 import {DeploymentHelper} from "scripts/lib/DeploymentHelper.sol";
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
-import {Web3Doc} from "src/Web3Doc.sol";
 
 /**
  * @title DeploymentHelperTest
@@ -61,22 +60,6 @@ contract DeploymentHelperTest is Test {
         assertNotEq(pgpResult.implementation, pgpResult.proxy, "Implementation and proxy should be different");
     }
 
-    function test_deployWeb3Doc_Success() public {
-        // Deploy dependencies
-        DeploymentHelper.DeploymentResult memory amResult = 
-            DeploymentHelper.deployAccessManager(testAdmin);
-        DeploymentHelper.DeploymentResult memory pgpResult = 
-            DeploymentHelper.deployWeb3PGP(testFee, amResult.proxy);
-
-        // Deploy Web3Doc
-        DeploymentHelper.DeploymentResult memory docResult = 
-            DeploymentHelper.deployWeb3Doc(testFee, amResult.proxy, pgpResult.proxy);
-
-        assertNotEq(docResult.implementation, address(0), "Implementation should not be zero");
-        assertNotEq(docResult.proxy, address(0), "Proxy should not be zero");
-        assertNotEq(docResult.implementation, docResult.proxy, "Implementation and proxy should be different");
-    }
-
     /*****************************************************************************************************************/
     /* PROXY VALIDATION TESTS                                                                                        */
     /*****************************************************************************************************************/
@@ -114,22 +97,5 @@ contract DeploymentHelperTest is Test {
         
         // Verify fee is set
         assertEq(pgp.requestedFee(), testFee, "Fee should be set correctly");
-    }
-
-    function test_deployWeb3Doc_IsInitialized() public {
-        DeploymentHelper.DeploymentResult memory amResult = 
-            DeploymentHelper.deployAccessManager(testAdmin);
-        DeploymentHelper.DeploymentResult memory pgpResult = 
-            DeploymentHelper.deployWeb3PGP(testFee, amResult.proxy);
-        DeploymentHelper.DeploymentResult memory docResult = 
-            DeploymentHelper.deployWeb3Doc(testFee, amResult.proxy, pgpResult.proxy);
-
-        Web3Doc doc = Web3Doc(payable(docResult.proxy));
-        
-        // Verify fee is set
-        assertEq(doc.requestedFee(), testFee, "Fee should be set correctly");
-        
-        // Verify Web3PGP address is set
-        assertEq(doc.getWeb3PGPAddress(), pgpResult.proxy, "Web3PGP address should be set");
     }
 }

@@ -7,7 +7,7 @@ import {RoleManagementHelper} from "scripts/lib/RoleManagementHelper.sol";
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
 import {UUPSUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
-import {Web3Doc} from "src/Web3Doc.sol";
+import {Web3Sign} from "src/Web3Sign.sol";
 
 /**
  * @title UpgradeHelperTest
@@ -39,8 +39,8 @@ contract UpgradeHelperTest is Test {
         // Deploy Web3PGP
         pgpResult = DeploymentHelper.deployWeb3PGP(fee, amResult.proxy);
 
-        // Deploy Web3Doc
-        docResult = DeploymentHelper.deployWeb3Doc(fee, amResult.proxy, pgpResult.proxy);
+        // Deploy Web3Sign
+        docResult = DeploymentHelper.deployWeb3Sign(fee, amResult.proxy, pgpResult.proxy);
 
         // Configure upgrade manager role
         vm.startPrank(deployer);
@@ -130,22 +130,22 @@ contract UpgradeHelperTest is Test {
     }
 
     /*****************************************************************************************************************/
-    /* WEB3DOC UPGRADE TESTS                                                                                         */
+    /* Web3Sign UPGRADE TESTS                                                                                         */
     /*****************************************************************************************************************/
 
-    function test_upgradeWeb3Doc_Success() public {
+    function test_upgradeWeb3Sign_Success() public {
         // Get original implementation
         address originalImplementation = docResult.implementation;
-        Web3Doc proxyAsWeb3Doc = Web3Doc(payable(docResult.proxy));
+        Web3Sign proxyAsWeb3Sign = Web3Sign(payable(docResult.proxy));
 
         // Verify original state is accessible
-        uint256 originalFee = proxyAsWeb3Doc.requestedFee();
-        address originalPgpAddress = proxyAsWeb3Doc.getWeb3PGPAddress();
+        uint256 originalFee = proxyAsWeb3Sign.requestedFee();
+        address originalPgpAddress = proxyAsWeb3Sign.getWeb3PGPAddress();
         assertEq(originalFee, fee, "Original fee should be accessible");
         assertEq(originalPgpAddress, pgpResult.proxy, "Original Web3PGP address should be accessible");
 
         // Deploy new implementation
-        Web3Doc newImplementation = new Web3Doc();
+        Web3Sign newImplementation = new Web3Sign();
 
         // Upgrade as upgrade manager
         vm.prank(upgradeManager);
@@ -155,81 +155,81 @@ contract UpgradeHelperTest is Test {
         assertNotEq(address(newImplementation), originalImplementation, "New implementation should be different");
 
         // Verify state is preserved
-        uint256 newFee = proxyAsWeb3Doc.requestedFee();
-        address newPgpAddress = proxyAsWeb3Doc.getWeb3PGPAddress();
+        uint256 newFee = proxyAsWeb3Sign.requestedFee();
+        address newPgpAddress = proxyAsWeb3Sign.getWeb3PGPAddress();
         assertEq(newFee, originalFee, "Fee should be preserved after upgrade");
         assertEq(newPgpAddress, originalPgpAddress, "Web3PGP address should be preserved after upgrade");
     }
 
-    function test_upgradeWeb3Doc_UnauthorizedCaller() public {
+    function test_upgradeWeb3Sign_UnauthorizedCaller() public {
         // Try to upgrade as non-upgrade manager
-        Web3Doc newImplementation = new Web3Doc();
+        Web3Sign newImplementation = new Web3Sign();
         
         vm.prank(address(0x9999)); // Unauthorized address
         vm.expectRevert();
         UUPSUpgradeable(docResult.proxy).upgradeToAndCall(address(newImplementation), "");
     }
 
-    function test_upgradeWeb3Doc_PreservesWeb3PGPLink() public {
+    function test_upgradeWeb3Sign_PreservesWeb3PGPLink() public {
         // Get original Web3PGP address
-        Web3Doc proxyAsWeb3Doc = Web3Doc(payable(docResult.proxy));
-        address originalPgpAddress = proxyAsWeb3Doc.getWeb3PGPAddress();
+        Web3Sign proxyAsWeb3Sign = Web3Sign(payable(docResult.proxy));
+        address originalPgpAddress = proxyAsWeb3Sign.getWeb3PGPAddress();
         
         // Deploy new implementation
-        Web3Doc newImplementation = new Web3Doc();
+        Web3Sign newImplementation = new Web3Sign();
 
         // Upgrade
         vm.prank(upgradeManager);
         UUPSUpgradeable(docResult.proxy).upgradeToAndCall(address(newImplementation), "");
 
         // Verify Web3PGP link is preserved
-        address newPgpAddress = proxyAsWeb3Doc.getWeb3PGPAddress();
+        address newPgpAddress = proxyAsWeb3Sign.getWeb3PGPAddress();
         assertEq(newPgpAddress, originalPgpAddress, "Web3PGP address should be preserved");
         assertEq(newPgpAddress, pgpResult.proxy, "Web3PGP address should still be correct");
     }
 
-    function test_upgradeWeb3Doc_MultipleUpgrades() public {
+    function test_upgradeWeb3Sign_MultipleUpgrades() public {
         // First upgrade
-        Web3Doc implementation1 = new Web3Doc();
+        Web3Sign implementation1 = new Web3Sign();
         vm.prank(upgradeManager);
         UUPSUpgradeable(docResult.proxy).upgradeToAndCall(address(implementation1), "");
 
         // Second upgrade
-        Web3Doc implementation2 = new Web3Doc();
+        Web3Sign implementation2 = new Web3Sign();
         vm.prank(upgradeManager);
         UUPSUpgradeable(docResult.proxy).upgradeToAndCall(address(implementation2), "");
 
         // Both upgrades should succeed
         // Verify state is still accessible
-        Web3Doc proxyAsWeb3Doc = Web3Doc(payable(docResult.proxy));
-        assertEq(proxyAsWeb3Doc.requestedFee(), fee, "Fee should be preserved after multiple upgrades");
-        assertEq(proxyAsWeb3Doc.getWeb3PGPAddress(), pgpResult.proxy, "Web3PGP address should be preserved");
+        Web3Sign proxyAsWeb3Sign = Web3Sign(payable(docResult.proxy));
+        assertEq(proxyAsWeb3Sign.requestedFee(), fee, "Fee should be preserved after multiple upgrades");
+        assertEq(proxyAsWeb3Sign.getWeb3PGPAddress(), pgpResult.proxy, "Web3PGP address should be preserved");
     }
 
     /*****************************************************************************************************************/
     /* CONCURRENT UPGRADE TESTS                                                                                      */
     /*****************************************************************************************************************/
 
-    function test_upgradeWeb3PGP_AndWeb3Doc_Independently() public {
+    function test_upgradeWeb3PGP_AndWeb3Sign_Independently() public {
         // Deploy new implementations
         Web3PGP newPgpImplementation = new Web3PGP();
-        Web3Doc newDocImplementation = new Web3Doc();
+        Web3Sign newDocImplementation = new Web3Sign();
 
         // Upgrade Web3PGP
         vm.prank(upgradeManager);
         UUPSUpgradeable(pgpResult.proxy).upgradeToAndCall(address(newPgpImplementation), "");
 
-        // Upgrade Web3Doc
+        // Upgrade Web3Sign
         vm.prank(upgradeManager);
         UUPSUpgradeable(docResult.proxy).upgradeToAndCall(address(newDocImplementation), "");
 
         // Verify both upgrades were successful
         Web3PGP proxyAsWeb3PGP = Web3PGP(payable(pgpResult.proxy));
-        Web3Doc proxyAsWeb3Doc = Web3Doc(payable(docResult.proxy));
+        Web3Sign proxyAsWeb3Sign = Web3Sign(payable(docResult.proxy));
 
         assertEq(proxyAsWeb3PGP.requestedFee(), fee, "Web3PGP fee preserved");
-        assertEq(proxyAsWeb3Doc.requestedFee(), fee, "Web3Doc fee preserved");
-        assertEq(proxyAsWeb3Doc.getWeb3PGPAddress(), pgpResult.proxy, "Web3Doc link to Web3PGP preserved");
+        assertEq(proxyAsWeb3Sign.requestedFee(), fee, "Web3Sign fee preserved");
+        assertEq(proxyAsWeb3Sign.getWeb3PGPAddress(), pgpResult.proxy, "Web3Sign link to Web3PGP preserved");
     }
 
     /*****************************************************************************************************************/

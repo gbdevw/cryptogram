@@ -6,7 +6,7 @@ import {DeploymentHelper} from "scripts/lib/DeploymentHelper.sol";
 import {RoleManagementHelper} from "scripts/lib/RoleManagementHelper.sol";
 import {AccessManagerUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagerUpgradeable.sol";
 import {Web3PGP} from "src/Web3PGP.sol";
-import {Web3Doc} from "src/Web3Doc.sol";
+import {Web3Sign} from "src/Web3Sign.sol";
 import {DeployDexesBundle} from "scripts/DeployDexesBundle.s.sol";
 
 /**
@@ -64,9 +64,9 @@ contract FullDeploymentFlowTest is Test {
         DeploymentHelper.DeploymentResult memory pgpResult = 
             DeploymentHelper.deployWeb3PGP(fee, amResult.proxy);
 
-        // 3. Deploy Web3Doc
+        // 3. Deploy Web3Sign
         DeploymentHelper.DeploymentResult memory docResult = 
-            DeploymentHelper.deployWeb3Doc(fee, amResult.proxy, pgpResult.proxy);
+            DeploymentHelper.deployWeb3Sign(fee, amResult.proxy, pgpResult.proxy);
 
         // 4-6. Configure roles and grant to users (as deployer/admin)
         vm.startPrank(deployer);
@@ -76,7 +76,7 @@ contract FullDeploymentFlowTest is Test {
         RoleManagementHelper.configureFeeManagerRole(amResult.proxy, pgpResult.proxy);
         RoleManagementHelper.configureFundsManagerRole(amResult.proxy, pgpResult.proxy);
 
-        // Configure roles for Web3Doc
+        // Configure roles for Web3Sign
         RoleManagementHelper.configureUpgradeManagerRole(amResult.proxy, docResult.proxy);
         RoleManagementHelper.configureFeeManagerRole(amResult.proxy, docResult.proxy);
         RoleManagementHelper.configureFundsManagerRole(amResult.proxy, docResult.proxy);
@@ -131,17 +131,17 @@ contract FullDeploymentFlowTest is Test {
         assertGt(codeSize, 0, "Proxy should have code");
     }
 
-    function test_FullDeploymentFlow_VerifyWeb3Doc() public {
+    function test_FullDeploymentFlow_VerifyWeb3Sign() public {
         DeploymentHelper.DeploymentResult memory amResult = 
             DeploymentHelper.deployAccessManager(deployer);
         DeploymentHelper.DeploymentResult memory pgpResult = 
             DeploymentHelper.deployWeb3PGP(fee, amResult.proxy);
         DeploymentHelper.DeploymentResult memory docResult = 
-            DeploymentHelper.deployWeb3Doc(fee, amResult.proxy, pgpResult.proxy);
+            DeploymentHelper.deployWeb3Sign(fee, amResult.proxy, pgpResult.proxy);
 
-        Web3Doc doc = Web3Doc(payable(docResult.proxy));
+        Web3Sign doc = Web3Sign(payable(docResult.proxy));
 
-        // Verify Web3Doc is initialized
+        // Verify Web3Sign is initialized
         assertEq(doc.requestedFee(), fee);
         assertEq(doc.getWeb3PGPAddress(), pgpResult.proxy);
 
@@ -235,15 +235,15 @@ contract FullDeploymentFlowTest is Test {
         assertEq(pgp.requestedFee(), fee);
     }
 
-    function test_Web3Doc_CanCallFunctions() public {
+    function test_Web3Sign_CanCallFunctions() public {
         DeploymentHelper.DeploymentResult memory amResult = 
             DeploymentHelper.deployAccessManager(deployer);
         DeploymentHelper.DeploymentResult memory pgpResult = 
             DeploymentHelper.deployWeb3PGP(fee, amResult.proxy);
         DeploymentHelper.DeploymentResult memory docResult = 
-            DeploymentHelper.deployWeb3Doc(fee, amResult.proxy, pgpResult.proxy);
+            DeploymentHelper.deployWeb3Sign(fee, amResult.proxy, pgpResult.proxy);
 
-        Web3Doc doc = Web3Doc(payable(docResult.proxy));
+        Web3Sign doc = Web3Sign(payable(docResult.proxy));
 
         // Verify we can call getters
         assertEq(doc.requestedFee(), fee);
