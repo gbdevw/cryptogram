@@ -66,11 +66,11 @@ ethereum:
 
 web3pgp:
   # Web3PGP smart contract address (test deployment)
-  contract: "0xce66927a2E6171056a9c2464CFe83b813215A905"
+  contract: "0x82733B49e65A2FE6B611e5CE454AC21237071638"
 
 web3sign:
   # Web3Sign smart contract address (test deployment)
-  contract: "0x14756E2646596e184D305deC6971802b38cf0651"
+  contract: "0x6f81441691340Bcf41b7eC323b6E74645820389E"
 
 monitoring:
   logging:

@@ -1,14 +1,14 @@
-# Web3PGP CLI
+# Web3Sign CLI
 
-A command-line interface for managing OpenPGP keys on Ethereum through the Web3PGP smart contracts. Interact with the decentralized key infrastructure directly from your terminal.
+A command-line interface for timestamping documents on Ethereum through the Web3Sign smart contracts. Create tamper-proof timestamps for any digital document with cryptographic verification.
 
 ## Features
 
-- 🔐 **Key Management**: Register, revoke, and manage OpenPGP keys on-chain
-- ⛓️ **Blockchain Sync**: Listen to blockchain events and sync key changes in real-time
-- 🔍 **Key Lookup**: Retrieve public keys by fingerprint from the blockchain
+- 📅 **Document Timestamping**: Create immutable timestamps for any digital document
+- 🔐 **Cryptographic Verification**: Verify document integrity and timestamp authenticity
+- 🔍 **Blockchain Verification**: Check timestamps against on-chain records
 - ⚙️ **Configuration**: Generate and manage environment-specific configurations
-- 📊 **Event Monitoring**: Real-time monitoring of key registration events
+- 📊 **Event Monitoring**: Real-time monitoring of timestamp events
 - 🛡️ **Security**: Secure wallet integration with private key management
 
 ## Installation
@@ -16,31 +16,31 @@ A command-line interface for managing OpenPGP keys on Ethereum through the Web3P
 ### Global Installation (Recommended)
 
 ```bash
-npm install -g @cryptogram/web3pgp-cli
+npm install -g @cryptogram/web3sign-cli
 ```
 
 Then use directly:
 
 ```bash
-web3pgp --help
+web3sign --help
 ```
 
 ### Local Installation
 
 ```bash
-npm install --save-dev @cryptogram/web3pgp-cli
+npm install --save-dev @cryptogram/web3sign-cli
 ```
 
 Then use with npx:
 
 ```bash
-npx web3pgp --help
+npx web3sign --help
 ```
 
 ### Direct Execution (No Installation)
 
 ```bash
-npx @cryptogram/web3pgp-cli --help
+npx @cryptogram/web3sign-cli --help
 ```
 
 ## Quick Start
@@ -49,63 +49,59 @@ npx @cryptogram/web3pgp-cli --help
 
 ```bash
 # Generate test environment configuration
-web3pgp configuration generate test
+web3sign configuration generate test
 
 # Or production configuration
-web3pgp configuration generate prod
+web3sign configuration generate prod
 
 # Save to a file
-web3pgp configuration generate prod -o ~/.web3pgp/config.yaml
+web3sign configuration generate test -o ~/.web3sign/config.yaml
 ```
 
-### 2. Use the CLI
+### 2. Timestamp Your First Document
+
+See the complete [timestamping example](examples/timestamping.md) for a step-by-step guide on how to:
+
+- Create cryptographic timestamps for documents
+- Verify document integrity and timestamp authenticity
+- Use detached signatures with PGP keys registered on Web3PGP
+
+### Example Usage
 
 ```bash
-# Generate a new Ethereum key
-web3pgp blockchain generate-key
+# Timestamp a document with a detached signature
+web3sign timestamp -e <key-fingerprint> -H <document-hash> -s <signature-file>
 
-# Get a public key by fingerprint
-web3pgp blockchain get 0x1234567890abcdef...
+# Verify a timestamp
+web3sign verify --id <timestamp-id> --doc <document-path>
 
-# Register your key
-web3pgp blockchain register --key /path/to/key.asc
-
-# Add a subkey
-web3pgp blockchain add-subkey 0xsubkeyfingerprint --key /path/to/subkey.asc
-
-# Revoke a key
-web3pgp blockchain revoke 0xfingerprint --revocation /path/to/revocation.asc
-
-# Listen for blockchain events
-web3pgp blockchain sync
-
-# View configuration
-web3pgp configuration display
-
-# Validate configuration
-web3pgp configuration validate
+# Find all timestamps for a document
+web3sign verify --all --doc <document-path>
 ```
 
 ## Configuration
 
-The CLI requires a configuration file at `~/.web3pgp/config.yaml`. Generate a default:
+The CLI requires a configuration file at `~/.web3sign/config.yaml`. Generate a default:
 
 ```bash
-web3pgp configuration generate prod -o ~/.web3pgp/config.yaml
+web3sign configuration generate test -o ~/.web3sign/config.yaml
 ```
 
 ### Configuration Structure
 
 ```yaml
 ethereum:
-  chain: ink  # Target blockchain (ink for mainnet, ink-sepolia for testnet)
+  chain: sepolia  # Target blockchain (sepolia for testnet, ink for mainnet)
   
   wallet:
     type: private-key
     privateKey: "${DEXES_WALLET_PRIVATE_KEY}"  # Use environment variable
 
 web3pgp:
-  contract: "0x..."  # Web3PGP contract address
+  contract: "0x82733B49e65A2FE6B611e5CE454AC21237071638"  # Web3PGP contract address
+
+web3sign:
+  contract: "0x6f81441691340Bcf41b7eC323b6E74645820389E"  # Web3Sign contract address
 
 monitoring:
   logging:
@@ -117,181 +113,156 @@ monitoring:
 Override configuration with environment variables:
 
 ```bash
-export DEXES_CHAIN_ID=763373
+export DEXES_CHAIN=sepolia
 export DEXES_WALLET_PRIVATE_KEY=0x...
-export DEXES_WEB3PGP_CONTRACT=0x...
+export DEXES_WEB3PGP_CONTRACT=0x82733B49e65A2FE6B611e5CE454AC21237071638
+export DEXES_WEB3SIGN_CONTRACT=0x6f81441691340Bcf41b7eC323b6E74645820389E
 export DEXES_LOG_LEVEL=debug
 ```
 
 ## Commands
 
-### Blockchain Commands
+### Timestamp Commands
 
-#### `web3pgp blockchain generate-key`
+#### `web3sign timestamp [options]`
 
-Generate a new Ethereum private key.
-
-```bash
-web3pgp blockchain generate-key
-# Output:
-# {
-#   "privateKey": "...", 
-#   "address": "0x..."
-# }
-```
-
-#### `web3pgp blockchain get <fingerprint>`
-
-Retrieve a public key from the blockchain.
+Create a timestamp for a document with a detached signature.
 
 ```bash
-web3pgp blockchain get 0x1234567890abcdef...
+# Timestamp with signature file
+web3sign timestamp -e <emitter-fingerprint> -H <document-hash> -s <signature-file>
+
+# Timestamp with signature from stdin
+cat signature.asc | web3sign timestamp -e <emitter-fingerprint> -H <document-hash>
 ```
 
-#### `web3pgp blockchain register [options]`
+#### `web3sign verify [options]`
 
-Register a public key on the blockchain.
+Verify timestamps for documents.
 
 ```bash
-web3pgp blockchain register --key ./my-key.asc
+# Verify specific timestamp
+web3sign verify --id <timestamp-id> --doc <document-path>
+
+# Find all timestamps for a document
+web3sign verify --all --doc <document-path>
+
+# Verify using document hash
+web3sign verify --id <timestamp-id> --hash <document-hash>
 ```
-
-**Options:**
-- `--key <path>`: Path to armored OpenPGP key file
-
-#### `web3pgp blockchain add-subkey [options] <subkeyFingerprint>`
-
-Add a subkey to an existing key.
-
-```bash
-web3pgp blockchain add-subkey 0xsubkeyfingerprint --key ./subkey.asc
-```
-
-**Options:**
-- `--key <path>`: Path to armored subkey file
-
-#### `web3pgp blockchain revoke [options] <fingerprint>`
-
-Revoke a key on the blockchain.
-
-```bash
-web3pgp blockchain revoke 0xfingerprint --revocation ./revocation.asc
-```
-
-**Options:**
-- `--revocation <path>`: Path to revocation certificate
-
-#### `web3pgp blockchain sync [options]`
-
-Listen for blockchain events and output armored keys to stdout.
-
-```bash
-# Listen indefinitely
-web3pgp blockchain sync
-
-# Listen to a specific block range
-web3pgp blockchain sync --from 1000 --to 2000
-
-# Custom polling interval (in seconds)
-web3pgp blockchain sync --interval 30
-```
-
-**Options:**
-- `--from <block>`: Starting block (default: latest)
-- `--to <block>`: Ending block (default: listen indefinitely)
-- `--interval <seconds>`: Polling interval (default: 15)
 
 ### Configuration Commands
 
-#### `web3pgp configuration generate [environment]`
+#### `web3sign configuration generate [environment]`
 
-Generate a template configuration file.
-
-```bash
-# Test environment (default)
-web3pgp configuration generate
-
-# Production environment
-web3pgp configuration generate prod
-
-# Save to file
-web3pgp configuration generate prod -o ~/.web3pgp/config.yaml
-```
-
-**Arguments:**
-- `environment`: 'test' or 'prod' (default: test)
-
-**Options:**
-- `-o, --output <path>`: Output file path (default: stdout)
-
-#### `web3pgp configuration display`
-
-Display the current configuration.
+Generate configuration templates.
 
 ```bash
-web3pgp configuration display
+web3sign configuration generate test   # Test environment (Sepolia)
+web3sign configuration generate prod   # Production environment (Ink)
 ```
 
-#### `web3pgp configuration validate`
+#### `web3sign configuration display`
 
-Validate the current configuration.
+Display current configuration.
 
 ```bash
-web3pgp configuration validate
+web3sign configuration display
 ```
+
+#### `web3sign configuration validate`
+
+Validate configuration file.
+
+```bash
+web3sign configuration validate
+```
+
+## Documentation
+
+For detailed configuration options, RPC setup, and advanced usage:
+
+- [Configuration Reference](documentation/CONFIGURATION.md) - Complete configuration guide
+- [Transport Documentation](documentation/TRANSPORT.md) - RPC configuration and batching strategies
 
 ## Examples
 
-### Generate a key and register it
+### Complete Timestamping Workflow
+
+See the [timestamping example](examples/timestamping.md) for a comprehensive guide on:
+
+- Creating document timestamps with cryptographic signatures
+- Verifying document integrity and timestamp authenticity
+- Using Web3Sign with keys registered on Web3PGP
+
+### Basic Usage
 
 ```bash
-# 1. Generate new key
-web3pgp blockchain generate-key > account.json
+# 1. Generate configuration
+web3sign configuration generate test -o ~/.web3sign/config.yaml
 
-# 2. Export the private key and use it for signing
-export DEXES_WALLET_PRIVATE_KEY=$(jq -r '.privateKey' account.json)
+# 2. Set your wallet private key
+export DEXES_WALLET_PRIVATE_KEY=0x...
 
-# 3. Create/import your OpenPGP key
-# (e.g., use Kleopatra or command line GPG tools)
+# 3. Create a timestamp
+web3sign timestamp -e <your-key-fingerprint> -H <document-hash> -s signature.asc
 
-# 4. Register it
-web3pgp blockchain register --key my-key.asc
+# 4. Verify the timestamp
+web3sign verify --id <timestamp-id> --doc document.txt
 ```
 
-### Sync and export events
+## Prerequisites
 
-```bash
-# Export all historical events to a file
-web3pgp blockchain sync --from 0 --to latest > keys.json
-
-# Listen for new events in real-time
-web3pgp blockchain sync
-```
+- **Web3PGP Key**: You need a PGP key registered on Web3PGP to create timestamps
+- **GPG Tools**: Install GPG for creating detached signatures
+- **Node.js**: Required for CLI installation
+- **Ethereum Wallet**: Private key for blockchain transactions
 
 ## Troubleshooting
 
-### Configuration not found
+### Configuration Issues
 
 ```bash
-# Generate configuration in the default location
-web3pgp configuration generate prod -o ~/.web3pgp/config.yaml
+# Generate fresh configuration
+web3sign configuration generate test -o ~/.web3sign/config.yaml
+
+# Validate configuration
+web3sign configuration validate
+
+# Display current config
+web3sign configuration display
 ```
 
-### RPC connection failed
+### RPC Connection Problems
 
-Check your RPC endpoint configuration:
+Verify your RPC endpoints:
 
 ```bash
-web3pgp configuration display
+web3sign configuration display | grep -A 10 "rpc:"
 ```
 
-Verify the `ethereum.chain` matches your target network.
+Ensure the `ethereum.chain` setting matches your target network.
 
-### Private key issues
+### Timestamp Verification Fails
 
-Ensure your wallet private key is set correctly:
+- Check that the document hash matches exactly
+- Verify the PGP key used for signing is registered on Web3PGP
+- Ensure the signature is a valid detached signature over the document hash
+
+### Wallet/Private Key Issues
 
 ```bash
+# Verify private key format (should start with 0x and be 64 hex chars)
+echo $DEXES_WALLET_PRIVATE_KEY | head -c 10
+```
+
+## Contributing
+
+This CLI is part of the Cryptogram project. See the main project repository for contribution guidelines.
+
+## License
+
+See LICENSE file in the project root.
 export DEXES_WALLET_PRIVATE_KEY=0xyourprivatekey...
 web3pgp configuration validate
 ```
