@@ -98,7 +98,7 @@ web3sign configuration generate test -o ~/.web3sign/config.yaml
 
 ```yaml
 ethereum:
-  chain: sepolia  # Target blockchain (sepolia for testnet, ink for mainnet)
+  chain: sepolia  # Target blockchain (sepolia for testnet, scroll for mainnet)
   
   wallet:
     type: private-key
@@ -166,7 +166,7 @@ Generate configuration templates.
 
 ```bash
 web3sign configuration generate test   # Test environment (Sepolia)
-web3sign configuration generate prod   # Production environment (Ink)
+web3sign configuration generate prod   # Production environment (Scroll)
 ```
 
 #### `web3sign configuration display`

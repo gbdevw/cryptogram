@@ -88,7 +88,7 @@ Tests the configuration loading and merging logic:
 describe('loadConfig', () => {
   it('should load default configuration', () => {
     const config = loadConfig({});
-    expect(config.ethereum.chain).toBe('ink-sepolia');
+    expect(config.ethereum.chain).toBe('sepolia');
   });
 
   it('should override defaults with environment variables', () => {
@@ -221,7 +221,7 @@ Use Jest mocking for dependencies:
 ```typescript
 jest.mock('../../src/config/loader', () => ({
   loadConfig: jest.fn().mockReturnValue({
-    ethereum: { chain: 'ink-sepolia' }
+    ethereum: { chain: 'sepolia' }
   })
 }));
 
@@ -230,7 +230,7 @@ import { loadConfig } from '../../src/config/loader';
 describe('ConfigurationTests', () => {
   it('should use mocked configuration', () => {
     const config = loadConfig({});
-    expect(config.ethereum.chain).toBe('ink-sepolia');
+    expect(config.ethereum.chain).toBe('sepolia');
   });
 });
 ```

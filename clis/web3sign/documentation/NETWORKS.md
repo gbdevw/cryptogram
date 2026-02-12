@@ -2,7 +2,32 @@
 
 ## Production network
 
-TODO: Scroll will be used as production environment. This guide will be updated with key information post go-live. 
+This section contains key information about the production network running on Scroll mainnet.
+
+### Prerequisites
+
+- Generate and have an Ethereum private key
+- Have ETH on Scroll mainnet for transaction fees
+
+### Get Scroll ETH
+
+For Scroll mainnet ETH, you can:
+- Bridge ETH from Ethereum mainnet using the [Scroll Bridge](https://scroll.io/bridge)
+- Use centralized exchanges that support Scroll withdrawals
+
+### Scroll mainnet
+
+Scroll has a block rate of approximately one block every 2 seconds, providing fast transaction confirmations.
+
+| Key | Value |
+| --- | --- |
+| Network ID | 534352 |
+| RPC | https://rpc.scroll.io ; https://1rpc.io/scroll ; https://scroll-rpc.publicnode.com ; https://scroll.drpc.org |
+| Explorer | https://scrollscan.com/ |
+| Access Manager | 0xEE9C6cBB829A65185cD9756A83fD576B4985d8a3 |
+| Web3PGP | 0xDa63568866C8eB53627a5CCF27DaB76061538dB1 |
+| Web3Sign | 0x8ceb8c20c367C32a459575f165566978c54da2c4 |
+| Admin - Multisig | 0xc8AF5C5C48Cba75B9D3BD61fF6541db42fE9E201 | 
 
 ## Testing network
 

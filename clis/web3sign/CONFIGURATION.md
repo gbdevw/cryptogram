@@ -18,8 +18,8 @@ Configuration follows a 3-tier precedence (lowest to highest):
 
 | Configuration Key | Description | Default Value | Environment Variable |
 |---|---|---|---|
-| `ethereum.chain` | Blockchain network to connect to. Supports well-known Viem chains (`mainnet`, `sepolia`, `anvil`, `ink-sepolia`) or custom numeric chain IDs. | `ink-sepolia` | `DEXES_CHAIN` |
-| `ethereum.rpc.endpoints[].url` | RPC endpoint URL for blockchain communication. Can specify multiple endpoints with fallback support. | `https://rpc-gel-sepolia.inkonchain.com` (priority 1)<br/>`https://rpc-qnd-sepolia.inkonchain.com` (priority 2) | `DEXES_RPC_URL` (single endpoint)<br/>`DEXES_RPC_ENDPOINTS` (JSON array) |
+| `ethereum.chain` | Blockchain network to connect to. Supports well-known Viem chains (`mainnet`, `sepolia`, `anvil`, `scroll`, `scrollSepolia`) or custom numeric chain IDs. | `scrollSepolia` | `DEXES_CHAIN` |
+| `ethereum.rpc.endpoints[].url` | RPC endpoint URL for blockchain communication. Can specify multiple endpoints with fallback support. | `https://rpc.scroll.io` (priority 1)<br/>`https://1rpc.io/scroll` (priority 2)<br/>`https://scroll-rpc.publicnode.com` (priority 3)<br/>`https://scroll.drpc.org` (priority 4) | `DEXES_RPC_URL` (single endpoint)<br/>`DEXES_RPC_ENDPOINTS` (JSON array) |
 | `ethereum.rpc.endpoints[].priority` | Priority order for RPC endpoints. Lower number = higher priority. Used for fallback when endpoints fail. | `1, 2` | N/A (set via `DEXES_RPC_ENDPOINTS` JSON) |
 | `ethereum.wallet.type` | Wallet type for signing transactions. Currently supports `private-key` for private key-based signing. | `private-key` | N/A (automatic) |
 | `ethereum.wallet.privateKey` | Private key for wallet signing (0x-prefixed 32-byte hex). **SECRET** - Do not commit to version control. | Not set | `DEXES_WALLET_PRIVATE_KEY` |
@@ -68,12 +68,12 @@ Create `~/.web3pgp/config.yaml`:
 
 ```yaml
 ethereum:
-  chain: ink-sepolia
+  chain: scrollSepolia
   rpc:
     endpoints:
-      - url: https://rpc-gel-sepolia.inkonchain.com
+      - url: https://sepolia-rpc.scroll.io
         priority: 1
-      - url: https://rpc-qnd-sepolia.inkonchain.com
+      - url: https://scroll-sepolia.g.alchemy.com/v2/YOUR_API_KEY
         priority: 2
   wallet:
     type: private-key
@@ -119,8 +119,9 @@ DEXES_LOG_LEVEL=debug web3pgp get --help
 
 - `mainnet` - Ethereum Mainnet
 - `sepolia` - Sepolia Testnet
+- `scroll` - Scroll Mainnet
+- `scrollSepolia` - Scroll Sepolia Testnet (default)
 - `anvil` - Local Anvil/Hardhat Node
-- `ink-sepolia` - Ink Sepolia Testnet (default)
 
 ### Custom Chain IDs
 

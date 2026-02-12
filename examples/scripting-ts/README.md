@@ -1,6 +1,6 @@
 # Cryptogram Scripting Example (TypeScript)
 
-This example demonstrates the complete PKI and document timestamping workflow using the Cryptogram system on Ink Sepolia testnet.
+This example demonstrates the complete PKI and document timestamping workflow using the Cryptogram system on Sepolia testnet.
 
 ## What It Does
 

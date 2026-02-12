@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
-- Support for both test (ink-sepolia) and production (ink) environments
+- Support for both test (scrollSepolia) and production (scroll) environments
 - Graceful shutdown with SIGINT/SIGTERM signal handling
 - Real-time event monitoring with configurable polling intervals
 - Secure wallet integration via environment variables
@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Configuration
 
-- Test environment defaults with Ink Sepolia
+- Test environment defaults with Scroll Sepolia
 - Production environment configuration templates
 - Environment variable overrides (DEXES_* prefix)
 - Configuration validation and display commands
@@ -79,4 +79,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration file required at `~/.web3pgp/config.yaml`
 - Private key management requires environment variables for security
 - Contract address must be configured for blockchain operations
-- Currently supports Ethereum and Ink chain only
+- Currently supports Ethereum and Scroll chain only

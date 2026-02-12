@@ -73,7 +73,7 @@ web3pgp generate-key
 
 The CLI uses this approach for automation-friendly, low-risk operations. A small amount of ETH woorth a few dollars covers severall dozens of write operations; read operations are free unless using private RPC endpoints.
 
-Fund your key on the target blockchain (currently Ink, future support for Scroll).
+Fund your key on the target blockchain (Sepolia for testing, Scroll for production).
 
 ## Quick Start
 

@@ -17,7 +17,7 @@ Configuration follows a 3-tier precedence (lowest to highest):
 You can generate a template configuration file using:
 ```bash
 web3pgp configuration generate test  # For testnet (Sepolia)
-web3pgp configuration generate prod  # For production (Ink mainnet)
+web3pgp configuration generate prod  # For production (Scroll mainnet)
 ```
 
 ---
@@ -26,7 +26,7 @@ web3pgp configuration generate prod  # For production (Ink mainnet)
 
 | Configuration Key | Description | Default Value | Environment Variable |
 |---|---|---|---|
-| `ethereum.chain` | Blockchain network to connect to. Supports well-known Viem chains (`mainnet`, `sepolia`, `anvil`, `ink`) or custom numeric chain IDs. | `sepolia` | `DEXES_CHAIN` |
+| `ethereum.chain` | Blockchain network to connect to. Supports well-known Viem chains (`mainnet`, `sepolia`, `anvil`, `scroll`) or custom numeric chain IDs. | `sepolia` | `DEXES_CHAIN` |
 | `ethereum.rpc.endpoints[]` | Array of RPC endpoints for blockchain communication with fallback support. Each endpoint has URL, priority, and optional batching config. | 4 Sepolia endpoints (priorities 1-4) | `DEXES_RPC_ENDPOINTS` (JSON array) or `DEXES_RPC_URL` (single endpoint) |
 | `ethereum.rpc.endpoints[].url` | RPC endpoint URL. | `https://ethereum-sepolia-rpc.publicnode.com` ; `https://sepolia.gateway.tenderly.co` ; `https://sepolia.drpc.org` ;  `https://1rpc.io/sepolia` | Set via `DEXES_RPC_ENDPOINTS` JSON or `DEXES_RPC_URL` |
 | `ethereum.rpc.endpoints[].priority` | Priority order for RPC endpoints. Lower number = higher priority. Used for fallback when endpoints fail. | `1, 2, 3, 4` | Set via `DEXES_RPC_ENDPOINTS` JSON |
@@ -180,8 +180,9 @@ DEXES_LOG_LEVEL=debug web3pgp get --help
 
 - `mainnet` - Ethereum Mainnet
 - `sepolia` - Sepolia Testnet (default)
+- `scroll` - Scroll Mainnet
+- `scrollSepolia` - Scroll Sepolia Testnet
 - `anvil` - Local Anvil/Hardhat Node
-- `ink` - Ink Mainnet
 
 ### Custom Chain IDs
 

@@ -109,18 +109,36 @@ monitoring:
 
 ethereum:
   # Blockchain network configuration
-  # Using Ink mainnet
-  chain: ink  # TODO: Update with production chain name/ID
+  # Using Scroll mainnet
+  chain: scroll
 
   # RPC endpoint configuration
   rpc:
     endpoints:
-      # TODO: Update with production RPC endpoints
-      - url: https://rpc.ink.inkonchain.com
+      # Primary RPC endpoint - Scroll official
+      - url: https://rpc.scroll.io
         priority: 1
         batching:
-          size: 100
-          waitMs: 50
+          size: 20
+          waitMs: 150
+      # Secondary RPC endpoint - 1RPC
+      - url: https://1rpc.io/scroll
+        priority: 2
+        batching:
+          size: 20
+          waitMs: 150
+      # Tertiary RPC endpoint - PublicNode
+      - url: https://scroll-rpc.publicnode.com
+        priority: 3
+        batching:
+          size: 20
+          waitMs: 150
+      # Quaternary RPC endpoint - DRPC
+      - url: https://scroll.drpc.org
+        priority: 4
+        batching:
+          size: 20
+          waitMs: 150
 
     retry:
       count: 3
@@ -138,9 +156,8 @@ ethereum:
   #   # privateKey: "<YOUR_PRIVATE_KEY>"
 
 web3pgp:
-  # Web3PGP smart contract address (production deployment)
-  # TODO: Update with actual contract address once deployed
-  contract: "UNDEFINED"
+  # Web3PGP smart contract address (production deployment on Scroll)
+  contract: "0xDa63568866C8eB53627a5CCF27DaB76061538dB1"
 
 monitoring:
   logging:
@@ -152,10 +169,11 @@ monitoring:
 # ============================================================================
 # You can override any configuration value using environment variables:
 #
-# DEXES_CHAIN=ink
-# DEXES_RPC_ENDPOINTS='[{"url":"...","priority":1,"batching":{"size":100,"waitMs":50}}]'
+# DEXES_CHAIN=scroll
+# DEXES_RPC_URL=https://rpc.scroll.io  # Single RPC endpoint override
+# DEXES_RPC_ENDPOINTS='[{"url":"https://rpc.scroll.io","priority":1,"batching":{"size":20,"waitMs":150}}]'
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
-# DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
+# DEXES_WEB3PGP_CONTRACT=0xDa63568866C8eB53627a5CCF27DaB76061538dB1
 # DEXES_LOG_LEVEL=info
 `;
   }

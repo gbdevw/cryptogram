@@ -19,7 +19,7 @@ Each tier overrides the previous one.
 
 ```typescript
 ethereum: {
-  chain: 'ink-sepolia' | 'mainnet' | 'sepolia' | 'anvil' | <numeric_chain_id>,
+  chain: 'scrollSepolia' | 'scroll' | 'mainnet' | 'sepolia' | 'anvil' | <numeric_chain_id>,
   rpc?: {
     endpoints: RpcEndpoint[],      // Array of RPC endpoints
     maxBlockRange?: number,        // Max block range for eth_getLogs queries - Default to 10000

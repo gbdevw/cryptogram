@@ -104,34 +104,36 @@ monitoring:
 
 ethereum:
   # Blockchain network configuration
-  # Using Ink mainnet
-  chain: ink
+  # Using Scroll mainnet
+  chain: scroll
 
   # RPC endpoint configuration with batching and failover
   rpc:
     endpoints:
-      # Primary RPC endpoint with batching configuration
-      - url: "https://rpc-gel.inkonchain.com"
+      # Primary RPC endpoint - Scroll official
+      - url: "https://rpc.scroll.io"
         priority: 1
         batching:
           size: 20    # Maximum requests per batch
-          waitMs: 100 # Wait time before sending batch
-      # Secondary RPC endpoints for failover
-      - url: "https://rpc-ten.inkonchain.com"
+          waitMs: 150 # Wait time before sending batch
+      # Secondary RPC endpoint - 1RPC
+      - url: "https://1rpc.io/scroll"
         priority: 2
         batching:
           size: 20
-          waitMs: 100
-      - url: "https://rpc-qnd.inkonchain.com"
+          waitMs: 150
+      # Tertiary RPC endpoint - PublicNode
+      - url: "https://scroll-rpc.publicnode.com"
         priority: 3
         batching:
           size: 20
-          waitMs: 100
-      - url: "https://ink.drpc.org"
+          waitMs: 150
+      # Quaternary RPC endpoint - DRPC
+      - url: "https://scroll.drpc.org"
         priority: 4
         batching:
           size: 20
-          waitMs: 100
+          waitMs: 150
     # Maximum block range for queries
     maxBlockRange: 10000
     # Retry configuration for failed requests
@@ -149,14 +151,12 @@ ethereum:
   #   # privateKey: "<YOUR_PRIVATE_KEY>"
 
 web3pgp:
-  # Web3PGP smart contract address (production deployment)
-  # TODO: Update with actual contract address once deployed
-  contract: "UNDEFINED"
+  # Web3PGP smart contract address (production deployment on Scroll)
+  contract: "0xDa63568866C8eB53627a5CCF27DaB76061538dB1"
 
 web3sign:
-  # Web3Sign smart contract address (production deployment)
-  # TODO: Update with actual contract address once deployed
-  contract: "UNDEFINED"
+  # Web3Sign smart contract address (production deployment on Scroll)
+  contract: "0x8ceb8c20c367C32a459575f165566978c54da2c4"
 
 monitoring:
   logging:
@@ -168,12 +168,12 @@ monitoring:
 # ============================================================================
 # You can override any configuration value using environment variables:
 #
-# DEXES_CHAIN=ink  # or numeric ID: DEXES_CHAIN_ID=<CHAIN_ID>
-# DEXES_RPC_URL=https://rpc-gel.inkonchain.com  # Single RPC endpoint override
-# DEXES_RPC_ENDPOINTS='[{"url":"https://rpc.example.com","priority":1}]'  # JSON array of endpoints
+# DEXES_CHAIN=scroll  # or numeric ID: DEXES_CHAIN_ID=534352
+# DEXES_RPC_URL=https://rpc.scroll.io  # Single RPC endpoint override
+# DEXES_RPC_ENDPOINTS='[{"url":"https://rpc.scroll.io","priority":1,"batching":{"size":20,"waitMs":150}}]'  # JSON array of endpoints
 # DEXES_WALLET_PRIVATE_KEY=<YOUR_PRIVATE_KEY>
-# DEXES_WEB3PGP_CONTRACT=<CONTRACT_ADDRESS>
-# DEXES_WEB3SIGN_CONTRACT=<CONTRACT_ADDRESS>
+# DEXES_WEB3PGP_CONTRACT=0xDa63568866C8eB53627a5CCF27DaB76061538dB1
+# DEXES_WEB3SIGN_CONTRACT=0x8ceb8c20c367C32a459575f165566978c54da2c4
 # DEXES_LOG_LEVEL=info
 `;
   }

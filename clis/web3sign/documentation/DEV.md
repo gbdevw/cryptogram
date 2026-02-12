@@ -42,7 +42,7 @@ The configuration system is designed with a 3-tier precedence model:
 
 1. **Defaults** (`defaults.ts`, `testnet.ts`)
    - Built-in default values that serve as the base
-   - Currently uses Ink Sepolia testnet configuration
+   - Currently uses Sepolia testnet configuration
 
 2. **Config File** (`loader.ts`)
    - YAML file at `~/.web3pgp/config.yaml`
