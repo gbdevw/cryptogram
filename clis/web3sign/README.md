@@ -2,6 +2,13 @@
 
 A command-line interface for timestamping documents on Ethereum through the Web3Sign smart contracts. Create tamper-proof timestamps for any digital document with cryptographic verification.
 
+## Related CLIs
+
+This is one of two CLIs in the Cryptogram project:
+
+- **[Web3PGP CLI](web3pgp/)** - Manage OpenPGP keys on Ethereum
+- **[Web3Sign CLI](web3sign/)** - Timestamp documents with cryptographic verification
+
 ## Features
 
 - 📅 **Document Timestamping**: Create immutable timestamps for any digital document

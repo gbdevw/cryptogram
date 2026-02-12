@@ -2,6 +2,13 @@
 
 A command-line interface for decentralized OpenPGP key infrastructure on Ethereum. Register, manage, and verify cryptographic identities directly from your terminal through the Web3PGP smart contract.
 
+## Related CLIs
+
+This is one of two CLIs in the Cryptogram project:
+
+- **[Web3PGP CLI](web3pgp/)** - Manage OpenPGP keys on Ethereum
+- **[Web3Sign CLI](web3sign/)** - Timestamp documents with cryptographic verification
+
 ## What is Web3PGP?
 
 Web3PGP enables a decentralized public key infrastructure (PKI) using OpenPGP and Ethereum. It allows:

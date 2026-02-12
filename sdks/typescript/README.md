@@ -1,15 +1,16 @@
-# Dexes - Web3PGP SDK
+# Dexes - Web3PGP & Web3Sign SDK
 
-A TypeScript SDK for managing OpenPGP keys on Ethereum through the Web3PGP smart contracts. Build decentralized key infrastructure with cryptographic operations powered by OpenPGP.
+A TypeScript SDK for managing OpenPGP keys and timestamping documents on Ethereum through the Web3PGP and Web3Sign smart contracts. Build decentralized key infrastructure and document timestamping with cryptographic operations powered by OpenPGP.
 
 ## Features
 
 - 🔐 **OpenPGP Integration**: Seamless integration with OpenPGP.js for cryptographic operations
-- ⛓️ **Ethereum Native**: Direct interaction with Web3PGP smart contracts
-- 🔍 **Event Searching**: Query blockchain events for key registrations, subkey additions, and revocations
-- ⚡ **Rate Limiting**: Built-in rate limiting to prevent RPC throttling
+- ⛓️ **Ethereum Native**: Direct interaction with Web3PGP and Web3Sign smart contracts
+- 📅 **Document Timestamping**: Create immutable timestamps for any digital document
+- 🔍 **Event Searching**: Query blockchain events for key registrations, subkey additions, revocations, and timestamps
+- ⚡ **Viem integration**: Viem is used for its fallback and batching features.
 - 📦 **TypeScript First**: Full type safety with comprehensive TypeScript support
-- 🧪 **Well Tested**: Comprehensive integration tests with Anvil blockchain
+- 🧪 **Well Tested**: Comprehensive integration tests with contracts deployed on Sepolia
 
 ## Installation
 
@@ -34,57 +35,76 @@ pnpm add @cryptogram/dexes
 ### Basic Usage
 
 ```typescript
-import { Web3PGP } from '@cryptogram/dexes';
+import { Web3PGP, Web3Sign } from '@cryptogram/dexes';
 import { createPublicClient, http } from 'viem';
-import { inksepolia } from 'viem/chains';
+import { sepolia } from 'viem/chains';
 
 // Create a Viem public client
 const publicClient = createPublicClient({
-  chain: inksepolia,
-  transport: http('https://rpc-gel-sepolia.inkonchain.com'),
+  chain: sepolia,
+  transport: http('https://ethereum-sepolia-rpc.publicnode.com'),
 });
 
 // Initialize Web3PGP
-const contractAddress = '0x...'; // Your Web3PGP contract address
-const web3pgp = new Web3PGP(publicClient, contractAddress);
+const web3pgpAddress = '0x82733B49e65A2FE6B611e5CE454AC21237071638';
+const web3pgp = new Web3PGP(publicClient, web3pgpAddress);
+
+// Initialize Web3Sign
+const web3signAddress = '0x6f81441691340Bcf41b7eC323b6E74645820389E';
+const web3sign = new Web3Sign(publicClient, web3signAddress);
 
 // Search for key events
-const events = await web3pgp.searchKeyEvents('earliest', 'latest');
-console.log(events);
+const keyEvents = await web3pgp.searchKeyEvents('earliest', 'latest');
+console.log('Key events:', keyEvents);
+
+// Search for timestamp events
+const timestampEvents = await web3sign.searchTimestampEvents('earliest', 'latest');
+console.log('Timestamp events:', timestampEvents);
 ```
 
 ### With Web3PGPService (High-Level API)
 
 ```typescript
-import { Web3PGPService, Web3PGP } from '@cryptogram/dexes';
+import { Web3PGPService, Web3PGP, Web3SignService, Web3Sign } from '@cryptogram/dexes';
 import { createPublicClient, http } from 'viem';
+import { sepolia } from 'viem/chains';
 
 const publicClient = createPublicClient({
-  chain: inksepolia,
-  transport: http('https://rpc-gel-sepolia.inkonchain.com'),
+  chain: sepolia,
+  transport: http('https://ethereum-sepolia-rpc.publicnode.com'),
 });
 
-const web3pgp = new Web3PGP(publicClient, contractAddress);
-const service = new Web3PGPService(web3pgp);
+const web3pgp = new Web3PGP(publicClient, '0x82733B49e65A2FE6B611e5CE454AC21237071638');
+const web3pgpService = new Web3PGPService(web3pgp);
 
 // Get a public key by fingerprint
-const publicKey = await service.getPublicKey('0x1234567890abcdef...');
+const publicKey = await web3pgpService.getPublicKey('0x1234567890abcdef...');
 
 // Register a new key
-await service.registerKey(armoredKey, walletClient);
+await web3pgpService.registerKey(armoredKey, walletClient);
 
 // Add a subkey
-await service.addSubkey(fingerprint, armoredSubkey, walletClient);
+await web3pgpService.addSubkey(fingerprint, armoredSubkey, walletClient);
 
 // Revoke a key
-await service.revokeKey(fingerprint, revocationCertificate, walletClient);
+await web3pgpService.revokeKey(fingerprint, revocationCertificate, walletClient);
+
+// Web3Sign for timestamping
+const web3sign = new Web3Sign(publicClient, '0x6f81441691340Bcf41b7eC323b6E74645820389E');
+const web3signService = new Web3SignService(web3sign);
+
+// Create a timestamp
+await web3signService.timestampDocument(documentHash, signature, emitterFingerprint, walletClient);
+
+// Verify a timestamp
+const verification = await web3signService.verifyTimestamp(timestampId, documentHash);
 ```
 
 ## API Reference
 
 ### Web3PGP (Low-Level)
 
-The `Web3PGP` class provides direct access to smart contract methods.
+The `Web3PGP` class provides direct access to Web3PGP smart contract methods.
 
 #### Methods
 
@@ -93,6 +113,17 @@ The `Web3PGP` class provides direct access to smart contract methods.
 - `registerKey(fingerprint, publicKey)`: Register a new key (requires wallet)
 - `addSubkey(fingerprint, subkeyFingerprint, subkey)`: Add a subkey
 - `revokeKey(fingerprint, revocationCertificate)`: Revoke a key
+
+### Web3Sign (Low-Level)
+
+The `Web3Sign` class provides direct access to Web3Sign smart contract methods.
+
+#### Methods
+
+- `searchTimestampEvents(fromBlock, toBlock)`: Search for timestamp-related events
+- `getTimestamp(timestampId)`: Retrieve a timestamp by ID
+- `timestampDocument(documentHash, signature, emitterFingerprint)`: Create a timestamp (requires wallet)
+- `verifyTimestamp(timestampId, documentHash)`: Verify a timestamp against a document hash
 
 ### Web3PGPService (High-Level)
 
@@ -105,6 +136,18 @@ The `Web3PGPService` class provides a higher-level API with OpenPGP integration.
 - `addSubkey(fingerprint, armoredSubkey, walletClient)`: Add an armored subkey
 - `revokeKey(fingerprint, revocationCertificate, walletClient)`: Revoke with certificate
 - `searchKeyEvents(fromBlock, toBlock)`: Search for events with parsed results
+
+### Web3SignService (High-Level)
+
+The `Web3SignService` class provides a higher-level API for document timestamping with cryptographic verification.
+
+#### Methods
+
+- `timestampDocument(documentHash, signature, emitterFingerprint, walletClient)`: Create a timestamp for a document
+- `verifyTimestamp(timestampId, documentHash)`: Verify a timestamp against a document hash
+- `getTimestamp(timestampId)`: Get timestamp details by ID
+- `searchTimestampsByHash(documentHash, fromBlock, toBlock)`: Find all timestamps for a document hash
+- `searchTimestampEvents(fromBlock, toBlock)`: Search for timestamp events with parsed results
 
 ## Environment
 
@@ -121,7 +164,7 @@ Run the test suite:
 # Unit tests
 npm run test:unit
 
-# Integration tests (requires Anvil)
+# Integration tests (connects to Sepolia testnet)
 npm run test:integration
 
 # All tests
