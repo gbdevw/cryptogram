@@ -64,30 +64,37 @@ interface RetryConfig {
 
 ```yaml
 ethereum:
-  chain: ink-sepolia
+  chain: sepolia
   rpc:
     endpoints:
-      - url: https://rpc-gel-sepolia.inkonchain.com
+      - url: https://ethereum-sepolia-rpc.publicnode.com
         priority: 1
         batching:
           size: 20
           waitMs: 100
-      - url: https://rpc-ten-sepolia.inkonchain.com
+      - url: https://sepolia.gateway.tenderly.co
         priority: 2
+        batching:
+          size: 20
+          waitMs: 100
+      - url: https://sepolia.drpc.org
+        priority: 3
+        batching:
+          size: 20
+          waitMs: 100
+      - url: https://1rpc.io/sepolia
+        priority: 4
         batching:
           size: 20
           waitMs: 100
     maxBlockRange: 10000
     retry:
       count: 3
-      delayMs: 500
+      delayMs: 200
   wallet:
     type: private-key
-    privateKey: ${PRIVATE_KEY}
-
 web3pgp:
-  contract: "0x72d02B94317ac899B34459a4e6685eFe12Ac17a8"
-
+  contract: "0xce66927a2E6171056a9c2464CFe83b813215A905"
 monitoring:
   logging:
     level: info
@@ -96,13 +103,13 @@ monitoring:
 ### Environment Variables
 
 ```bash
-export DEXES_CHAIN="ink-sepolia"
+export DEXES_CHAIN="sepolia"
 export DEXES_RPC_ENDPOINTS='[
-  {"url":"https://rpc-gel-sepolia.inkonchain.com","priority":1,"batching":{"size":20,"waitMs":100}},
-  {"url":"https://rpc-ten-sepolia.inkonchain.com","priority":2,"batching":{"size":20,"waitMs":100}}
+  {"url":"https://ethereum-sepolia-rpc.publicnode.com","priority":1,"batching":{"size":20,"waitMs":100}},
+  {"url":"https://sepolia.drpc.org","priority":2,"batching":{"size":20,"waitMs":100}}
 ]'
 export DEXES_WALLET_PRIVATE_KEY="0x..." # pragma: allowlist secret
-export DEXES_WEB3PGP_CONTRACT="0x72d02B94317ac899B34459a4e6685eFe12Ac17a8"
+export DEXES_WEB3PGP_CONTRACT="0xce66927a2E6171056a9c2464CFe83b813215A905"
 export DEXES_LOG_LEVEL="info"
 ```
 
@@ -166,7 +173,7 @@ const transport = fallback(httpTransports, {
 
 // Use with clients
 const publicClient = createPublicClient({
-  chain: inkSepolia,
+  chain: sepolia,
   transport,
 });
 ```

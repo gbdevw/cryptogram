@@ -21,9 +21,11 @@ export function createRegisterCommand(deps: RegisterDeps): Command {
   return new Command('register')
     .description('Register a public key on the blockchain')
     .option('--key <path>', 'Path to PGP public key file (armored or binary)')
-    .action(async (options: { key?: string }) => {
+    .option('--insecure', 'Disable public key verification and allow registering expired and revoked keys')
+    .action(async (options: { key?: string; insecure?: boolean }) => {
       try {
         let keyData: Buffer | string;
+        const insecure = options.insecure || false;
 
         // Determine source and read input
         if (options.key) {
@@ -42,7 +44,11 @@ export function createRegisterCommand(deps: RegisterDeps): Command {
 
         cmdLogger.debug({ fingerprint: publicKey.getFingerprint() }, 'Key parsed successfully');
 
-        const result = await service.register(publicKey);
+        if (insecure) {
+          cmdLogger.warn('Insecure mode enabled - public key verification disabled');
+        }
+
+        const result = await service.register(publicKey, insecure);
 
         cmdLogger.info(
           {

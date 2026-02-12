@@ -15,11 +15,19 @@ export function createGetPublicKeyCommand(deps: GetPublicKeyDeps): Command {
   return new Command('get')
     .description('Retrieve a public key from the blockchain by fingerprint')
     .argument('<fingerprint>', 'Key fingerprint')
-    .action(async (fingerprintArg: string) => {
+    .option('--insecure', 'Disable public key verification when retrieving keys')
+    .action(async (fingerprintArg: string, options: { insecure?: boolean }) => {
       try {
         const fp = fingerprintArg.replaceAll(/\s/g, '');
-        cmdLogger.info({ fingerprint: fp }, 'Retrieving public key');
-        const publicKey = await service.getPublicKey(to0x(fp));
+        const insecure = options.insecure || false;
+        
+        cmdLogger.info({ fingerprint: fp, insecure }, 'Retrieving public key');
+        
+        if (insecure) {
+          cmdLogger.warn('Insecure mode enabled - public key verification disabled');
+        }
+        
+        const publicKey = await service.getPublicKey(to0x(fp), insecure);
 
         if (!publicKey) {
           throw new Error(`No key found for fingerprint: ${fp}`);

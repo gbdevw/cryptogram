@@ -18,6 +18,6 @@ export const TESTNET_CONFIG: MergedConfig = {
     },
     wallet: { type: WalletType.PrivateKey },
   },
-  web3pgp: { contract: '0xce66927a2E6171056a9c2464CFe83b813215A905' as const },
+  web3pgp: { contract: '0x82733B49e65A2FE6B611e5CE454AC21237071638' as const },
   monitoring: { logging: { level: 'info' } },
 };

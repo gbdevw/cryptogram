@@ -14,22 +14,28 @@ Configuration follows a 3-tier precedence (lowest to highest):
 
 > **Note**: For detailed information about RPC configuration, transport layers, and batching/retry strategies, see [TRANSPORT.md](TRANSPORT.md).
 
+You can generate a template configuration file using:
+```bash
+web3pgp configuration generate test  # For testnet (Sepolia)
+web3pgp configuration generate prod  # For production (Ink mainnet)
+```
+
 ---
 
 ## Configuration Table
 
 | Configuration Key | Description | Default Value | Environment Variable |
 |---|---|---|---|
-| `ethereum.chain` | Blockchain network to connect to. Supports well-known Viem chains (`mainnet`, `sepolia`, `anvil`, `ink-sepolia`) or custom numeric chain IDs. | `ink-sepolia` | `DEXES_CHAIN` |
-| `ethereum.rpc.endpoints[]` | Array of RPC endpoints for blockchain communication with fallback support. Each endpoint has URL, priority, and optional batching config. | 4 Ink Sepolia endpoints (priorities 1-4) | `DEXES_RPC_ENDPOINTS` (JSON array) |
-| `ethereum.rpc.endpoints[].url` | RPC endpoint URL. | `https://rpc-gel-sepolia.inkonchain.com`, `https://rpc-ten-sepolia.inkonchain.com`, `https://rpc-qnd-sepolia.inkonchain.com`, `https://ink-sepolia.drpc.org` | Set via `DEXES_RPC_ENDPOINTS` |
+| `ethereum.chain` | Blockchain network to connect to. Supports well-known Viem chains (`mainnet`, `sepolia`, `anvil`, `ink`) or custom numeric chain IDs. | `sepolia` | `DEXES_CHAIN` |
+| `ethereum.rpc.endpoints[]` | Array of RPC endpoints for blockchain communication with fallback support. Each endpoint has URL, priority, and optional batching config. | 4 Sepolia endpoints (priorities 1-4) | `DEXES_RPC_ENDPOINTS` (JSON array) or `DEXES_RPC_URL` (single endpoint) |
+| `ethereum.rpc.endpoints[].url` | RPC endpoint URL. | `https://ethereum-sepolia-rpc.publicnode.com` ; `https://sepolia.gateway.tenderly.co` ; `https://sepolia.drpc.org` ;  `https://1rpc.io/sepolia` | Set via `DEXES_RPC_ENDPOINTS` JSON or `DEXES_RPC_URL` |
 | `ethereum.rpc.endpoints[].priority` | Priority order for RPC endpoints. Lower number = higher priority. Used for fallback when endpoints fail. | `1, 2, 3, 4` | Set via `DEXES_RPC_ENDPOINTS` JSON |
 | `ethereum.rpc.endpoints[].batching` | Optional batching configuration for RPC requests (size and wait time). | `{ size: 20, waitMs: 100 }` | Set via `DEXES_RPC_ENDPOINTS` JSON |
 | `ethereum.rpc.maxBlockRange` | Maximum block range for `eth_getLogs` queries to avoid provider limits. | `10000` | N/A |
 | `ethereum.rpc.retry` | Retry configuration for failed RPC requests (count and delay with exponential backoff). | `{ count: 3, delayMs: 200 }` | N/A |
 | `ethereum.wallet.type` | Wallet type for signing transactions. Currently supports `private-key` for private key-based signing. | `private-key` | N/A (automatic) |
 | `ethereum.wallet.privateKey` | Private key for wallet signing (0x-prefixed 32-byte hex). **SECRET** - Do not commit to version control. | Not set | `DEXES_WALLET_PRIVATE_KEY` |
-| `web3pgp.contract` | Smart contract address for Web3PGP operations. Ethereum address format (0x-prefixed 40 hex characters). | `0x72d02B94317ac899B34459a4e6685eFe12Ac17a8` | `DEXES_WEB3PGP_CONTRACT` |
+| `web3pgp.contract` | Smart contract address for Web3PGP operations. Ethereum address format (0x-prefixed 40 hex characters). | `0x82733B49e65A2FE6B611e5CE454AC21237071638` | `DEXES_WEB3PGP_CONTRACT` |
 | `monitoring.logging.level` | Logging level for CLI output. Valid values: `debug`, `info`, `warn`, `error`. | `info` | `DEXES_LOG_LEVEL` |
 
 ---
@@ -41,8 +47,10 @@ Configuration follows a 3-tier precedence (lowest to highest):
 Set individual configuration via environment variables:
 
 ```bash
-# Set blockchain network and RPC endpoint
+# Set blockchain network
 export DEXES_CHAIN=sepolia
+
+# Set single RPC endpoint (creates endpoint with priority 1)
 export DEXES_RPC_URL=https://sepolia.infura.io/v3/YOUR_API_KEY
 
 # Set wallet private key
@@ -57,7 +65,7 @@ web3pgp get 0x1234...
 
 ### Multiple RPC Endpoints with Batching
 
-Configure multiple RPC endpoints with fallback and batching using JSON:
+Configure multiple RPC endpoints with fallback and batching using the `DEXES_RPC_ENDPOINTS` environment variable (JSON array of endpoint objects):
 
 ```bash
 export DEXES_RPC_ENDPOINTS='[
@@ -75,23 +83,25 @@ Create `~/.web3pgp/config.yaml`:
 
 ```yaml
 ethereum:
-  chain: ink-sepolia
+  chain: sepolia
   rpc:
     endpoints:
+      - url: https://ethereum-sepolia-rpc.publicnode.com
+        priority: 1
         batching:
           size: 20
           waitMs: 100
-      - url: https://rpc-ten-sepolia.inkonchain.com
+      - url: https://sepolia.gateway.tenderly.co
         priority: 2
         batching:
           size: 20
           waitMs: 100
-      - url: https://rpc-qnd-sepolia.inkonchain.com
+      - url: https://sepolia.drpc.org
         priority: 3
         batching:
           size: 20
           waitMs: 100
-      - url: https://ink-sepolia.drpc.org
+      - url: https://1rpc.io/sepolia
         priority: 4
         batching:
           size: 20
@@ -102,12 +112,10 @@ ethereum:
       delayMs: 200
   wallet:
     type: private-key
-    privateKey: "0x..." # pragma: allowlist secrete-key
     privateKey: "0x..." # pragma: allowlist secret
-  gasLimit: null
 
 web3pgp:
-  contract: "0x72d02B94317ac899B34459a4e6685eFe12Ac17a8"
+  contract: "0x82733B49e65A2FE6B611e5CE454AC21237071638"
 
 monitoring:
   logging:
@@ -118,6 +126,21 @@ monitoring:
 
 ```bash
 web3pgp --config /path/to/custom/config.yaml get 0x1234...
+```
+
+### Generating Configuration Templates
+
+Use the built-in configuration generator to create template files:
+
+```bash
+# Generate testnet configuration template
+web3pgp configuration generate test
+
+# Generate production configuration template
+web3pgp configuration generate prod
+
+# Save to file
+web3pgp configuration generate test -o ~/.web3pgp/config.yaml
 ```
 
 ---RPC Configuration
@@ -156,9 +179,9 @@ DEXES_LOG_LEVEL=debug web3pgp get --help
 ### Well-Known Chains
 
 - `mainnet` - Ethereum Mainnet
-- `sepolia` - Sepolia Testnet
+- `sepolia` - Sepolia Testnet (default)
 - `anvil` - Local Anvil/Hardhat Node
-- `ink-sepolia` - Ink Sepolia Testnet (default)
+- `ink` - Ink Mainnet
 
 ### Custom Chain IDs
 

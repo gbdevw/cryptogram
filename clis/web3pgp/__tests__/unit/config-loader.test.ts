@@ -24,7 +24,7 @@ describe('Configuration Loader', () => {
       // Pass empty env vars to prevent DEXES_LOG_LEVEL override from process.env
       const config = loadConfig({ configPath: '/nonexistent/path', envVars: {} });
       expect(config.ethereum.chain).toBe('sepolia');
-      expect(config.web3pgp.contract).toBe('0xce66927a2E6171056a9c2464CFe83b813215A905');
+      expect(config.web3pgp.contract).toBe('0x82733B49e65A2FE6B611e5CE454AC21237071638');
       expect(config.monitoring.logging.level).toBe('info');
     });
 

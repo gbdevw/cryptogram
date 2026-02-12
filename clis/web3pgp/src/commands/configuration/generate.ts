@@ -77,7 +77,7 @@ ethereum:
 
 web3pgp:
   # Web3PGP smart contract address (test deployment on Sepolia)
-  contract: "0xce66927a2E6171056a9c2464CFe83b813215A905"
+  contract: "0x82733B49e65A2FE6B611e5CE454AC21237071638"
 
 monitoring:
   logging:
