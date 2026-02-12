@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode, useEffect, useState } from 'react'
-import { usePublicClient, useWalletClient } from 'wagmi'
+import { usePublicClient, useWalletClient, useChainId } from 'wagmi'
 import { web3pgpServiceManager } from '../services/web3pgpService'
 
 interface Web3PGPContextType {
@@ -24,8 +24,11 @@ export const Web3PGPProvider = ({ children }: { children: ReactNode }) => {
   // Get public client from WAGMI
   const publicClient = usePublicClient()
 
-  // Get wallet client from WAGMI (automatically updates when wallet connects/disconnects)
+  // Get wallet client from WAGMI (automatically updates when wallet connects/disconnects or chain switches)
   const { data: walletClient } = useWalletClient()
+
+  // Get chain ID to detect network switches
+  const chainId = useChainId()
 
   // Initialize service on mount with public client
   useEffect(() => {
@@ -60,21 +63,25 @@ export const Web3PGPProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [publicClient])
 
-  // Re-initialize service when public client changes (network switch)
+  // Handle network switches by reinitializing the service
   useEffect(() => {
-    if (isInitialized && publicClient) {
-      try {
-        console.log('Web3PGPProvider: Network changed, updating contract address')
-        // Update the contract address to match the new network
-        web3pgpServiceManager.setContractAddress(publicClient)
-        console.log('Web3PGPProvider: Contract address updated for new network')
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error('Unknown error')
-        setError(error)
-        console.error('Web3PGPProvider: Failed to update contract address for new network:', error)
+    if (isInitialized && publicClient && chainId) {
+      const handleNetworkSwitch = async () => {
+        try {
+          console.log(`Web3PGPProvider: Network switch detected (chain ID: ${chainId}), reinitializing service`)
+          // Reinitialize the service to ensure clean state on new chain
+          await web3pgpServiceManager.initialize(publicClient as any)
+          console.log('Web3PGPProvider: Service reinitialized for new network')
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error('Unknown error')
+          setError(error)
+          console.error('Web3PGPProvider: Failed to reinitialize service for new network:', error)
+        }
       }
+
+      handleNetworkSwitch()
     }
-  }, [publicClient, isInitialized])
+  }, [chainId, publicClient, isInitialized])
 
   // Update wallet client whenever it changes (user connects/disconnects wallet or switches chain)
   useEffect(() => {

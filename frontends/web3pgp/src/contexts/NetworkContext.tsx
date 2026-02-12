@@ -21,7 +21,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     setIsClient(true)
     // Load from localStorage if available
     const saved = localStorage.getItem('web3pgp-chain')
-    if (saved && (saved === 'sepolia' || saved === 'scrollSepolia')) {
+    if (saved && (saved === 'sepolia' || saved === 'scroll')) {
       setCurrentChain(saved as SupportedChain)
     }
   }, [])
@@ -31,8 +31,8 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     if (chainId && isClient) {
       if (chainId === 11155111) {
         setCurrentChain('sepolia')
-      } else if (chainId === 534351) {
-        setCurrentChain('scrollSepolia')
+      } else if (chainId === 534352) {
+        setCurrentChain('scroll')
       }
     }
   }, [chainId, isClient])

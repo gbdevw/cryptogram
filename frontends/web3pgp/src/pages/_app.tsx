@@ -10,6 +10,7 @@ import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 
 import { config } from '../wagmi';
 import { Web3PGPProvider } from '../contexts/Web3PGPContext';
+import { initializeProductionMode } from '../utils/productionMode';
 
 import { Layout } from '../components/Layout';
 import FindPage from './find';
@@ -47,6 +48,8 @@ function MyApp({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     setIsClient(true);
+    // Initialize production mode settings (disables dev tools, console logging)
+    initializeProductionMode();
   }, []);
 
   if (!isClient) {
