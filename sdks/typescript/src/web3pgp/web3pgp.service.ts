@@ -157,10 +157,12 @@ export class Web3PGPService implements IWeb3PGPService {
      * console.log(`Key registered at block ${receipt.blockNumber}`);
      * ```
      */
-    public async register(key: openpgp.PublicKey): Promise<TransactionReceipt> {
+    public async register(key: openpgp.PublicKey, insecure?: boolean): Promise<TransactionReceipt> {
         try {
             // Verify the key and its subkeys
-            await OpenPGPUtils.verifyKey(key, new Date());
+            if (!insecure) {
+                await OpenPGPUtils.verifyKey(key, new Date());
+            }
             // Publish the key and its subkeys on-chain
             return this.web3pgp.register(
                 toBytes32(to0x(key.getFingerprint())),
@@ -207,7 +209,7 @@ export class Web3PGPService implements IWeb3PGPService {
             // Remove extra subkey
             const pk = await OpenPGPUtils.sanitizePrimaryKey(key);
             // Verify the key
-            await OpenPGPUtils.verifyKey(key, new Date());
+            await OpenPGPUtils.verifyKey(pk, new Date());
             // Publish the updated key
             return this.web3pgp.update(
                 toBytes32(to0x(pk.getFingerprint())),
@@ -255,13 +257,12 @@ export class Web3PGPService implements IWeb3PGPService {
             // Sanitize the key to only include the primary key and the specified subkey
             const pk = await OpenPGPUtils.sanitizeSubkey(key, subkeyFingerprint);
             const sk = pk.getSubkeys()[0];
-            const now = new Date();
             // Verify the sanitized key
-            await OpenPGPUtils.verifyKey(pk,      );
+            await OpenPGPUtils.verifyKey(pk);
             // Publish the sanitized key
             return this.web3pgp.addSubkey(
                 toBytes32(to0x(pk.getFingerprint())),
-                toBytes32(to0x(subkeyFingerprint)),
+                toBytes32(to0x(sk.getFingerprint())),
                 toHex(pk.toPublic().write())
             );
         } catch (err) {

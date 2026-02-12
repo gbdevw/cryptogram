@@ -28,13 +28,14 @@ export interface IWeb3PGPService {
      * 
      * @description
      * This method:
-     * 1. Verifies the provided public key and subkeys have a valid signature, are not expired and not revoked.
+     * 1. (If not insecure) Verifies the provided public key and subkeys have a valid signature, are not expired and not revoked.
      * 2. Extracts the primary key fingerprint and subkey fingerprints
      * 3. Ensures the key and its subkeys are not registered on-chain (enforced by smart contract).
      * 4. Serializes the key into the OpenPGP binary format.
      * 5. Registers the key on-chain via the Web3PGP contract
      * 
      * @param key The OpenPGP public key to register (may include subkeys)
+     * @param insecure If true, skips cryptographic verifications of the key and subkeys. Defaults to false.
      * @returns Transaction receipt after successful registration
      * 
      * @throws Error if the key or one of its subkeys are invalid
@@ -50,7 +51,7 @@ export interface IWeb3PGPService {
      * console.log(`Key registered at block ${receipt.blockNumber}`);
      * ```
      */
-    register(key: openpgp.PublicKey): Promise<TransactionReceipt>;
+    register(key: openpgp.PublicKey, insecure?: boolean): Promise<TransactionReceipt>;
 
     /**
      * Update an existing OpenPGP public key on the blockchain to add or revoke user ID packets,
