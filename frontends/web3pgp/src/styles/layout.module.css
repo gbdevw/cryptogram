@@ -48,7 +48,8 @@
   width: 100%;
   gap: 2rem;
   padding: 2rem;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Left Sidebar */
@@ -121,7 +122,8 @@
   padding: 2rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   min-height: 400px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
